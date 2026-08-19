@@ -127,7 +127,7 @@ export default function MemberEnrollmentModal() {
                 <input value={memberForm.preferredName} onChange={(event) => setMemberForm((current) => ({ ...current, preferredName: event.target.value }))} />
               </label>
               <label>
-                Last Name
+                Surname
                 <input value={memberForm.lastName} onChange={(event) => setMemberForm((current) => ({ ...current, lastName: event.target.value }))} />
               </label>
               <label>
@@ -142,8 +142,15 @@ export default function MemberEnrollmentModal() {
                 </select>
               </label>
               <label>
-                Phone
+                Primary Mobile
                 <input value={memberForm.phone} onChange={(event) => setMemberForm((current) => ({ ...current, phone: event.target.value }))} />
+              </label>
+              <label>
+                Residential Area
+                <input
+                  value={memberForm.residentialArea}
+                  onChange={(event) => setMemberForm((current) => ({ ...current, residentialArea: event.target.value }))}
+                />
               </label>
               <label>
                 Email
@@ -317,7 +324,7 @@ export default function MemberEnrollmentModal() {
               <div>
                 <p className="section-label">Section 3</p>
                 <h3>Group Path</h3>
-                <p>Choose the parent structure before moving deeper.</p>
+                <p>Choose each parent group and the next level will keep opening as deep as your hierarchy goes.</p>
               </div>
             </div>
 
@@ -342,7 +349,7 @@ export default function MemberEnrollmentModal() {
 
                 return (
                   <label key={groupId}>
-                    {`Child Group ${index + 1}`}
+                      {`Next Group Level ${index + 2}`}
                     <select value={selectedChain[index + 1] || ""} onChange={(event) => handleMemberGroupChange(index + 1, event.target.value)}>
                       <option value="">Select child group</option>
                       {childGroups.map((group) => (

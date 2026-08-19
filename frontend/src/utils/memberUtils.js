@@ -12,21 +12,21 @@ const reciprocalMap = {
 export function generateNextMemberId(members) {
   const nextNumber =
     members.reduce((maxValue, member) => {
-      const numericPart = Number(String(member.memberId || "").replace("MB", ""));
+      const numericPart = Number(String(member.memberId || "").replace("M", ""));
       return Number.isNaN(numericPart) ? maxValue : Math.max(maxValue, numericPart);
     }, 0) + 1;
 
-  return `MB${String(nextNumber).padStart(4, "0")}`;
+  return `M${String(nextNumber).padStart(6, "0")}`;
 }
 
 export function generateNextFamilyId(families) {
   const nextNumber =
     families.reduce((maxValue, family) => {
-      const numericPart = Number(String(family.familyId || "").replace("FH", ""));
+      const numericPart = Number(String(family.familyId || "").replace("HH", ""));
       return Number.isNaN(numericPart) ? maxValue : Math.max(maxValue, numericPart);
     }, 0) + 1;
 
-  return `FH${String(nextNumber).padStart(4, "0")}`;
+  return `HH${String(nextNumber).padStart(6, "0")}`;
 }
 
 export function getReciprocalRelationship(relationship, member = null) {

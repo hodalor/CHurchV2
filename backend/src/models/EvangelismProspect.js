@@ -38,6 +38,10 @@ const evangelismProspectSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    gender: {
+      type: String,
+      trim: true,
+    },
     phone: {
       type: String,
       trim: true,
@@ -61,6 +65,10 @@ const evangelismProspectSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    assignedEvangelistMemberId: {
+      type: String,
+      trim: true,
+    },
     currentStage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "LookupValue",
@@ -75,6 +83,30 @@ const evangelismProspectSchema = new mongoose.Schema(
     sourceVisitorId: {
       type: String,
       trim: true,
+    },
+    dateFirstContact: {
+      type: Date,
+    },
+    nextFollowUpDate: {
+      type: Date,
+    },
+    baptismDate: {
+      type: Date,
+    },
+    convertedMemberId: {
+      type: String,
+      trim: true,
+    },
+    notesSummary: {
+      type: String,
+      trim: true,
+    },
+    dataEntryClerk: {
+      type: String,
+      trim: true,
+    },
+    dateCaptured: {
+      type: Date,
     },
   },
   {

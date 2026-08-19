@@ -7,7 +7,7 @@ export default function FamilyRecordFields({
   groups,
   onChange,
 }) {
-  const previewMembers = [
+  const householdSelections = [
     draft.headOfHousehold?.memberId
       ? { ...draft.headOfHousehold, relationshipToHead: "Head" }
       : null,
@@ -25,6 +25,8 @@ export default function FamilyRecordFields({
     ...(draft.dependants || []).map((item) => item.memberId),
   ].filter(Boolean);
 
+  const primaryContactOptions = householdSelections.filter((item) => item.memberId);
+
   return (
     <div className="modal-form">
       <div className="form-grid">
@@ -33,11 +35,38 @@ export default function FamilyRecordFields({
           <input value={draft.familyId || ""} readOnly />
         </label>
         <label>
-          Family Name
+          Household Name
           <input
             value={draft.familyName || ""}
             readOnly={!isEditing}
             onChange={(event) => onChange("familyName", event.target.value)}
+          />
+        </label>
+        <label>
+          Primary Contact Member ID
+          <select
+            value={draft.primaryContactMemberId || ""}
+            disabled={!isEditing}
+            onChange={(event) => {
+              const selected = primaryContactOptions.find((item) => item.memberId === event.target.value);
+              onChange("primaryContactMemberId", event.target.value);
+              onChange("primaryContactNumber", selected?.phone || draft.primaryContactNumber || "");
+            }}
+          >
+            <option value="">Select household member</option>
+            {primaryContactOptions.map((item) => (
+              <option key={item.memberId} value={item.memberId}>
+                {item.memberId} - {item.memberName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Primary Contact Number
+          <input
+            value={draft.primaryContactNumber || ""}
+            readOnly={!isEditing}
+            onChange={(event) => onChange("primaryContactNumber", event.target.value)}
           />
         </label>
         <label>
@@ -71,6 +100,15 @@ export default function FamilyRecordFields({
             onChange={(event) => onChange("familyContact", event.target.value)}
           />
         </label>
+        <label>
+          Date Last Visited
+          <input
+            type="date"
+            value={draft.dateLastVisited || ""}
+            readOnly={!isEditing}
+            onChange={(event) => onChange("dateLastVisited", event.target.value)}
+          />
+        </label>
         <label className="full-width">
           Physical Address
           <input
@@ -78,6 +116,22 @@ export default function FamilyRecordFields({
             readOnly={!isEditing}
             onChange={(event) => onChange("physicalAddress", event.target.value)}
           />
+        </label>
+        <label>
+          Source Record Ref
+          <input
+            value={draft.sourceRecordRef || ""}
+            readOnly={!isEditing}
+            onChange={(event) => onChange("sourceRecordRef", event.target.value)}
+          />
+        </label>
+        <label>
+          Data Entry Clerk
+          <input value={draft.dataEntryClerk || ""} readOnly />
+        </label>
+        <label>
+          Date Captured
+          <input type="date" value={draft.dateCaptured || ""} readOnly />
         </label>
       </div>
 
@@ -93,6 +147,9 @@ export default function FamilyRecordFields({
           <MemberLookupField
             label="Head of Household"
             placeholder="Search head of household"
+            compact
+            addLabel="Add Head"
+            roleLabel="Head"
             members={members}
             selected={draft.headOfHousehold}
             onSelect={(value) => onChange("headOfHousehold", value)}
@@ -104,6 +161,9 @@ export default function FamilyRecordFields({
           <MemberLookupField
             label="Spouse"
             placeholder="Search spouse"
+            compact
+            addLabel="Add Spouse"
+            roleLabel="Spouse"
             members={members}
             selected={draft.spouse}
             onSelect={(value) => onChange("spouse", value)}
@@ -115,6 +175,9 @@ export default function FamilyRecordFields({
           <MemberLookupField
             label="Children"
             placeholder="Search child member"
+            compact
+            addLabel="Add Child"
+            roleLabel={(item) => item.relationshipToHead || "Child"}
             members={members}
             selected={draft.children || []}
             multiple
@@ -132,6 +195,9 @@ export default function FamilyRecordFields({
           <MemberLookupField
             label="Dependents"
             placeholder="Search dependant"
+            compact
+            addLabel="Add Dependent"
+            roleLabel="Dependent"
             members={members}
             selected={draft.dependants || []}
             multiple
@@ -158,7 +224,7 @@ export default function FamilyRecordFields({
         />
       </label>
 
-      {previewMembers.length ? (
+      {householdSelections.length ? (
         <div className="subsection-card">
           <div className="section-headline">
             <div>
@@ -167,10 +233,12 @@ export default function FamilyRecordFields({
             </div>
           </div>
           <div className="simple-list">
-            {previewMembers.map((member) => (
+            {householdSelections.map((member) => (
               <div className="simple-list-item" key={`${member.memberId}-${member.relationshipToHead}`}>
                 <div>
                   <strong>{member.memberName}</strong>
+                  <p>{member.memberId}</p>
+                  <p>{member.gender || "-"} {member.phone ? `| ${member.phone}` : ""}</p>
                   <p>{member.relationshipToHead}</p>
                 </div>
                 <span className="status-pill active">Selected</span>

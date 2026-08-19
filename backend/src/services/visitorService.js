@@ -54,6 +54,7 @@ async function createVisitor(payload) {
     visitorId,
     firstName: payload.firstName,
     surname: payload.surname,
+    gender: payload.gender || "",
     phone: payload.phone || "",
     email: payload.email || "",
     residentialArea: payload.residentialArea || "",
@@ -63,6 +64,7 @@ async function createVisitor(payload) {
     visitDates,
     status: status?._id || null,
     assignedFollowUpUserId: payload.assignedFollowUpUserId || null,
+    assignedFollowUpMemberId: payload.assignedFollowUpMemberId || "",
     visitationHistory: [],
     convertedToProspectId: "",
     convertedToMemberId: "",
@@ -92,8 +94,9 @@ async function addChurchVisit(visitor, payload) {
   return visitor;
 }
 
-async function assignVisitorFollowUp(visitor, assignedUserId) {
+async function assignVisitorFollowUp(visitor, assignedUserId, assignedMemberId = "") {
   visitor.assignedFollowUpUserId = assignedUserId;
+  visitor.assignedFollowUpMemberId = assignedMemberId || visitor.assignedFollowUpMemberId;
   await visitor.save();
 
   await createPendingAction({

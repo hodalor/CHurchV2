@@ -21,9 +21,20 @@ async function generateNextProspectId() {
   return `EP${String(nextNumber).padStart(4, "0")}`;
 }
 
+async function generateNextBibleStudyId() {
+  const studies = await BibleStudy.find({}, { bibleStudyId: 1 }).lean();
+  const nextNumber =
+    studies.reduce((maxValue, item) => {
+      const numericPart = Number(String(item.bibleStudyId || "").replace("B", ""));
+      return Number.isNaN(numericPart) ? maxValue : Math.max(maxValue, numericPart);
+    }, 0) + 1;
+
+  return `B${String(nextNumber).padStart(7, "0")}`;
+}
+
 async function createProspect(payload, user = null) {
-  if (!payload.firstName || !payload.surname) {
-    throw new Error("First name and surname are required.");
+  if (!payload.firstName || !payload.surname || !payload.gender || !payload.phone || !payload.residentialArea) {
+    throw new Error("First name, surname, gender, primary mobile, and residential area are required.");
   }
 
   const contactStage = await getLookupValueByTypeAndKey("evangelism_pipeline_stage", "contact");
@@ -32,14 +43,23 @@ async function createProspect(payload, user = null) {
     prospectId: payload.prospectId || (await generateNextProspectId()),
     firstName: payload.firstName,
     surname: payload.surname,
+    gender: payload.gender || "",
     phone: payload.phone || "",
     email: payload.email || "",
     residentialArea: payload.residentialArea || "",
     source: payload.source || null,
     assignedEvangelistId: payload.assignedEvangelistId || null,
+    assignedEvangelistMemberId: payload.assignedEvangelistMemberId || "",
     currentStage: stageId,
     campaignId: payload.campaignId || null,
     sourceVisitorId: payload.sourceVisitorId || "",
+    dateFirstContact: payload.dateFirstContact ? new Date(payload.dateFirstContact) : new Date(),
+    nextFollowUpDate: payload.nextFollowUpDate ? new Date(payload.nextFollowUpDate) : null,
+    baptismDate: payload.baptismDate ? new Date(payload.baptismDate) : null,
+    convertedMemberId: payload.convertedMemberId || "",
+    notesSummary: payload.notesSummary || "",
+    dataEntryClerk: payload.dataEntryClerk || user?.displayName || user?.username || "",
+    dateCaptured: payload.dateCaptured ? new Date(payload.dateCaptured) : new Date(),
     stageHistory: stageId
       ? [{ stage: stageId, date: new Date(), changedBy: user?._id || null }]
       : [],
@@ -64,9 +84,12 @@ async function createProspectFromVisitor(visitor, user = null) {
       phone: visitor.phone || "",
       email: visitor.email || "",
       residentialArea: visitor.residentialArea || "",
+      gender: visitor.gender || "",
       source: visitor.howHeard || null,
       assignedEvangelistId: visitor.assignedFollowUpUserId || null,
+      assignedEvangelistMemberId: visitor.assignedFollowUpMemberId || "",
       sourceVisitorId: visitor.visitorId,
+      dateFirstContact: visitor.firstVisitDate || new Date(),
     },
     user
   );
@@ -80,28 +103,42 @@ async function updateProspect(prospect, payload) {
   prospect.phone = payload.phone ?? prospect.phone;
   prospect.email = payload.email ?? prospect.email;
   prospect.residentialArea = payload.residentialArea ?? prospect.residentialArea;
+  prospect.gender = payload.gender ?? prospect.gender;
   prospect.source = payload.source ?? prospect.source;
   prospect.assignedEvangelistId = payload.assignedEvangelistId ?? prospect.assignedEvangelistId;
+  prospect.assignedEvangelistMemberId = payload.assignedEvangelistMemberId ?? prospect.assignedEvangelistMemberId;
   prospect.campaignId = payload.campaignId ?? prospect.campaignId;
+  prospect.currentStage = payload.currentStage ?? prospect.currentStage;
+  prospect.dateFirstContact = payload.dateFirstContact ? new Date(payload.dateFirstContact) : prospect.dateFirstContact;
+  prospect.nextFollowUpDate = payload.nextFollowUpDate ? new Date(payload.nextFollowUpDate) : prospect.nextFollowUpDate;
+  prospect.baptismDate = payload.baptismDate ? new Date(payload.baptismDate) : prospect.baptismDate;
+  prospect.convertedMemberId = payload.convertedMemberId ?? prospect.convertedMemberId;
+  prospect.notesSummary = payload.notesSummary ?? prospect.notesSummary;
+  prospect.dataEntryClerk = payload.dataEntryClerk ?? prospect.dataEntryClerk;
+  prospect.dateCaptured = payload.dateCaptured ? new Date(payload.dateCaptured) : prospect.dateCaptured;
   await prospect.save();
 
   return populateProspectById(prospect._id);
 }
 
-async function assignProspect(prospect, assignedUserId) {
-  if (!assignedUserId) {
-    throw new Error("Assigned user is required.");
+async function assignProspect(prospect, assignedUserId, assignedMemberId = "") {
+  if (!assignedUserId && !assignedMemberId) {
+    throw new Error("Assigned evangelist member or user is required.");
   }
 
-  await validateAssignmentUser(assignedUserId);
-  prospect.assignedEvangelistId = assignedUserId;
+  if (assignedUserId) {
+    await validateAssignmentUser(assignedUserId);
+  }
+
+  prospect.assignedEvangelistId = assignedUserId || null;
+  prospect.assignedEvangelistMemberId = assignedMemberId || prospect.assignedEvangelistMemberId;
   await prospect.save();
 
   await createPendingAction({
     subjectType: "Prospect",
     subjectId: prospect.prospectId,
     reason: "Prospect follow-up assigned",
-    assignedUser: assignedUserId,
+    assignedUser: assignedUserId || null,
     dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
     status: "Open",
     sourceModule: "Evangelism",
@@ -145,6 +182,8 @@ async function logProspectContact(prospect, payload, user) {
   });
 
   if (contact.nextFollowUpDate) {
+    prospect.nextFollowUpDate = contact.nextFollowUpDate;
+    await prospect.save();
     await createPendingAction({
       subjectType: "Prospect",
       subjectId: prospect.prospectId,
@@ -168,8 +207,8 @@ async function logProspectContact(prospect, payload, user) {
 }
 
 async function createBibleStudy(payload) {
-  if (!payload.teacherId) {
-    throw new Error("Teacher is required.");
+  if (!payload.teacherId && !payload.teacherMemberId) {
+    throw new Error("Teacher or evangelist member is required.");
   }
 
   if (!payload.prospect && !payload.member) {
@@ -184,14 +223,24 @@ async function createBibleStudy(payload) {
     throw new Error("Selected member was not found.");
   }
 
-  await validateAssignmentUser(payload.teacherId);
+  if (payload.teacherId) {
+    await validateAssignmentUser(payload.teacherId);
+  }
   const inProgressStatus = await getLookupValueByTypeAndKey("bible_study_status", "in_progress");
   const study = await BibleStudy.create({
+    bibleStudyId: payload.bibleStudyId || (await generateNextBibleStudyId()),
     prospect: payload.prospect || null,
     member: payload.member || null,
-    teacherId: payload.teacherId,
+    teacherId: payload.teacherId || null,
+    teacherMemberId: payload.teacherMemberId || "",
+    studyType: payload.studyType || "",
     startDate: payload.startDate ? new Date(payload.startDate) : new Date(),
+    lastSessionDate: payload.lastSessionDate ? new Date(payload.lastSessionDate) : null,
     status: payload.status || inProgressStatus?._id || null,
+    nextSessionDate: payload.nextSessionDate ? new Date(payload.nextSessionDate) : null,
+    outcome: payload.outcome || "",
+    dataEntryClerk: payload.dataEntryClerk || "",
+    dateCaptured: payload.dateCaptured ? new Date(payload.dateCaptured) : new Date(),
     lessonsCompleted: [],
   });
 
@@ -216,6 +265,18 @@ async function addBibleStudyLesson(study, payload) {
     study.status = payload.status;
   }
 
+  if (payload.completedAt) {
+    study.lastSessionDate = new Date(payload.completedAt);
+  }
+
+  if (payload.nextSessionDate) {
+    study.nextSessionDate = new Date(payload.nextSessionDate);
+  }
+
+  if (payload.outcome) {
+    study.outcome = payload.outcome;
+  }
+
   await study.save();
   return populateBibleStudyById(study._id);
 }
@@ -234,12 +295,40 @@ async function updateBibleStudy(study, payload) {
     study.teacherId = payload.teacherId;
   }
 
+  if (payload.teacherMemberId !== undefined) {
+    study.teacherMemberId = payload.teacherMemberId;
+  }
+
+  if (payload.studyType !== undefined) {
+    study.studyType = payload.studyType;
+  }
+
   if (payload.startDate) {
     study.startDate = new Date(payload.startDate);
   }
 
+  if (payload.lastSessionDate) {
+    study.lastSessionDate = new Date(payload.lastSessionDate);
+  }
+
   if (payload.status) {
     study.status = payload.status;
+  }
+
+  if (payload.nextSessionDate !== undefined) {
+    study.nextSessionDate = payload.nextSessionDate ? new Date(payload.nextSessionDate) : null;
+  }
+
+  if (payload.outcome !== undefined) {
+    study.outcome = payload.outcome;
+  }
+
+  if (payload.dataEntryClerk !== undefined) {
+    study.dataEntryClerk = payload.dataEntryClerk;
+  }
+
+  if (payload.dateCaptured !== undefined) {
+    study.dateCaptured = payload.dateCaptured ? new Date(payload.dateCaptured) : study.dateCaptured;
   }
 
   await study.save();
@@ -299,6 +388,12 @@ async function convertProspectToMember(prospect, payload = {}, user = null) {
   if (discipleshipStage) {
     await moveProspectStage(prospect, discipleshipStage._id, user);
   }
+
+  prospect.convertedMemberId = member.memberId;
+  if (payload.baptismDate) {
+    prospect.baptismDate = new Date(payload.baptismDate);
+  }
+  await prospect.save();
 
   return member;
 }
@@ -414,6 +509,7 @@ module.exports = {
   createProspectFromVisitor,
   convertProspectToMember,
   generateNextProspectId,
+  generateNextBibleStudyId,
   getDashboardMetrics,
   logProspectContact,
   moveProspectStage,

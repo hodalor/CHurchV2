@@ -12,6 +12,7 @@ const {
   createCampaign,
   createProspect,
   convertProspectToMember,
+  generateNextBibleStudyId,
   generateNextProspectId,
   getDashboardMetrics,
   logProspectContact,
@@ -36,6 +37,15 @@ router.get(
   async (req, res) => {
     const prospectId = await generateNextProspectId();
     res.json({ prospectId });
+  }
+);
+
+router.get(
+  "/bible-studies/next-id",
+  authorizePermissions(PERMISSIONS.VIEW_EVANGELISM),
+  async (req, res) => {
+    const bibleStudyId = await generateNextBibleStudyId();
+    res.json({ bibleStudyId });
   }
 );
 
@@ -104,7 +114,15 @@ router.post(
     const previousValue = prospect.toObject();
 
     try {
-      const updatedProspect = await assignProspect(prospect, req.body.assignedUserId);
+      if (!req.body.assignedUserId && !req.body.assignedMemberId) {
+        return res.status(400).json({ message: "Assigned evangelist member or user is required." });
+      }
+
+      const updatedProspect = await assignProspect(
+        prospect,
+        req.body.assignedUserId,
+        req.body.assignedMemberId || ""
+      );
       await logAudit({
         action: "update",
         module: "Evangelism",

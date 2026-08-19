@@ -5,8 +5,13 @@ const router = express.Router();
 
 router.get("/next-id", async (req, res) => {
   try {
-    const totalMembers = await Member.countDocuments();
-    const memberId = `MB${String(totalMembers + 1).padStart(4, "0")}`;
+    const members = await Member.find({}, { memberId: 1 }).lean();
+    const nextNumber =
+      members.reduce((maxValue, item) => {
+        const numericPart = Number(String(item.memberId || "").replace("M", ""));
+        return Number.isNaN(numericPart) ? maxValue : Math.max(maxValue, numericPart);
+      }, 0) + 1;
+    const memberId = `M${String(nextNumber).padStart(6, "0")}`;
     res.json({ memberId });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -53,6 +58,7 @@ router.put("/:memberId", async (req, res) => {
 
 function normalizeMemberPayload(payload = {}) {
   const personalPhoto = normalizePhotoField(payload.personalPhoto);
+  validateRequiredFields(payload);
   const normalized = {
     ...payload,
     ministry: payload.ministry || payload.ministryId || null,
@@ -70,6 +76,23 @@ function normalizeMemberPayload(payload = {}) {
   delete normalized.dateBaptized;
 
   return normalized;
+}
+
+function validateRequiredFields(payload = {}) {
+  const requiredPairs = [
+    ["firstName", "First name"],
+    ["lastName", "Surname"],
+    ["gender", "Gender"],
+    ["phone", "Primary mobile"],
+    ["residentialArea", "Residential area"],
+    ["membershipStatus", "Membership status"],
+  ];
+
+  const missing = requiredPairs.find(([fieldName]) => !String(payload[fieldName] || "").trim());
+
+  if (missing) {
+    throw new Error(`${missing[1]} is required.`);
+  }
 }
 
 function normalizePhotoField(value) {

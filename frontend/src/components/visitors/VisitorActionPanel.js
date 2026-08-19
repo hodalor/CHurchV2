@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useAppContext } from "../../context/AppContext";
+import MemberLookupField from "../common/MemberLookupField";
 
 const VISITOR_PERMISSIONS = {
   manage: "manage_visitors",
@@ -10,6 +11,7 @@ const VISITOR_PERMISSIONS = {
 
 export default function VisitorActionPanel({ visitor }) {
   const {
+    members,
     users,
     visitorApiState,
     recordVisitorChurchVisit,
@@ -27,7 +29,7 @@ export default function VisitorActionPanel({ visitor }) {
     date: getToday(),
     notes: "",
   });
-  const [assignment, setAssignment] = useState(visitor?.assignedFollowUpUserId?._id || "");
+  const [assignment, setAssignment] = useState(visitor?.assignedFollowUpMemberId || "");
   const [memberConversion, setMemberConversion] = useState({
     city: "",
     address: "",
@@ -45,10 +47,15 @@ export default function VisitorActionPanel({ visitor }) {
   const latestChurchVisit = getLatestVisit(visitor?.visitDates);
   const latestHomeVisit = getLatestVisit(visitor?.visitationHistory);
   const actionDisabled = visitorApiState.loading || !visitor?.visitorId || !visitor?._id;
+  const selectedAssignee =
+    members.find((member) => member.memberId === assignment) ||
+    members.find((member) => member.memberId === visitor?.assignedFollowUpMemberId) ||
+    members.find((member) => member.memberId === visitor?.assignedFollowUpUserId?.memberId) ||
+    null;
 
   useEffect(() => {
-    setAssignment(visitor?.assignedFollowUpUserId?._id || "");
-  }, [visitor?.assignedFollowUpUserId?._id]);
+    setAssignment(visitor?.assignedFollowUpMemberId || visitor?.assignedFollowUpUserId?.memberId || "");
+  }, [visitor?.assignedFollowUpMemberId, visitor?.assignedFollowUpUserId?.memberId]);
 
   if (!visitor?.visitorId || !visitor?._id) {
     return null;
@@ -64,7 +71,11 @@ export default function VisitorActionPanel({ visitor }) {
       return;
     }
 
-    await assignVisitorFollowUp(visitor.visitorId, assignment);
+    const linkedUser = users.find((user) => user.memberId === assignment);
+    await assignVisitorFollowUp(visitor.visitorId, {
+      assignedMemberId: assignment,
+      assignedUserId: linkedUser?._id || "",
+    });
   };
 
   const handleHomeVisitSave = async () => {
@@ -86,29 +97,41 @@ export default function VisitorActionPanel({ visitor }) {
         <div className="section-headline compact">
           <h3>Workflow Snapshot</h3>
         </div>
-        <div className="info-grid">
-          <article className="info-tile">
-            <span>Current Status</span>
-            <strong>{visitor.status?.label || "Pending"}</strong>
-          </article>
-          <article className="info-tile">
-            <span>Last Church Visit</span>
-            <strong>{latestChurchVisit || "Not recorded"}</strong>
-          </article>
-          <article className="info-tile">
-            <span>Last Home Visit</span>
-            <strong>{latestHomeVisit || "Not recorded"}</strong>
-          </article>
-          <article className="info-tile">
-            <span>Conversion Path</span>
-            <strong>
-              {visitor.convertedToMemberId
-                ? `Member ${visitor.convertedToMemberId}`
-                : visitor.convertedToProspectId
-                  ? `Prospect ${visitor.convertedToProspectId}`
-                  : "Still in visitor pipeline"}
-            </strong>
-          </article>
+        <div className="table-wrap">
+          <table className="data-table">
+            <tbody>
+              <tr>
+                <th>Current Status</th>
+                <td>{visitor.status?.label || "Pending"}</td>
+              </tr>
+              <tr>
+                <th>Last Church Visit</th>
+                <td>{latestChurchVisit || "Not recorded"}</td>
+              </tr>
+              <tr>
+                <th>Last Home Visit</th>
+                <td>{latestHomeVisit || "Not recorded"}</td>
+              </tr>
+              <tr>
+                <th>Assigned Follow-Up</th>
+                <td>
+                  {selectedAssignee
+                    ? `${selectedAssignee.memberId} - ${selectedAssignee.firstName} ${selectedAssignee.lastName}`
+                    : visitor.assignedFollowUpUserId?.displayName || "Unassigned"}
+                </td>
+              </tr>
+              <tr>
+                <th>Conversion Path</th>
+                <td>
+                  {visitor.convertedToMemberId
+                    ? `Member ${visitor.convertedToMemberId}`
+                    : visitor.convertedToProspectId
+                      ? `Prospect ${visitor.convertedToProspectId}`
+                      : "Still in visitor pipeline"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -157,23 +180,18 @@ export default function VisitorActionPanel({ visitor }) {
           <div className="section-headline compact">
             <h3>Assign Follow-Up</h3>
           </div>
-          <div className="form-grid">
-            <label>
-              Responsible User
-              <select value={assignment} onChange={(event) => setAssignment(event.target.value)}>
-                <option value="">Select a user</option>
-                {users.map((user) => (
-                  <option key={user._id} value={user._id}>
-                    {user.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <article className="info-tile">
-              <span>Current Assignee</span>
-              <strong>{visitor.assignedFollowUpUserId?.displayName || "Unassigned"}</strong>
-            </article>
-          </div>
+          <MemberLookupField
+            label="Responsible Member"
+            placeholder="Search member for follow-up"
+            compact
+            addLabel="Select Member"
+            roleLabel="Follow-Up"
+            members={members}
+            selected={selectedAssignee}
+            onSelect={(value) => setAssignment(value.memberId)}
+            onRemove={() => setAssignment("")}
+            disabled={actionDisabled}
+          />
           <div className="modal-actions">
             <button
               type="button"

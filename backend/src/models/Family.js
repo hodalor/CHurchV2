@@ -55,6 +55,14 @@ const familySchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    primaryContactMemberId: {
+      type: String,
+      trim: true,
+    },
+    primaryContactNumber: {
+      type: String,
+      trim: true,
+    },
     headOfHousehold: {
       type: memberLookupSchema,
       default: null,
@@ -84,6 +92,20 @@ const familySchema = new mongoose.Schema(
     visitationHistory: {
       type: String,
       trim: true,
+    },
+    dateLastVisited: {
+      type: Date,
+    },
+    sourceRecordRef: {
+      type: String,
+      trim: true,
+    },
+    dataEntryClerk: {
+      type: String,
+      trim: true,
+    },
+    dateCaptured: {
+      type: Date,
     },
     householdMembers: [householdMemberSchema],
   },

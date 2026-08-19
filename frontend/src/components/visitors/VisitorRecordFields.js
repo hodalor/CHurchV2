@@ -1,10 +1,20 @@
+import MemberLookupField from "../common/MemberLookupField";
+
+const genderOptions = ["Male", "Female"];
+
 export default function VisitorRecordFields({
   draft,
   isEditing,
   onChange,
   howHeardOptions,
+  members,
   users,
 }) {
+  const selectedFollowUpMember =
+    members.find((member) => member.memberId === draft.assignedFollowUpMemberId) ||
+    members.find((member) => member.memberId === draft.assignedFollowUpUserId?.memberId) ||
+    null;
+
   return (
     <div className="modal-form">
       <div className="form-grid">
@@ -29,7 +39,22 @@ export default function VisitorRecordFields({
           />
         </label>
         <label>
-          Phone
+          Gender
+          <select
+            value={draft.gender || ""}
+            disabled={!isEditing}
+            onChange={(event) => onChange("gender", event.target.value)}
+          >
+            <option value="">Select gender</option>
+            {genderOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Primary Mobile
           <input
             value={draft.phone || ""}
             readOnly={!isEditing}
@@ -80,22 +105,11 @@ export default function VisitorRecordFields({
           </select>
         </label>
         <label>
-          Assigned Follow-Up User
-          <select
-            value={draft.assignedFollowUpUserId?._id || draft.assignedFollowUpUserId || ""}
-            disabled={!isEditing}
-            onChange={(event) => {
-              const selected = users.find((item) => item._id === event.target.value);
-              onChange("assignedFollowUpUserId", selected || "");
-            }}
-          >
-            <option value="">Unassigned</option>
-            {users.map((user) => (
-              <option key={user._id} value={user._id}>
-                {user.displayName}
-              </option>
-            ))}
-          </select>
+          Linked User Account
+          <input
+            value={draft.assignedFollowUpUserId?.displayName || draft.assignedFollowUpUserId?.username || ""}
+            readOnly
+          />
         </label>
         <label>
           Status
@@ -106,6 +120,24 @@ export default function VisitorRecordFields({
           <input value={draft.visitCount || 0} readOnly />
         </label>
       </div>
+
+      <MemberLookupField
+        label="Assign Follow-Up"
+        placeholder="Search member for follow-up"
+        compact
+        addLabel="Add Follow-Up Member"
+        roleLabel="Follow-Up"
+        members={members}
+        selected={selectedFollowUpMember}
+        onSelect={(value) => onChange("assignedFollowUpMemberId", value.memberId)}
+        onRemove={() => {
+          onChange("assignedFollowUpMemberId", "");
+          if (!users.some((user) => user._id === draft.assignedFollowUpUserId?._id)) {
+            onChange("assignedFollowUpUserId", "");
+          }
+        }}
+        disabled={!isEditing}
+      />
     </div>
   );
 }

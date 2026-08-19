@@ -146,7 +146,11 @@ function PipelineView({ prospects, stageData, onOpen }) {
                     <td>{prospect.firstName} {prospect.surname}</td>
                     <td>{prospect.source?.label || "-"}</td>
                     <td>{prospect.currentStage?.label || "-"}</td>
-                    <td>{prospect.assignedEvangelistId?.displayName || "Unassigned"}</td>
+                    <td>
+                      {prospect.assignedEvangelistMemberId ||
+                        prospect.assignedEvangelistId?.displayName ||
+                        "Unassigned"}
+                    </td>
                     <td>{prospect.campaignId?.name || "-"}</td>
                   </tr>
                 ))
@@ -224,8 +228,10 @@ function BibleStudyView({ studies, onOpen }) {
           <table className="data-table">
             <thead>
               <tr>
+                <th>Bible Study ID</th>
                 <th>Participant</th>
                 <th>Teacher</th>
+                <th>Study Type</th>
                 <th>Start Date</th>
                 <th>Status</th>
                 <th>Lessons</th>
@@ -235,6 +241,7 @@ function BibleStudyView({ studies, onOpen }) {
               {studies.length ? (
                 studies.map((study) => (
                   <tr key={study._id} className="clickable-row" onClick={() => onOpen(study)}>
+                    <td>{study.bibleStudyId || "-"}</td>
                     <td>
                       {study.prospect
                         ? `${study.prospect.prospectId} - ${study.prospect.firstName} ${study.prospect.surname}`
@@ -242,14 +249,15 @@ function BibleStudyView({ studies, onOpen }) {
                           ? `${study.member.memberId} - ${study.member.firstName} ${study.member.lastName}`
                           : "-"}
                     </td>
-                    <td>{study.teacherId?.displayName || "-"}</td>
+                    <td>{study.teacherMemberId || study.teacherId?.displayName || "-"}</td>
+                    <td>{study.studyType || "-"}</td>
                     <td>{formatDate(study.startDate)}</td>
                     <td>{study.status?.label || "-"}</td>
                     <td>{study.lessonsCompleted?.length || 0}</td>
                   </tr>
                 ))
               ) : (
-                <EmptyTable columns={5} message="No Bible study records yet." />
+                <EmptyTable columns={7} message="No Bible study records yet." />
               )}
             </tbody>
           </table>

@@ -375,10 +375,10 @@ export const churchApi = {
     });
   },
 
-  async assignProspect(prospectId, assignedUserId) {
+  async assignProspect(prospectId, payload) {
     return request(`/evangelism/prospects/${prospectId}/assign`, {
       method: "POST",
-      body: JSON.stringify({ assignedUserId }),
+      body: JSON.stringify(payload),
     });
   },
 
@@ -409,6 +409,10 @@ export const churchApi = {
 
   async getBibleStudies() {
     return request("/evangelism/bible-studies");
+  },
+
+  async getNextBibleStudyId() {
+    return request("/evangelism/bible-studies/next-id");
   },
 
   async createBibleStudy(payload) {
@@ -483,10 +487,10 @@ export const churchApi = {
     });
   },
 
-  async assignVisitorFollowUp(visitorId, assignedUserId) {
+  async assignVisitorFollowUp(visitorId, payload) {
     return request(`/visitors/${visitorId}/assign`, {
       method: "POST",
-      body: JSON.stringify({ assignedUserId }),
+      body: JSON.stringify(payload),
     });
   },
 

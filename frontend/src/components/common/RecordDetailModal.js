@@ -77,6 +77,7 @@ export default function RecordDetailModal() {
               setRecordModalDraft((current) => ({ ...current, [field]: value }))
             }
             howHeardOptions={visitorHowHeardOptions}
+            members={members}
             users={users}
           />
           <VisitorActionPanel visitor={draft} />
@@ -98,6 +99,7 @@ export default function RecordDetailModal() {
             sourceOptions={evangelismSourceOptions}
             stageOptions={evangelismStageOptions}
             campaignOptions={campaigns}
+            members={members}
             users={users}
           />
           <ProspectActionPanel prospect={draft} />

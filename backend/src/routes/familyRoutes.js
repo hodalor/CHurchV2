@@ -56,16 +56,30 @@ module.exports = router;
 
 async function generateNextFamilyId() {
   const latestFamily = await Family.findOne().sort({ familyId: -1 }).lean();
-  const latestNumericPart = latestFamily ? Number(String(latestFamily.familyId).replace("FH", "")) : 0;
-  return `FH${String((Number.isNaN(latestNumericPart) ? 0 : latestNumericPart) + 1).padStart(4, "0")}`;
+  const latestNumericPart = latestFamily ? Number(String(latestFamily.familyId).replace("HH", "")) : 0;
+  return `HH${String((Number.isNaN(latestNumericPart) ? 0 : latestNumericPart) + 1).padStart(6, "0")}`;
 }
 
 async function normalizeFamilyPayload(body) {
+  if (!String(body.familyName || "").trim()) {
+    throw new Error("Household name is required.");
+  }
+
+  if (!String(body.physicalAddress || "").trim()) {
+    throw new Error("Residential address is required.");
+  }
+
   const familyId = body.familyId || (await generateNextFamilyId());
 
   return {
     familyId,
     familyName: body.familyName,
+    primaryContactMemberId:
+      body.primaryContactMemberId ||
+      normalizeLookup(body.headOfHousehold)?.memberId ||
+      normalizeLookup(body.spouse)?.memberId ||
+      "",
+    primaryContactNumber: body.primaryContactNumber || "",
     headOfHousehold: normalizeLookup(body.headOfHousehold),
     spouse: normalizeLookup(body.spouse),
     children: normalizeLookupArray(body.children),
@@ -75,6 +89,10 @@ async function normalizeFamilyPayload(body) {
     fellowshipZone: body.fellowshipZone || "",
     familyContact: body.familyContact || "",
     visitationHistory: body.visitationHistory || "",
+    dateLastVisited: body.dateLastVisited ? new Date(body.dateLastVisited) : null,
+    sourceRecordRef: body.sourceRecordRef || "",
+    dataEntryClerk: body.dataEntryClerk || "",
+    dateCaptured: body.dateCaptured ? new Date(body.dateCaptured) : new Date(),
     householdMembers: normalizeHouseholdMembers(body.householdMembers),
   };
 }

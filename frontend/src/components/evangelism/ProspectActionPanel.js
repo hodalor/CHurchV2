@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useAppContext } from "../../context/AppContext";
+import MemberLookupField from "../common/MemberLookupField";
 
 const EVANGELISM_PERMISSIONS = {
   manage: "manage_evangelism",
@@ -9,6 +10,7 @@ const EVANGELISM_PERMISSIONS = {
 
 export default function ProspectActionPanel({ prospect }) {
   const {
+    members,
     users,
     evangelismApiState,
     evangelismStageOptions,
@@ -22,7 +24,7 @@ export default function ProspectActionPanel({ prospect }) {
     addBibleStudyLesson,
   } = useAppContext();
   const { authUser } = useAuth();
-  const [assignment, setAssignment] = useState(prospect?.assignedEvangelistId?._id || "");
+  const [assignment, setAssignment] = useState(prospect?.assignedEvangelistMemberId || "");
   const [nextStage, setNextStage] = useState(prospect?.currentStage?._id || "");
   const [contactForm, setContactForm] = useState({
     date: getToday(),
@@ -43,6 +45,8 @@ export default function ProspectActionPanel({ prospect }) {
     completedAt: getToday(),
     notes: "",
     status: "",
+    nextSessionDate: "",
+    outcome: "",
   });
 
   const permissionSet = useMemo(() => new Set(authUser?.permissions || []), [authUser?.permissions]);
@@ -50,11 +54,16 @@ export default function ProspectActionPanel({ prospect }) {
   const canConvert = permissionSet.has(EVANGELISM_PERMISSIONS.convert);
   const actionDisabled = evangelismApiState.loading || !prospect?._id;
   const studyForProspect = bibleStudies.find((study) => study.prospect?._id === prospect?._id);
+  const selectedEvangelist =
+    members.find((member) => member.memberId === assignment) ||
+    members.find((member) => member.memberId === prospect?.assignedEvangelistMemberId) ||
+    members.find((member) => member.memberId === prospect?.assignedEvangelistId?.memberId) ||
+    null;
 
   useEffect(() => {
-    setAssignment(prospect?.assignedEvangelistId?._id || "");
+    setAssignment(prospect?.assignedEvangelistMemberId || prospect?.assignedEvangelistId?.memberId || "");
     setNextStage(prospect?.currentStage?._id || "");
-  }, [prospect?.assignedEvangelistId?._id, prospect?.currentStage?._id]);
+  }, [prospect?.assignedEvangelistMemberId, prospect?.assignedEvangelistId?.memberId, prospect?.currentStage?._id]);
 
   if (!prospect?._id) {
     return null;
@@ -74,11 +83,13 @@ export default function ProspectActionPanel({ prospect }) {
   };
 
   const handleStartBibleStudy = () => {
+    const linkedUser = users.find((user) => user.memberId === (prospect.assignedEvangelistMemberId || ""));
     openRecordModal(
       "bibleStudy",
       {
         prospect,
-        teacherId: prospect.assignedEvangelistId || users[0] || null,
+        teacherId: linkedUser || prospect.assignedEvangelistId || null,
+        teacherMemberId: prospect.assignedEvangelistMemberId || "",
         startDate: getToday(),
         status: bibleStudyStatusOptions.find((item) => item.key === "in_progress") || "",
         lessonsCompleted: [],
@@ -97,6 +108,8 @@ export default function ProspectActionPanel({ prospect }) {
       completedAt: lessonForm.completedAt,
       notes: lessonForm.notes,
       status: lessonForm.status,
+      nextSessionDate: lessonForm.nextSessionDate,
+      outcome: lessonForm.outcome,
     });
 
     setLessonForm({
@@ -104,6 +117,8 @@ export default function ProspectActionPanel({ prospect }) {
       completedAt: getToday(),
       notes: "",
       status: "",
+      nextSessionDate: "",
+      outcome: "",
     });
   };
 
@@ -120,7 +135,11 @@ export default function ProspectActionPanel({ prospect }) {
           </article>
           <article className="info-tile">
             <span>Assigned Evangelist</span>
-            <strong>{prospect.assignedEvangelistId?.displayName || "Unassigned"}</strong>
+            <strong>
+              {selectedEvangelist
+                ? `${selectedEvangelist.memberId} - ${selectedEvangelist.firstName} ${selectedEvangelist.lastName}`
+                : prospect.assignedEvangelistId?.displayName || "Unassigned"}
+            </strong>
           </article>
           <article className="info-tile">
             <span>Stage Changes</span>
@@ -140,17 +159,6 @@ export default function ProspectActionPanel({ prospect }) {
           </div>
           <div className="form-grid">
             <label>
-              Assigned Evangelist
-              <select value={assignment} onChange={(event) => setAssignment(event.target.value)}>
-                <option value="">Select evangelist</option>
-                {users.map((user) => (
-                  <option key={user._id} value={user._id}>
-                    {user.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
               Move To Stage
               <select value={nextStage} onChange={(event) => setNextStage(event.target.value)}>
                 <option value="">Select stage</option>
@@ -162,12 +170,29 @@ export default function ProspectActionPanel({ prospect }) {
               </select>
             </label>
           </div>
+          <MemberLookupField
+            label="Assigned Evangelist"
+            placeholder="Search evangelist from members"
+            compact
+            addLabel="Select Evangelist"
+            roleLabel="Assigned Evangelist"
+            members={members}
+            selected={selectedEvangelist}
+            onSelect={(value) => setAssignment(value.memberId)}
+            onRemove={() => setAssignment("")}
+            disabled={actionDisabled}
+          />
           <div className="modal-actions">
             <button
               type="button"
               className="ghost-button small"
               disabled={actionDisabled || !assignment}
-              onClick={() => assignProspect(prospect.prospectId, assignment)}
+              onClick={() =>
+                assignProspect(prospect.prospectId, {
+                  assignedMemberId: assignment,
+                  assignedUserId: users.find((user) => user.memberId === assignment)?._id || "",
+                })
+              }
             >
               Assign Evangelist
             </button>
@@ -239,7 +264,7 @@ export default function ProspectActionPanel({ prospect }) {
               <div className="info-grid">
                 <article className="info-tile">
                   <span>Teacher</span>
-                  <strong>{studyForProspect.teacherId?.displayName || "-"}</strong>
+                  <strong>{studyForProspect.teacherMemberId || studyForProspect.teacherId?.displayName || "-"}</strong>
                 </article>
                 <article className="info-tile">
                   <span>Status</span>
@@ -282,6 +307,16 @@ export default function ProspectActionPanel({ prospect }) {
                     ))}
                   </select>
                 </label>
+                <label>
+                  Next Session Date
+                  <input
+                    type="date"
+                    value={lessonForm.nextSessionDate}
+                    onChange={(event) =>
+                      setLessonForm((current) => ({ ...current, nextSessionDate: event.target.value }))
+                    }
+                  />
+                </label>
                 <label className="full-width">
                   Lesson Notes
                   <textarea
@@ -289,6 +324,16 @@ export default function ProspectActionPanel({ prospect }) {
                     value={lessonForm.notes}
                     onChange={(event) =>
                       setLessonForm((current) => ({ ...current, notes: event.target.value }))
+                    }
+                  />
+                </label>
+                <label className="full-width">
+                  Outcome
+                  <textarea
+                    rows="3"
+                    value={lessonForm.outcome}
+                    onChange={(event) =>
+                      setLessonForm((current) => ({ ...current, outcome: event.target.value }))
                     }
                   />
                 </label>

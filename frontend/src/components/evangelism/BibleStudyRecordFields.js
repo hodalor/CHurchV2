@@ -1,15 +1,25 @@
+import MemberLookupField from "../common/MemberLookupField";
+
 export default function BibleStudyRecordFields({
   draft,
   isEditing,
   onChange,
   prospects,
   members,
-  users,
   statusOptions,
 }) {
+  const selectedTeacher =
+    members.find((member) => member.memberId === draft.teacherMemberId) ||
+    members.find((member) => member.memberId === draft.teacherId?.memberId) ||
+    null;
+
   return (
     <div className="modal-form">
       <div className="form-grid">
+        <label>
+          Bible Study ID
+          <input value={draft.bibleStudyId || ""} readOnly />
+        </label>
         <label>
           Prospect
           <select
@@ -47,22 +57,12 @@ export default function BibleStudyRecordFields({
           </select>
         </label>
         <label>
-          Teacher
-          <select
-            value={draft.teacherId?._id || draft.teacherId || ""}
-            disabled={!isEditing}
-            onChange={(event) => {
-              const selected = users.find((item) => item._id === event.target.value);
-              onChange("teacherId", selected || "");
-            }}
-          >
-            <option value="">Select teacher</option>
-            {users.map((user) => (
-              <option key={user._id} value={user._id}>
-                {user.displayName}
-              </option>
-            ))}
-          </select>
+          Study Type
+          <input
+            value={draft.studyType || ""}
+            readOnly={!isEditing}
+            onChange={(event) => onChange("studyType", event.target.value)}
+          />
         </label>
         <label>
           Start Date
@@ -74,7 +74,16 @@ export default function BibleStudyRecordFields({
           />
         </label>
         <label>
-          Status
+          Last Session Date
+          <input
+            type="date"
+            value={formatDateValue(draft.lastSessionDate)}
+            readOnly={!isEditing}
+            onChange={(event) => onChange("lastSessionDate", event.target.value)}
+          />
+        </label>
+        <label>
+          Current Status
           <select
             value={draft.status?._id || draft.status || ""}
             disabled={!isEditing}
@@ -92,10 +101,49 @@ export default function BibleStudyRecordFields({
           </select>
         </label>
         <label>
-          Lessons Completed
+          Next Session Date
+          <input
+            type="date"
+            value={formatDateValue(draft.nextSessionDate)}
+            readOnly={!isEditing}
+            onChange={(event) => onChange("nextSessionDate", event.target.value)}
+          />
+        </label>
+        <label>
+          Sessions Completed
           <input value={draft.lessonsCompleted?.length || 0} readOnly />
         </label>
+        <label>
+          Data Entry Clerk
+          <input value={draft.dataEntryClerk || ""} readOnly />
+        </label>
+        <label>
+          Date Captured
+          <input type="date" value={formatDateValue(draft.dateCaptured)} readOnly />
+        </label>
+        <label className="full-width">
+          Outcome
+          <textarea
+            rows="4"
+            value={draft.outcome || ""}
+            readOnly={!isEditing}
+            onChange={(event) => onChange("outcome", event.target.value)}
+          />
+        </label>
       </div>
+
+      <MemberLookupField
+        label="Teacher Or Evangelist"
+        placeholder="Search teacher or evangelist"
+        compact
+        addLabel="Add Teacher"
+        roleLabel="Teacher"
+        members={members}
+        selected={selectedTeacher}
+        onSelect={(value) => onChange("teacherMemberId", value.memberId)}
+        onRemove={() => onChange("teacherMemberId", "")}
+        disabled={!isEditing}
+      />
     </div>
   );
 }

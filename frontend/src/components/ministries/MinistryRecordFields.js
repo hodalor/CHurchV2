@@ -64,6 +64,9 @@ export default function MinistryRecordFields({ draft, isEditing, members, onChan
               key={field.key}
               label={field.label}
               placeholder={`Search ${field.label.toLowerCase()}`}
+              compact
+              addLabel={`Add ${field.label}`}
+              roleLabel={field.label}
               members={members}
               selected={leadership[field.key] || null}
               onSelect={(value) =>
@@ -96,6 +99,9 @@ export default function MinistryRecordFields({ draft, isEditing, members, onChan
         <MemberLookupField
           label="Members"
           placeholder="Search ministry member"
+          compact
+          addLabel="Add Ministry Member"
+          roleLabel="Ministry Member"
           members={members}
           selected={draft.members || []}
           multiple

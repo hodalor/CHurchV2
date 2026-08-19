@@ -22,6 +22,12 @@ const completedLessonSchema = new mongoose.Schema(
 
 const bibleStudySchema = new mongoose.Schema(
   {
+    bibleStudyId: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
     prospect: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "EvangelismProspect",
@@ -35,17 +41,42 @@ const bibleStudySchema = new mongoose.Schema(
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
+    },
+    teacherMemberId: {
+      type: String,
+      trim: true,
+    },
+    studyType: {
+      type: String,
+      trim: true,
     },
     startDate: {
       type: Date,
       required: true,
+    },
+    lastSessionDate: {
+      type: Date,
     },
     lessonsCompleted: [completedLessonSchema],
     status: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "LookupValue",
       default: null,
+    },
+    nextSessionDate: {
+      type: Date,
+    },
+    outcome: {
+      type: String,
+      trim: true,
+    },
+    dataEntryClerk: {
+      type: String,
+      trim: true,
+    },
+    dateCaptured: {
+      type: Date,
     },
   },
   {

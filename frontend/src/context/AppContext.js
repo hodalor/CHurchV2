@@ -207,6 +207,7 @@ export function AppProvider({ children }) {
           roles,
           prospects,
           users,
+          authUser,
           discipleshipProgrammes,
           attendanceEventTypeOptions,
           attendanceCaptureModeOptions,
@@ -234,6 +235,15 @@ export function AppProvider({ children }) {
       try {
         const payload = await churchApi.getNextProspectId();
         sourceRecord.prospectId = payload.prospectId || sourceRecord.prospectId;
+      } catch (error) {
+        // Fall back to local generated ID if the next-id request fails.
+      }
+    }
+
+    if (!record && type === "bibleStudy" && authUser) {
+      try {
+        const payload = await churchApi.getNextBibleStudyId();
+        sourceRecord.bibleStudyId = payload.bibleStudyId || sourceRecord.bibleStudyId;
       } catch (error) {
         // Fall back to local generated ID if the next-id request fails.
       }
@@ -434,17 +444,20 @@ export function AppProvider({ children }) {
   };
 
   const refreshEvangelismCollections = async () => {
-    const [contactsResponse, studiesResponse, campaignsResponse] = await Promise.all([
+    const [prospectsResponse, contactsResponse, studiesResponse, campaignsResponse] = await Promise.all([
+      churchApi.getProspects(),
       churchApi.getEvangelismContacts(),
       churchApi.getBibleStudies(),
       churchApi.getCampaigns(),
     ]);
 
+    setProspects(Array.isArray(prospectsResponse) ? prospectsResponse.map(hydrateProspectRecord) : []);
     setEvangelismContacts(Array.isArray(contactsResponse) ? contactsResponse : []);
     setBibleStudies(Array.isArray(studiesResponse) ? studiesResponse.map(hydrateBibleStudyRecord) : []);
     setCampaigns(Array.isArray(campaignsResponse) ? campaignsResponse : []);
 
     return {
+      prospects: prospectsResponse,
       contacts: contactsResponse,
       bibleStudies: studiesResponse,
       campaigns: campaignsResponse,
@@ -911,6 +924,15 @@ export function AppProvider({ children }) {
   };
 
   const submitMemberForm = async () => {
+    const memberValidationError = getRequiredMemberError(memberForm);
+    if (memberValidationError) {
+      setMediaUploadState((current) => ({
+        ...current,
+        error: memberValidationError,
+      }));
+      return;
+    }
+
     const selectedGroups = buildGroupSelections(groups, memberForm.groupChain);
     const resolvedLinks = enrichFamilyLinks(memberForm.familyLinks, members);
     const inheritedHousehold = getInheritedFamilyAssignment(memberForm, members);
@@ -932,6 +954,7 @@ export function AppProvider({ children }) {
       const payload = normalizeMemberDraft(newMember, authUser);
       const savedMember = await churchApi.createMember(payload);
       const hydratedMember = hydrateMemberRecord(savedMember);
+      setMediaUploadState({ loading: false, error: "", fieldName: "" });
 
       setMembers((current) => {
         const nextMembers = [hydratedMember, ...current];
@@ -1008,6 +1031,11 @@ export function AppProvider({ children }) {
 
     if (type === "member") {
       try {
+        const memberValidationError = getRequiredMemberError(draft);
+        if (memberValidationError) {
+          throw new Error(memberValidationError);
+        }
+
         const payload = normalizeMemberDraft(draft, authUser);
         const savedMember = record?._id
           ? await churchApi.updateMember(record._id, payload)
@@ -1032,7 +1060,7 @@ export function AppProvider({ children }) {
     if (type === "visitor") {
       try {
         setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
-        const normalizedVisitor = normalizeVisitorDraft(draft);
+        const normalizedVisitor = normalizeVisitorDraft(draft, users);
         const savedVisitor = record?.visitorId
           ? await churchApi.updateVisitor(record.visitorId, normalizedVisitor)
           : await churchApi.createVisitor(normalizedVisitor);
@@ -1053,7 +1081,7 @@ export function AppProvider({ children }) {
     if (type === "prospect") {
       try {
         setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
-        const normalizedProspect = normalizeProspectDraft(draft);
+        const normalizedProspect = normalizeProspectDraft(draft, users);
         const savedProspect = record?.prospectId
           ? await churchApi.updateProspect(record.prospectId, normalizedProspect)
           : await churchApi.createProspect(normalizedProspect);
@@ -1074,7 +1102,7 @@ export function AppProvider({ children }) {
     if (type === "bibleStudy") {
       try {
         setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
-        const normalizedStudy = normalizeBibleStudyDraft(draft);
+        const normalizedStudy = normalizeBibleStudyDraft(draft, users);
         const savedStudy = record?._id
           ? await churchApi.updateBibleStudy(record._id, normalizedStudy)
           : await churchApi.createBibleStudy(normalizedStudy);
@@ -1181,7 +1209,7 @@ export function AppProvider({ children }) {
     if (type === "family") {
       try {
         setFamilyApiState((current) => ({ ...current, loading: true, error: "" }));
-        const normalizedFamily = normalizeFamilyDraft(draft, members, groups, families);
+        const normalizedFamily = normalizeFamilyDraft(draft, members, groups, families, authUser);
         const savedFamily = record?._id
           ? await churchApi.updateFamily(record._id, normalizedFamily)
           : await churchApi.createFamily(normalizedFamily);
@@ -1551,7 +1579,11 @@ export function AppProvider({ children }) {
         setPendingActionState((current) => ({ ...current, loading: true, error: "" }));
         const contact = await churchApi.addProspectContact(prospectId, payload);
         setEvangelismContacts((current) => [contact, ...current]);
-        await Promise.all([refreshPendingActions(), refreshEvangelismDashboard()]);
+        await Promise.all([
+          refreshPendingActions(),
+          refreshEvangelismDashboard(),
+          refreshEvangelismCollections(),
+        ]);
         return contact;
       } catch (error) {
         setEvangelismApiState((current) => ({
@@ -1789,18 +1821,20 @@ function updateOrInsert(items, draft, originalId, fallbacks = {}) {
   return items.map((item) => (getRecordIdentity(item) === originalId ? nextItem : item));
 }
 
-function buildNewRecord(type, { families, members, ministries, roles, prospects, users, discipleshipProgrammes }) {
+function buildNewRecord(type, { families, members, ministries, roles, users, authUser, discipleshipProgrammes }) {
   if (type === "visitor") {
     return {
       visitorId: `VS${String(Date.now()).slice(-4)}`,
       firstName: "",
       surname: "",
+      gender: "",
       phone: "",
       email: "",
       residentialArea: "",
       firstVisitDate: new Date().toISOString().slice(0, 10),
       howHeard: "",
       assignedFollowUpUserId: "",
+      assignedFollowUpMemberId: "",
       visitCount: 1,
       visitDates: [],
       status: "",
@@ -1812,6 +1846,8 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
     return {
       familyId: generateNextFamilyId(families),
       familyName: "",
+      primaryContactMemberId: "",
+      primaryContactNumber: "",
       headOfHousehold: null,
       spouse: null,
       children: [],
@@ -1821,6 +1857,10 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
       fellowshipZone: "",
       familyContact: "",
       visitationHistory: "",
+      dateLastVisited: "",
+      sourceRecordRef: "",
+      dataEntryClerk: authUser?.displayName || authUser?.username || "",
+      dateCaptured: new Date().toISOString().slice(0, 10),
       householdMembers: [],
     };
   }
@@ -1830,13 +1870,22 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
       prospectId: `EP${String(Date.now()).slice(-4)}`,
       firstName: "",
       surname: "",
+      gender: "",
       phone: "",
       email: "",
       residentialArea: "",
       source: "",
       assignedEvangelistId: "",
+      assignedEvangelistMemberId: "",
       currentStage: "",
       campaignId: "",
+      dateFirstContact: new Date().toISOString().slice(0, 10),
+      nextFollowUpDate: "",
+      baptismDate: "",
+      convertedMemberId: "",
+      notesSummary: "",
+      dataEntryClerk: authUser?.displayName || authUser?.username || "",
+      dateCaptured: new Date().toISOString().slice(0, 10),
       stageHistory: [],
       sourceVisitorId: "",
     };
@@ -1844,11 +1893,19 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
 
   if (type === "bibleStudy") {
     return {
-      prospect: prospects[0] || null,
+      bibleStudyId: `B${String(Date.now()).slice(-7)}`,
+      prospect: null,
       member: null,
-      teacherId: users[0] || null,
+      teacherId: null,
+      teacherMemberId: "",
+      studyType: "",
       startDate: new Date().toISOString().slice(0, 10),
+      lastSessionDate: "",
       status: "",
+      nextSessionDate: "",
+      outcome: "",
+      dataEntryClerk: authUser?.displayName || authUser?.username || "",
+      dateCaptured: new Date().toISOString().slice(0, 10),
       lessonsCompleted: [],
     };
   }
@@ -1966,6 +2023,7 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
       maritalStatus: "",
       phone: "",
       email: "",
+      residentialArea: "",
       dateOfBirth: "",
       occupation: "",
       employerOrBusiness: "",
@@ -2025,6 +2083,7 @@ function hydrateMemberRecord(member) {
     occupation: member.occupation || "",
     employerOrBusiness: member.employerOrBusiness || "",
     educationOrSkills: member.educationOrSkills || "",
+    residentialArea: member.residentialArea || "",
     dateJoined: formatDateInputValue(member.dateJoined || member.membershipDate),
     placeBaptized: member.placeBaptized || "",
     baptizedBy: member.baptizedBy || "",
@@ -2054,6 +2113,7 @@ function normalizeMemberDraft(draft, authUser = null) {
     maritalStatus: draft.maritalStatus || "",
     phone: draft.phone || "",
     email: draft.email || "",
+    residentialArea: draft.residentialArea || "",
     dateOfBirth: draft.dateOfBirth || null,
     preferredName: draft.preferredName || "",
     occupation: draft.occupation || "",
@@ -2130,6 +2190,28 @@ function formatDateInputValue(value) {
   return String(value).slice(0, 10);
 }
 
+function findUserIdByMemberId(users = [], memberId = "") {
+  if (!memberId) {
+    return "";
+  }
+
+  return users.find((user) => user.memberId === memberId)?._id || "";
+}
+
+function getRequiredMemberError(member = {}) {
+  const requiredPairs = [
+    ["firstName", "First name"],
+    ["lastName", "Surname"],
+    ["gender", "Gender"],
+    ["phone", "Primary mobile"],
+    ["residentialArea", "Residential area"],
+    ["membershipStatus", "Membership status"],
+  ];
+
+  const missing = requiredPairs.find(([fieldName]) => !String(member[fieldName] || "").trim());
+  return missing ? `${missing[1]} is required.` : "";
+}
+
 function hydrateVisitorRecord(visitor) {
   if (!visitor) {
     return visitor;
@@ -2137,23 +2219,38 @@ function hydrateVisitorRecord(visitor) {
 
   return {
     ...visitor,
+    gender: visitor.gender || "",
     howHeard: visitor.howHeard || "",
     status: visitor.status || "",
     assignedFollowUpUserId: visitor.assignedFollowUpUserId || "",
+    assignedFollowUpMemberId: visitor.assignedFollowUpMemberId || "",
   };
 }
 
-function normalizeVisitorDraft(draft) {
+function normalizeVisitorDraft(draft, users = []) {
+  const assignedMemberId =
+    draft.assignedFollowUpMemberId?.memberId ||
+    draft.assignedFollowUpMemberId ||
+    draft.assignedFollowUpUserId?.memberId ||
+    "";
+  const assignedUserId =
+    draft.assignedFollowUpUserId?._id ||
+    draft.assignedFollowUpUserId ||
+    findUserIdByMemberId(users, assignedMemberId) ||
+    null;
+
   return {
     visitorId: draft.visitorId,
     firstName: draft.firstName || "",
     surname: draft.surname || "",
+    gender: draft.gender || "",
     phone: draft.phone || "",
     email: draft.email || "",
     residentialArea: draft.residentialArea || "",
     firstVisitDate: draft.firstVisitDate || new Date().toISOString().slice(0, 10),
     howHeard: draft.howHeard?._id || draft.howHeard || null,
-    assignedFollowUpUserId: draft.assignedFollowUpUserId?._id || draft.assignedFollowUpUserId || null,
+    assignedFollowUpUserId: assignedUserId,
+    assignedFollowUpMemberId: assignedMemberId || "",
   };
 }
 
@@ -2164,26 +2261,57 @@ function hydrateProspectRecord(prospect) {
 
   return {
     ...prospect,
+    gender: prospect.gender || "",
     source: prospect.source || "",
     assignedEvangelistId: prospect.assignedEvangelistId || "",
+    assignedEvangelistMemberId: prospect.assignedEvangelistMemberId || "",
     currentStage: prospect.currentStage || "",
     campaignId: prospect.campaignId || "",
+    sourceVisitorId: prospect.sourceVisitorId || "",
+    dateFirstContact: formatDateInputValue(prospect.dateFirstContact),
+    nextFollowUpDate: formatDateInputValue(prospect.nextFollowUpDate),
+    baptismDate: formatDateInputValue(prospect.baptismDate),
+    convertedMemberId: prospect.convertedMemberId || "",
+    notesSummary: prospect.notesSummary || "",
+    dataEntryClerk: prospect.dataEntryClerk || "",
+    dateCaptured: formatDateInputValue(prospect.dateCaptured || prospect.createdAt),
     stageHistory: Array.isArray(prospect.stageHistory) ? prospect.stageHistory : [],
   };
 }
 
-function normalizeProspectDraft(draft) {
+function normalizeProspectDraft(draft, users = []) {
+  const assignedMemberId =
+    draft.assignedEvangelistMemberId?.memberId ||
+    draft.assignedEvangelistMemberId ||
+    draft.assignedEvangelistId?.memberId ||
+    "";
+  const assignedUserId =
+    draft.assignedEvangelistId?._id ||
+    draft.assignedEvangelistId ||
+    findUserIdByMemberId(users, assignedMemberId) ||
+    null;
+
   return {
     prospectId: draft.prospectId,
     firstName: draft.firstName || "",
     surname: draft.surname || "",
+    gender: draft.gender || "",
     phone: draft.phone || "",
     email: draft.email || "",
     residentialArea: draft.residentialArea || "",
     source: draft.source?._id || draft.source || null,
-    assignedEvangelistId: draft.assignedEvangelistId?._id || draft.assignedEvangelistId || null,
+    assignedEvangelistId: assignedUserId,
+    assignedEvangelistMemberId: assignedMemberId || "",
     currentStage: draft.currentStage?._id || draft.currentStage || null,
     campaignId: draft.campaignId?._id || draft.campaignId || null,
+    sourceVisitorId: draft.sourceVisitorId || "",
+    dateFirstContact: draft.dateFirstContact || null,
+    nextFollowUpDate: draft.nextFollowUpDate || null,
+    baptismDate: draft.baptismDate || null,
+    convertedMemberId: draft.convertedMemberId || "",
+    notesSummary: draft.notesSummary || "",
+    dataEntryClerk: draft.dataEntryClerk || "",
+    dateCaptured: draft.dateCaptured || new Date().toISOString().slice(0, 10),
   };
 }
 
@@ -2194,21 +2322,49 @@ function hydrateBibleStudyRecord(study) {
 
   return {
     ...study,
+    bibleStudyId: study.bibleStudyId || "",
     prospect: study.prospect || null,
     member: study.member || null,
     teacherId: study.teacherId || null,
+    teacherMemberId: study.teacherMemberId || "",
+    studyType: study.studyType || "",
+    startDate: formatDateInputValue(study.startDate),
+    lastSessionDate: formatDateInputValue(study.lastSessionDate),
     status: study.status || "",
+    nextSessionDate: formatDateInputValue(study.nextSessionDate),
+    outcome: study.outcome || "",
+    dataEntryClerk: study.dataEntryClerk || "",
+    dateCaptured: formatDateInputValue(study.dateCaptured || study.createdAt),
     lessonsCompleted: Array.isArray(study.lessonsCompleted) ? study.lessonsCompleted : [],
   };
 }
 
-function normalizeBibleStudyDraft(draft) {
+function normalizeBibleStudyDraft(draft, users = []) {
+  const teacherMemberId =
+    draft.teacherMemberId?.memberId ||
+    draft.teacherMemberId ||
+    draft.teacherId?.memberId ||
+    "";
+  const teacherUserId =
+    draft.teacherId?._id ||
+    draft.teacherId ||
+    findUserIdByMemberId(users, teacherMemberId) ||
+    null;
+
   return {
+    bibleStudyId: draft.bibleStudyId || "",
     prospect: draft.prospect?._id || draft.prospect || null,
     member: draft.member?._id || draft.member || null,
-    teacherId: draft.teacherId?._id || draft.teacherId || null,
+    teacherId: teacherUserId,
+    teacherMemberId: teacherMemberId || "",
+    studyType: draft.studyType || "",
     startDate: draft.startDate || new Date().toISOString().slice(0, 10),
+    lastSessionDate: draft.lastSessionDate || null,
     status: draft.status?._id || draft.status || null,
+    nextSessionDate: draft.nextSessionDate || null,
+    outcome: draft.outcome || "",
+    dataEntryClerk: draft.dataEntryClerk || "",
+    dateCaptured: draft.dateCaptured || new Date().toISOString().slice(0, 10),
   };
 }
 
@@ -2389,6 +2545,12 @@ function hydrateFamilyRecord(family) {
 
   return {
     ...family,
+    primaryContactMemberId: family.primaryContactMemberId || "",
+    primaryContactNumber: family.primaryContactNumber || "",
+    dateLastVisited: formatDateInputValue(family.dateLastVisited),
+    sourceRecordRef: family.sourceRecordRef || "",
+    dataEntryClerk: family.dataEntryClerk || "",
+    dateCaptured: formatDateInputValue(family.dateCaptured || family.createdAt),
     headOfHousehold: normalizeLegacyLookup(family.headOfHousehold),
     spouse: normalizeLegacyLookup(family.spouse),
     children: normalizeLegacyLookupArray(family.children),
@@ -2424,14 +2586,20 @@ function getInheritedFamilyAssignment(memberForm, members) {
   return linkedHousehold || {};
 }
 
-function normalizeFamilyDraft(draft, members, groups, families) {
+function normalizeFamilyDraft(draft, members, groups, families, authUser = null) {
   const normalized = {
     ...draft,
     familyId: draft.familyId || generateNextFamilyId(families),
+    primaryContactMemberId: draft.primaryContactMemberId || "",
+    primaryContactNumber: draft.primaryContactNumber || "",
     headOfHousehold: ensureMemberSelection(draft.headOfHousehold),
     spouse: ensureMemberSelection(draft.spouse),
     children: ensureMemberSelectionArray(draft.children),
     dependants: ensureMemberSelectionArray(draft.dependants),
+    dateLastVisited: draft.dateLastVisited || null,
+    sourceRecordRef: draft.sourceRecordRef || "",
+    dataEntryClerk: draft.dataEntryClerk || authUser?.displayName || authUser?.username || "",
+    dateCaptured: draft.dateCaptured || new Date().toISOString().slice(0, 10),
   };
 
   const zoneMatch = groups.find(
@@ -2443,6 +2611,16 @@ function normalizeFamilyDraft(draft, members, groups, families) {
     normalized.familyContact ||
     members.find((member) => member.memberId === normalized.headOfHousehold?.memberId)?.phone ||
     members.find((member) => member.memberId === normalized.spouse?.memberId)?.phone ||
+    "";
+  normalized.primaryContactMemberId =
+    normalized.primaryContactMemberId ||
+    normalized.headOfHousehold?.memberId ||
+    normalized.spouse?.memberId ||
+    "";
+  normalized.primaryContactNumber =
+    normalized.primaryContactNumber ||
+    members.find((member) => member.memberId === normalized.primaryContactMemberId)?.phone ||
+    normalized.familyContact ||
     "";
 
   return normalized;

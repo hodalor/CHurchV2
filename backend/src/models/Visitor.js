@@ -51,6 +51,10 @@ const visitorSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    gender: {
+      type: String,
+      trim: true,
+    },
     phone: {
       type: String,
       trim: true,
@@ -87,6 +91,10 @@ const visitorSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
+    },
+    assignedFollowUpMemberId: {
+      type: String,
+      trim: true,
     },
     visitationHistory: [homeVisitSchema],
     convertedToProspectId: {

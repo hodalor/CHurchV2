@@ -106,6 +106,10 @@ const memberSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    residentialArea: {
+      type: String,
+      trim: true,
+    },
     email: {
       type: String,
       trim: true,
