@@ -7,6 +7,7 @@ import DashboardPage from "../../pages/DashboardPage";
 import SetupPage from "../../pages/SetupPage";
 import MembersPage from "../../pages/MembersPage";
 import MinistriesPage from "../../pages/MinistriesPage";
+import EvangelismPage from "../../pages/EvangelismPage";
 import VisitorsPage from "../../pages/VisitorsPage";
 import FamilyOverviewPage from "../../pages/FamilyOverviewPage";
 import FamilyHouseholdsPage from "../../pages/FamilyHouseholdsPage";
@@ -21,7 +22,7 @@ export default function AppLayout() {
   const location = useLocation();
   const { openMemberEnrollment, openRecordModal, activeSetupTab, branding } = useAppContext();
   const pageMeta = getPageMeta(location.pathname);
-  const pageAction = getPageAction(pageMeta.action, activeSetupTab, { openMemberEnrollment, openRecordModal, branding });
+  const pageAction = getPageAction(pageMeta.action, activeSetupTab, { openMemberEnrollment, openRecordModal, branding }, location.pathname);
 
   return (
     <>
@@ -40,6 +41,11 @@ export default function AppLayout() {
                 <Route path="/setup" element={<SetupPage />} />
                 <Route path="/members" element={<MembersPage />} />
                 <Route path="/ministries" element={<MinistriesPage />} />
+                <Route path="/evangelism/pipeline" element={<EvangelismPage />} />
+                <Route path="/evangelism/contacts" element={<EvangelismPage />} />
+                <Route path="/evangelism/bible-study" element={<EvangelismPage />} />
+                <Route path="/evangelism/campaigns" element={<EvangelismPage />} />
+                <Route path="/evangelism/reports" element={<EvangelismPage />} />
                 <Route path="/visitors/register-list" element={<VisitorsPage />} />
                 <Route path="/visitors/pipeline" element={<VisitorsPage />} />
                 <Route path="/visitors/follow-ups" element={<VisitorsPage />} />
@@ -85,6 +91,14 @@ function getPageMeta(pathname) {
       title: "Visitors",
       subtitle: "Register visitors separately and manage their follow-up journey.",
       action: "visitor",
+    };
+  }
+
+  if (pathname.startsWith("/evangelism")) {
+    return {
+      title: "Evangelism",
+      subtitle: "Track prospects from first contact through Bible study and integration.",
+      action: "evangelism",
     };
   }
 
@@ -142,7 +156,7 @@ function getPageMeta(pathname) {
   };
 }
 
-function getPageAction(action, activeSetupTab, handlers) {
+function getPageAction(action, activeSetupTab, handlers, pathname) {
   if (!action) {
     return null;
   }
@@ -183,6 +197,11 @@ function getPageAction(action, activeSetupTab, handlers) {
 
   const labels = {
     visitor: "Add Visitor",
+    evangelism: pathname?.startsWith("/evangelism/campaigns")
+      ? "Add Campaign"
+      : pathname?.startsWith("/evangelism/bible-study")
+        ? "Add Bible Study"
+        : "Add Prospect",
     family: "Add Family",
     finance: "Add Finance",
     attendance: "Add Attendance",
@@ -195,7 +214,23 @@ function getPageAction(action, activeSetupTab, handlers) {
   }
 
   return (
-    <button type="button" className="primary-button large-action" onClick={() => handlers.openRecordModal(action, null, "edit")}>
+    <button
+      type="button"
+      className="primary-button large-action"
+      onClick={() =>
+        handlers.openRecordModal(
+          action === "evangelism"
+            ? pathname?.startsWith("/evangelism/campaigns")
+              ? "campaign"
+              : pathname?.startsWith("/evangelism/bible-study")
+                ? "bibleStudy"
+                : "prospect"
+            : action,
+          null,
+          "edit"
+        )
+      }
+    >
       <FaPlus />
       {labels[action]}
     </button>

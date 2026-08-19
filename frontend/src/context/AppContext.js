@@ -21,6 +21,7 @@ import {
   userFormTemplate,
 } from "../data/mockData";
 import { churchApi } from "../apis/churchApi";
+import { useAuth } from "./AuthContext";
 import {
   buildGroupSelections,
   enrichFamilyLinks,
@@ -32,6 +33,7 @@ import {
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
+  const { authUser } = useAuth();
   const [branding, setBranding] = useState(initialBranding);
   const [groups, setGroups] = useState(initialGroups);
   const [ministries, setMinistries] = useState(initialMinistries);
@@ -39,10 +41,18 @@ export function AppProvider({ children }) {
   const [roles, setRoles] = useState(initialRoles);
   const [users, setUsers] = useState(initialUsers);
   const [visitors, setVisitors] = useState(initialVisitors);
+  const [prospects, setProspects] = useState([]);
+  const [evangelismContacts, setEvangelismContacts] = useState([]);
+  const [bibleStudies, setBibleStudies] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [families, setFamilies] = useState(initialFamilies);
   const [financeRecords, setFinanceRecords] = useState(initialFinanceRecords);
   const [attendanceSessions, setAttendanceSessions] = useState(initialAttendanceSessions);
   const [familyApiState, setFamilyApiState] = useState({ loading: false, error: "" });
+  const [visitorApiState, setVisitorApiState] = useState({ loading: false, error: "", metrics: null });
+  const [evangelismApiState, setEvangelismApiState] = useState({ loading: false, error: "", dashboard: null });
+  const [lookupState, setLookupState] = useState({ loading: false, error: "", values: [] });
+  const [pendingActionState, setPendingActionState] = useState({ loading: false, error: "", items: [] });
   const [memberSearch, setMemberSearch] = useState("");
   const [memberMinistryFilter, setMemberMinistryFilter] = useState("all");
   const [activeSetupTab, setActiveSetupTab] = useState("groups");
@@ -104,6 +114,34 @@ export function AppProvider({ children }) {
     ];
   }, [members]);
 
+  const visitorHowHeardOptions = useMemo(
+    () => lookupState.values.filter((item) => item.type?.key === "visitor_how_heard"),
+    [lookupState.values]
+  );
+
+  const visitorStatusOptions = useMemo(
+    () => lookupState.values.filter((item) => item.type?.key === "visitor_status"),
+    [lookupState.values]
+  );
+
+  const evangelismSourceOptions = useMemo(
+    () =>
+      lookupState.values.filter((item) =>
+        ["evangelism_source", "visitor_how_heard"].includes(item.type?.key)
+      ),
+    [lookupState.values]
+  );
+
+  const evangelismStageOptions = useMemo(
+    () => lookupState.values.filter((item) => item.type?.key === "evangelism_pipeline_stage"),
+    [lookupState.values]
+  );
+
+  const bibleStudyStatusOptions = useMemo(
+    () => lookupState.values.filter((item) => item.type?.key === "bible_study_status"),
+    [lookupState.values]
+  );
+
   const openModal = (name) => setActiveModal(name);
   const closeModal = () => setActiveModal(null);
 
@@ -111,18 +149,44 @@ export function AppProvider({ children }) {
     const sourceRecord = record
       ? type === "family"
         ? hydrateFamilyRecord(record)
-        : record
+        : type === "visitor"
+          ? hydrateVisitorRecord(record)
+          : type === "prospect"
+            ? hydrateProspectRecord(record)
+            : type === "bibleStudy"
+              ? hydrateBibleStudyRecord(record)
+              : record
       : buildNewRecord(type, {
-      families,
-      members,
-      ministries,
-      roles,
-    });
+          families,
+          members,
+          ministries,
+          roles,
+          prospects,
+          users,
+        });
 
     if (!record && type === "family") {
       try {
         const payload = await churchApi.getNextFamilyId();
         sourceRecord.familyId = payload.familyId || sourceRecord.familyId;
+      } catch (error) {
+        // Fall back to local generated ID if the next-id request fails.
+      }
+    }
+
+    if (!record && type === "visitor" && authUser) {
+      try {
+        const payload = await churchApi.getNextVisitorId();
+        sourceRecord.visitorId = payload.visitorId || sourceRecord.visitorId;
+      } catch (error) {
+        // Fall back to local generated ID if the next-id request fails.
+      }
+    }
+
+    if (!record && type === "prospect" && authUser) {
+      try {
+        const payload = await churchApi.getNextProspectId();
+        sourceRecord.prospectId = payload.prospectId || sourceRecord.prospectId;
       } catch (error) {
         // Fall back to local generated ID if the next-id request fails.
       }
@@ -168,6 +232,149 @@ export function AppProvider({ children }) {
     setActiveModal("member-enrolment");
   };
 
+  const syncVisitorState = (incomingVisitor) => {
+    if (!incomingVisitor) {
+      return null;
+    }
+
+    const hydratedVisitor = hydrateVisitorRecord(incomingVisitor);
+    const visitorIdentity = hydratedVisitor.visitorId || hydratedVisitor._id || hydratedVisitor.id;
+
+    setVisitors((current) =>
+      updateOrInsert(current, hydratedVisitor, visitorIdentity, {
+        id: hydratedVisitor.id || `v${Date.now()}`,
+        _id: hydratedVisitor._id,
+      })
+    );
+
+    setRecordModal((current) => {
+      if (current.type !== "visitor") {
+        return current;
+      }
+
+      const currentIdentity =
+        current.record?.visitorId ||
+        current.record?._id ||
+        current.record?.id ||
+        current.draft?.visitorId ||
+        current.draft?._id ||
+        current.draft?.id;
+
+      if (currentIdentity !== visitorIdentity) {
+        return current;
+      }
+
+      return {
+        ...current,
+        record: hydratedVisitor,
+        draft: hydratedVisitor,
+      };
+    });
+
+    return hydratedVisitor;
+  };
+
+  const refreshVisitorMetrics = async () => {
+    const metrics = await churchApi.getVisitorRetentionMetrics(30);
+    setVisitorApiState((current) => ({
+      ...current,
+      loading: false,
+      error: "",
+      metrics,
+    }));
+    return metrics;
+  };
+
+  const refreshPendingActions = async () => {
+    try {
+      const pendingActions = await churchApi.getPendingActions();
+      setPendingActionState({
+        loading: false,
+        error: "",
+        items: Array.isArray(pendingActions) ? pendingActions : [],
+      });
+      return pendingActions;
+    } catch (error) {
+      setPendingActionState({
+        loading: false,
+        error: error.message || "Unable to load follow-up actions.",
+        items: [],
+      });
+      return [];
+    }
+  };
+
+  const syncProspectState = (incomingProspect) => {
+    if (!incomingProspect) {
+      return null;
+    }
+
+    const hydratedProspect = hydrateProspectRecord(incomingProspect);
+    const prospectIdentity = hydratedProspect.prospectId || hydratedProspect._id || hydratedProspect.id;
+
+    setProspects((current) =>
+      updateOrInsert(current, hydratedProspect, prospectIdentity, {
+        id: hydratedProspect.id || `p${Date.now()}`,
+        _id: hydratedProspect._id,
+      })
+    );
+
+    setRecordModal((current) => {
+      if (current.type !== "prospect") {
+        return current;
+      }
+
+      const currentIdentity =
+        current.record?.prospectId ||
+        current.record?._id ||
+        current.record?.id ||
+        current.draft?.prospectId ||
+        current.draft?._id ||
+        current.draft?.id;
+
+      if (currentIdentity !== prospectIdentity) {
+        return current;
+      }
+
+      return {
+        ...current,
+        record: hydratedProspect,
+        draft: hydratedProspect,
+      };
+    });
+
+    return hydratedProspect;
+  };
+
+  const refreshEvangelismDashboard = async () => {
+    const dashboard = await churchApi.getEvangelismDashboard();
+    setEvangelismApiState((current) => ({
+      ...current,
+      loading: false,
+      error: "",
+      dashboard,
+    }));
+    return dashboard;
+  };
+
+  const refreshEvangelismCollections = async () => {
+    const [contactsResponse, studiesResponse, campaignsResponse] = await Promise.all([
+      churchApi.getEvangelismContacts(),
+      churchApi.getBibleStudies(),
+      churchApi.getCampaigns(),
+    ]);
+
+    setEvangelismContacts(Array.isArray(contactsResponse) ? contactsResponse : []);
+    setBibleStudies(Array.isArray(studiesResponse) ? studiesResponse.map(hydrateBibleStudyRecord) : []);
+    setCampaigns(Array.isArray(campaignsResponse) ? campaignsResponse : []);
+
+    return {
+      contacts: contactsResponse,
+      bibleStudies: studiesResponse,
+      campaigns: campaignsResponse,
+    };
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -193,6 +400,155 @@ export function AppProvider({ children }) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProtectedData() {
+      if (!authUser) {
+        if (active) {
+          setVisitors(initialVisitors);
+          setProspects([]);
+          setEvangelismContacts([]);
+          setBibleStudies([]);
+          setCampaigns([]);
+          setUsers(initialUsers);
+          setLookupState({ loading: false, error: "", values: [] });
+          setVisitorApiState({ loading: false, error: "", metrics: null });
+          setEvangelismApiState({ loading: false, error: "", dashboard: null });
+          setPendingActionState({ loading: false, error: "", items: [] });
+        }
+        return;
+      }
+
+      setLookupState((current) => ({ ...current, loading: true, error: "" }));
+      setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
+      setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+      setPendingActionState((current) => ({ ...current, loading: true, error: "" }));
+
+      try {
+        const [
+          lookupsResponse,
+          usersResponse,
+          visitorsResponse,
+          retentionMetrics,
+          pendingActionsResponse,
+          prospectsResponse,
+          contactsResponse,
+          bibleStudiesResponse,
+          campaignsResponse,
+          evangelismDashboardResponse,
+        ] =
+          await Promise.allSettled([
+            churchApi.getLookups(),
+            churchApi.getUsers(),
+            churchApi.getVisitors(),
+            churchApi.getVisitorRetentionMetrics(30),
+            churchApi.getPendingActions(),
+            churchApi.getProspects(),
+            churchApi.getEvangelismContacts(),
+            churchApi.getBibleStudies(),
+            churchApi.getCampaigns(),
+            churchApi.getEvangelismDashboard(),
+          ]);
+
+        if (!active) {
+          return;
+        }
+
+        setLookupState({
+          loading: false,
+          error:
+            lookupsResponse.status === "rejected"
+              ? lookupsResponse.reason?.message || "Unable to load lookups."
+              : "",
+          values:
+            lookupsResponse.status === "fulfilled" && Array.isArray(lookupsResponse.value.values)
+              ? lookupsResponse.value.values
+              : [],
+        });
+        setUsers(
+          usersResponse.status === "fulfilled" && Array.isArray(usersResponse.value)
+            ? usersResponse.value
+            : []
+        );
+        setVisitors(
+          visitorsResponse.status === "fulfilled" && Array.isArray(visitorsResponse.value)
+            ? visitorsResponse.value.map(hydrateVisitorRecord)
+            : []
+        );
+        setProspects(
+          prospectsResponse.status === "fulfilled" && Array.isArray(prospectsResponse.value)
+            ? prospectsResponse.value.map(hydrateProspectRecord)
+            : []
+        );
+        setEvangelismContacts(
+          contactsResponse.status === "fulfilled" && Array.isArray(contactsResponse.value)
+            ? contactsResponse.value
+            : []
+        );
+        setBibleStudies(
+          bibleStudiesResponse.status === "fulfilled" && Array.isArray(bibleStudiesResponse.value)
+            ? bibleStudiesResponse.value.map(hydrateBibleStudyRecord)
+            : []
+        );
+        setCampaigns(
+          campaignsResponse.status === "fulfilled" && Array.isArray(campaignsResponse.value)
+            ? campaignsResponse.value
+            : []
+        );
+        setVisitorApiState({
+          loading: false,
+          error:
+            visitorsResponse.status === "rejected"
+              ? visitorsResponse.reason?.message || "Unable to load visitors."
+              : retentionMetrics.status === "rejected"
+                ? retentionMetrics.reason?.message || "Unable to load visitor metrics."
+                : "",
+          metrics: retentionMetrics.status === "fulfilled" ? retentionMetrics.value : null,
+        });
+        setEvangelismApiState({
+          loading: false,
+          error:
+            prospectsResponse.status === "rejected"
+              ? prospectsResponse.reason?.message || "Unable to load prospects."
+              : evangelismDashboardResponse.status === "rejected"
+                ? evangelismDashboardResponse.reason?.message || "Unable to load evangelism dashboard."
+                : "",
+          dashboard:
+            evangelismDashboardResponse.status === "fulfilled"
+              ? evangelismDashboardResponse.value
+              : null,
+        });
+        setPendingActionState({
+          loading: false,
+          error:
+            pendingActionsResponse.status === "rejected"
+              ? pendingActionsResponse.reason?.message || "Unable to load follow-up actions."
+              : "",
+          items:
+            pendingActionsResponse.status === "fulfilled" && Array.isArray(pendingActionsResponse.value)
+              ? pendingActionsResponse.value
+              : [],
+        });
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setLookupState({ loading: false, error: error.message || "Unable to load lookups.", values: [] });
+        setVisitorApiState({ loading: false, error: error.message || "Unable to load visitors.", metrics: null });
+        setEvangelismApiState({ loading: false, error: error.message || "Unable to load evangelism data.", dashboard: null });
+        setPendingActionState({ loading: false, error: error.message || "Unable to load follow-up actions.", items: [] });
+      }
+    }
+
+    loadProtectedData();
+
+    return () => {
+      active = false;
+    };
+  }, [authUser]);
 
   const handleMemberGroupChange = (depth, value) => {
     setMemberForm((current) => {
@@ -323,11 +679,104 @@ export function AppProvider({ children }) {
     }
 
     if (type === "visitor") {
-      setVisitors((current) =>
-        updateOrInsert(current, draft, record?.id, {
-          id: draft.id || `v${Date.now()}`,
-        })
-      );
+      try {
+        setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
+        const normalizedVisitor = normalizeVisitorDraft(draft);
+        const savedVisitor = record?.visitorId
+          ? await churchApi.updateVisitor(record.visitorId, normalizedVisitor)
+          : await churchApi.createVisitor(normalizedVisitor);
+
+        syncVisitorState(savedVisitor);
+        await refreshVisitorMetrics();
+        closeRecordModal();
+      } catch (error) {
+        setVisitorApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save visitor.",
+        }));
+      }
+      return;
+    }
+
+    if (type === "prospect") {
+      try {
+        setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+        const normalizedProspect = normalizeProspectDraft(draft);
+        const savedProspect = record?.prospectId
+          ? await churchApi.updateProspect(record.prospectId, normalizedProspect)
+          : await churchApi.createProspect(normalizedProspect);
+
+        syncProspectState(savedProspect);
+        await refreshEvangelismDashboard();
+        closeRecordModal();
+      } catch (error) {
+        setEvangelismApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save prospect.",
+        }));
+      }
+      return;
+    }
+
+    if (type === "bibleStudy") {
+      try {
+        setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+        const normalizedStudy = normalizeBibleStudyDraft(draft);
+        const savedStudy = record?._id
+          ? await churchApi.updateBibleStudy(record._id, normalizedStudy)
+          : await churchApi.createBibleStudy(normalizedStudy);
+
+        setBibleStudies((current) =>
+          updateOrInsert(current, hydrateBibleStudyRecord(savedStudy), record?._id || record?.id, {
+            id: savedStudy.id || `bs${Date.now()}`,
+            _id: savedStudy._id,
+          })
+        );
+
+        await refreshEvangelismDashboard();
+        closeRecordModal();
+      } catch (error) {
+        setEvangelismApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save Bible study.",
+        }));
+      }
+      return;
+    }
+
+    if (type === "campaign") {
+      try {
+        setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+        const payload = {
+          name: draft.name || "",
+          startDate: draft.startDate || new Date().toISOString().slice(0, 10),
+          endDate: draft.endDate || null,
+          summaryNotes: draft.summaryNotes || "",
+        };
+        const savedCampaign = record?._id
+          ? await churchApi.updateCampaign(record._id, payload)
+          : await churchApi.createCampaign(payload);
+
+        setCampaigns((current) =>
+          updateOrInsert(current, savedCampaign, record?._id || record?.id, {
+            id: savedCampaign.id || `camp${Date.now()}`,
+            _id: savedCampaign._id,
+          })
+        );
+
+        await refreshEvangelismDashboard();
+        closeRecordModal();
+      } catch (error) {
+        setEvangelismApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save campaign.",
+        }));
+      }
+      return;
     }
 
     if (type === "family") {
@@ -425,6 +874,7 @@ export function AppProvider({ children }) {
   };
 
   const value = {
+    authUser,
     branding,
     setBranding,
     groups,
@@ -434,12 +884,25 @@ export function AppProvider({ children }) {
     filteredMembers,
     visitors,
     setVisitors,
+    prospects,
+    evangelismContacts,
+    bibleStudies,
+    campaigns,
     roles,
     users,
     families,
     financeRecords,
     attendanceSessions,
     familyApiState,
+    visitorApiState,
+    evangelismApiState,
+    lookupState,
+    pendingActionState,
+    visitorHowHeardOptions,
+    visitorStatusOptions,
+    evangelismSourceOptions,
+    evangelismStageOptions,
+    bibleStudyStatusOptions,
     attendanceTrend,
     dashboardStats,
     memberDistribution,
@@ -458,6 +921,10 @@ export function AppProvider({ children }) {
     saveRecordModal,
     setRecordModalDraft,
     setRecordModalMode,
+    refreshPendingActions,
+    syncVisitorState,
+    syncProspectState,
+    refreshEvangelismCollections,
     openMemberEnrollment,
     enrolmentStep,
     setEnrolmentStep,
@@ -489,6 +956,180 @@ export function AppProvider({ children }) {
     setFinanceRecords,
     setAttendanceSessions,
     setFamilies,
+    setCampaigns,
+    async recordVisitorChurchVisit(visitorId, payload) {
+      try {
+        setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedVisitor = await churchApi.addVisitorChurchVisit(visitorId, payload);
+        syncVisitorState(updatedVisitor);
+        await refreshVisitorMetrics();
+        return updatedVisitor;
+      } catch (error) {
+        setVisitorApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to record church visit.",
+        }));
+        throw error;
+      }
+    },
+    async assignVisitorFollowUp(visitorId, assignedUserId) {
+      try {
+        setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
+        setPendingActionState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedVisitor = await churchApi.assignVisitorFollowUp(visitorId, assignedUserId);
+        syncVisitorState(updatedVisitor);
+        await Promise.all([refreshVisitorMetrics(), refreshPendingActions()]);
+        return updatedVisitor;
+      } catch (error) {
+        setVisitorApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to assign visitor follow-up.",
+        }));
+        setPendingActionState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to load follow-up actions.",
+        }));
+        throw error;
+      }
+    },
+    async recordVisitorHomeVisit(visitorId, payload) {
+      try {
+        setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedVisitor = await churchApi.addVisitorHomeVisit(visitorId, payload);
+        syncVisitorState(updatedVisitor);
+        setVisitorApiState((current) => ({ ...current, loading: false, error: "" }));
+        return updatedVisitor;
+      } catch (error) {
+        setVisitorApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save home visit.",
+        }));
+        throw error;
+      }
+    },
+    async convertVisitorToProspect(visitorId) {
+      try {
+        setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
+        const result = await churchApi.convertVisitorToProspect(visitorId);
+        syncVisitorState(result.visitor);
+        syncProspectState(result.prospect);
+        await Promise.all([refreshVisitorMetrics(), refreshEvangelismDashboard()]);
+        return result;
+      } catch (error) {
+        setVisitorApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to convert visitor to prospect.",
+        }));
+        throw error;
+      }
+    },
+    async convertVisitorToMember(visitorId, payload) {
+      try {
+        setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
+        const result = await churchApi.convertVisitorToMember(visitorId, payload);
+        syncVisitorState(result.visitor);
+        await refreshVisitorMetrics();
+        return result;
+      } catch (error) {
+        setVisitorApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to convert visitor to member.",
+        }));
+        throw error;
+      }
+    },
+    async assignProspect(prospectId, assignedUserId) {
+      try {
+        setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+        setPendingActionState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedProspect = await churchApi.assignProspect(prospectId, assignedUserId);
+        syncProspectState(updatedProspect);
+        await Promise.all([refreshEvangelismDashboard(), refreshPendingActions()]);
+        return updatedProspect;
+      } catch (error) {
+        setEvangelismApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to assign prospect.",
+        }));
+        throw error;
+      }
+    },
+    async moveProspectStage(prospectId, stageId) {
+      try {
+        setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedProspect = await churchApi.moveProspectStage(prospectId, stageId);
+        syncProspectState(updatedProspect);
+        await refreshEvangelismDashboard();
+        return updatedProspect;
+      } catch (error) {
+        setEvangelismApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to update prospect stage.",
+        }));
+        throw error;
+      }
+    },
+    async logProspectContact(prospectId, payload) {
+      try {
+        setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+        setPendingActionState((current) => ({ ...current, loading: true, error: "" }));
+        const contact = await churchApi.addProspectContact(prospectId, payload);
+        setEvangelismContacts((current) => [contact, ...current]);
+        await Promise.all([refreshPendingActions(), refreshEvangelismDashboard()]);
+        return contact;
+      } catch (error) {
+        setEvangelismApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to log evangelism contact.",
+        }));
+        throw error;
+      }
+    },
+    async convertProspectToMember(prospectId, payload) {
+      try {
+        setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+        const result = await churchApi.convertProspectToMember(prospectId, payload);
+        syncProspectState(result.prospect);
+        await refreshEvangelismDashboard();
+        return result;
+      } catch (error) {
+        setEvangelismApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to convert prospect to member.",
+        }));
+        throw error;
+      }
+    },
+    async addBibleStudyLesson(studyId, payload) {
+      try {
+        setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedStudy = await churchApi.addBibleStudyLesson(studyId, payload);
+        setBibleStudies((current) =>
+          updateOrInsert(current, hydrateBibleStudyRecord(updatedStudy), studyId, {
+            _id: updatedStudy._id,
+          })
+        );
+        await refreshEvangelismDashboard();
+        return updatedStudy;
+      } catch (error) {
+        setEvangelismApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save Bible study lesson.",
+        }));
+        throw error;
+      }
+    },
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -496,23 +1137,31 @@ export function AppProvider({ children }) {
 
 function updateOrInsert(items, draft, originalId, fallbacks = {}) {
   const nextItem = { ...fallbacks, ...draft };
-  const existingIndex = items.findIndex((item) => item.id === originalId);
+  const existingIndex = items.findIndex((item) => getRecordIdentity(item) === originalId);
 
   if (existingIndex === -1) {
     return [nextItem, ...items];
   }
 
-  return items.map((item) => (item.id === originalId ? nextItem : item));
+  return items.map((item) => (getRecordIdentity(item) === originalId ? nextItem : item));
 }
 
-function buildNewRecord(type, { families, members, ministries, roles }) {
+function buildNewRecord(type, { families, members, ministries, roles, prospects, users }) {
   if (type === "visitor") {
     return {
-      fullName: "",
+      visitorId: `VS${String(Date.now()).slice(-4)}`,
+      firstName: "",
+      surname: "",
       phone: "",
-      stage: "First Timer",
-      assignedTo: "Follow-up Team",
-      nextStep: "",
+      email: "",
+      residentialArea: "",
+      firstVisitDate: new Date().toISOString().slice(0, 10),
+      howHeard: "",
+      assignedFollowUpUserId: "",
+      visitCount: 1,
+      visitDates: [],
+      status: "",
+      visitationHistory: [],
     };
   }
 
@@ -530,6 +1179,44 @@ function buildNewRecord(type, { families, members, ministries, roles }) {
       familyContact: "",
       visitationHistory: "",
       householdMembers: [],
+    };
+  }
+
+  if (type === "prospect") {
+    return {
+      prospectId: `EP${String(Date.now()).slice(-4)}`,
+      firstName: "",
+      surname: "",
+      phone: "",
+      email: "",
+      residentialArea: "",
+      source: "",
+      assignedEvangelistId: "",
+      currentStage: "",
+      campaignId: "",
+      stageHistory: [],
+      sourceVisitorId: "",
+    };
+  }
+
+  if (type === "bibleStudy") {
+    return {
+      prospect: prospects[0] || null,
+      member: null,
+      teacherId: users[0] || null,
+      startDate: new Date().toISOString().slice(0, 10),
+      status: "",
+      lessonsCompleted: [],
+    };
+  }
+
+  if (type === "campaign") {
+    return {
+      name: "",
+      startDate: new Date().toISOString().slice(0, 10),
+      endDate: "",
+      summaryNotes: "",
+      linkedProspects: 0,
     };
   }
 
@@ -623,6 +1310,92 @@ function buildNewRecord(type, { families, members, ministries, roles }) {
   }
 
   return {};
+}
+
+function getRecordIdentity(item) {
+  return item?.id || item?._id || item?.visitorId || item?.prospectId || item?.familyId || item?.memberId;
+}
+
+function hydrateVisitorRecord(visitor) {
+  if (!visitor) {
+    return visitor;
+  }
+
+  return {
+    ...visitor,
+    howHeard: visitor.howHeard || "",
+    status: visitor.status || "",
+    assignedFollowUpUserId: visitor.assignedFollowUpUserId || "",
+  };
+}
+
+function normalizeVisitorDraft(draft) {
+  return {
+    visitorId: draft.visitorId,
+    firstName: draft.firstName || "",
+    surname: draft.surname || "",
+    phone: draft.phone || "",
+    email: draft.email || "",
+    residentialArea: draft.residentialArea || "",
+    firstVisitDate: draft.firstVisitDate || new Date().toISOString().slice(0, 10),
+    howHeard: draft.howHeard?._id || draft.howHeard || null,
+    assignedFollowUpUserId: draft.assignedFollowUpUserId?._id || draft.assignedFollowUpUserId || null,
+  };
+}
+
+function hydrateProspectRecord(prospect) {
+  if (!prospect) {
+    return prospect;
+  }
+
+  return {
+    ...prospect,
+    source: prospect.source || "",
+    assignedEvangelistId: prospect.assignedEvangelistId || "",
+    currentStage: prospect.currentStage || "",
+    campaignId: prospect.campaignId || "",
+    stageHistory: Array.isArray(prospect.stageHistory) ? prospect.stageHistory : [],
+  };
+}
+
+function normalizeProspectDraft(draft) {
+  return {
+    prospectId: draft.prospectId,
+    firstName: draft.firstName || "",
+    surname: draft.surname || "",
+    phone: draft.phone || "",
+    email: draft.email || "",
+    residentialArea: draft.residentialArea || "",
+    source: draft.source?._id || draft.source || null,
+    assignedEvangelistId: draft.assignedEvangelistId?._id || draft.assignedEvangelistId || null,
+    currentStage: draft.currentStage?._id || draft.currentStage || null,
+    campaignId: draft.campaignId?._id || draft.campaignId || null,
+  };
+}
+
+function hydrateBibleStudyRecord(study) {
+  if (!study) {
+    return study;
+  }
+
+  return {
+    ...study,
+    prospect: study.prospect || null,
+    member: study.member || null,
+    teacherId: study.teacherId || null,
+    status: study.status || "",
+    lessonsCompleted: Array.isArray(study.lessonsCompleted) ? study.lessonsCompleted : [],
+  };
+}
+
+function normalizeBibleStudyDraft(draft) {
+  return {
+    prospect: draft.prospect?._id || draft.prospect || null,
+    member: draft.member?._id || draft.member || null,
+    teacherId: draft.teacherId?._id || draft.teacherId || null,
+    startDate: draft.startDate || new Date().toISOString().slice(0, 10),
+    status: draft.status?._id || draft.status || null,
+  };
 }
 
 function hydrateFamilyRecord(family) {

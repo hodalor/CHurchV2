@@ -1,6 +1,11 @@
 import ModalShell from "./ModalShell";
 import { useAppContext } from "../../context/AppContext";
+import BibleStudyRecordFields from "../evangelism/BibleStudyRecordFields";
+import ProspectActionPanel from "../evangelism/ProspectActionPanel";
+import ProspectRecordFields from "../evangelism/ProspectRecordFields";
 import FamilyRecordFields from "../family/FamilyRecordFields";
+import VisitorActionPanel from "../visitors/VisitorActionPanel";
+import VisitorRecordFields from "../visitors/VisitorRecordFields";
 
 export default function RecordDetailModal() {
   const {
@@ -12,6 +17,13 @@ export default function RecordDetailModal() {
     groups,
     members,
     roles,
+    users,
+    visitorHowHeardOptions,
+    evangelismSourceOptions,
+    evangelismStageOptions,
+    bibleStudyStatusOptions,
+    campaigns,
+    prospects,
   } = useAppContext();
 
   if (!recordModal.open || !recordModal.draft) {
@@ -46,6 +58,66 @@ export default function RecordDetailModal() {
             setRecordModalMode={setRecordModalMode}
           />
         </>
+      ) : type === "visitor" ? (
+        <>
+          <VisitorRecordFields
+            draft={draft}
+            isEditing={isEditing}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+            howHeardOptions={visitorHowHeardOptions}
+            users={users}
+          />
+          <VisitorActionPanel visitor={draft} />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
+      ) : type === "prospect" ? (
+        <>
+          <ProspectRecordFields
+            draft={draft}
+            isEditing={isEditing}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+            sourceOptions={evangelismSourceOptions}
+            stageOptions={evangelismStageOptions}
+            campaignOptions={campaigns}
+            users={users}
+          />
+          <ProspectActionPanel prospect={draft} />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
+      ) : type === "bibleStudy" ? (
+        <>
+          <BibleStudyRecordFields
+            draft={draft}
+            isEditing={isEditing}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+            prospects={prospects}
+            members={members}
+            users={users}
+            statusOptions={bibleStudyStatusOptions}
+          />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
       ) : (
         <div className="modal-form">
           <div className="form-grid">
@@ -54,7 +126,7 @@ export default function RecordDetailModal() {
                 {field.label}
                 {field.type === "select" ? (
                   <select
-                    value={Array.isArray(draft[field.name]) ? draft[field.name].join(", ") : draft[field.name] ?? ""}
+                    value={getFieldValue(field, draft)}
                     disabled={!isEditing}
                     onChange={(event) =>
                       setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
@@ -69,7 +141,7 @@ export default function RecordDetailModal() {
                 ) : field.type === "textarea" ? (
                   <textarea
                     rows="4"
-                    value={Array.isArray(draft[field.name]) ? draft[field.name].join(", ") : draft[field.name] ?? ""}
+                    value={getFieldValue(field, draft)}
                     readOnly={!isEditing}
                     onChange={(event) =>
                       setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
@@ -78,7 +150,7 @@ export default function RecordDetailModal() {
                 ) : (
                   <input
                     type={field.type || "text"}
-                    value={Array.isArray(draft[field.name]) ? draft[field.name].join(", ") : draft[field.name] ?? ""}
+                    value={getFieldValue(field, draft)}
                     readOnly={!isEditing}
                     onChange={(event) =>
                       setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
@@ -125,6 +197,9 @@ function getTitle(type) {
   const titles = {
     member: "Member Details",
     visitor: "Visitor Details",
+    prospect: "Prospect Details",
+    bibleStudy: "Bible Study Details",
+    campaign: "Campaign Details",
     finance: "Finance Details",
     attendance: "Attendance Details",
     user: "User Details",
@@ -157,13 +232,11 @@ function getFields(type, groups, roles) {
   }
 
   if (type === "visitor") {
-    return [
-      { name: "fullName", label: "Full Name" },
-      { name: "phone", label: "Phone" },
-      { name: "stage", label: "Stage" },
-      { name: "assignedTo", label: "Assigned To" },
-      { name: "nextStep", label: "Next Step", wide: true },
-    ];
+    return [];
+  }
+
+  if (type === "prospect" || type === "bibleStudy") {
+    return [];
   }
 
   if (type === "finance") {
@@ -232,9 +305,32 @@ function getFields(type, groups, roles) {
     ];
   }
 
+  if (type === "campaign") {
+    return [
+      { name: "name", label: "Campaign Name" },
+      { name: "startDate", label: "Start Date", type: "date" },
+      { name: "endDate", label: "End Date", type: "date" },
+      { name: "summaryNotes", label: "Summary Notes", type: "textarea", wide: true },
+    ];
+  }
+
   if (type === "family") {
     return [];
   }
 
   return [];
+}
+
+function getFieldValue(field, draft) {
+  const value = draft[field.name];
+
+  if (Array.isArray(value)) {
+    return value.join(", ");
+  }
+
+  if (field.type === "date" && value) {
+    return String(value).slice(0, 10);
+  }
+
+  return value ?? "";
 }

@@ -1,13 +1,45 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5100/api";
+const SESSION_STORAGE_KEY = "churchflow.session";
 
-async function request(path, options = {}) {
+function getStoredSession() {
+  const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function storeSession(session) {
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+function clearStoredSession() {
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+async function request(path, options = {}, retryOnUnauthorized = true) {
+  const session = getStoredSession();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  if (session?.accessToken) {
+    headers.Authorization = `Bearer ${session.accessToken}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
     ...options,
+    headers,
   });
+
+  if (response.status === 401 && retryOnUnauthorized && session?.refreshToken) {
+    try {
+      const refreshed = await refreshSession(session.refreshToken);
+      storeSession(refreshed);
+      return request(path, options, false);
+    } catch (error) {
+      clearStoredSession();
+      throw error;
+    }
+  }
 
   if (!response.ok) {
     const payload = await safeJson(response);
@@ -22,7 +54,65 @@ async function safeJson(response) {
   return text ? JSON.parse(text) : {};
 }
 
+async function refreshSession(refreshToken) {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!response.ok) {
+    const payload = await safeJson(response);
+    throw new Error(payload.message || "Unable to refresh session.");
+  }
+
+  return safeJson(response);
+}
+
 export const churchApi = {
+  getStoredSession,
+  clearStoredSession,
+  storeSession,
+
+  async login(username, pin) {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, pin }),
+    });
+
+    const payload = await safeJson(response);
+    if (!response.ok) {
+      throw new Error(payload.message || "Login failed.");
+    }
+
+    storeSession(payload);
+    return payload;
+  },
+
+  async logout() {
+    const session = getStoredSession();
+    if (session?.refreshToken) {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken: session.refreshToken }),
+      });
+    }
+
+    clearStoredSession();
+  },
+
+  async getCurrentUser() {
+    return request("/auth/me");
+  },
+
   async getHealth() {
     return request("/health");
   },
@@ -47,5 +137,179 @@ export const churchApi = {
       method: "PUT",
       body: JSON.stringify(payload),
     });
+  },
+
+  async getLookups() {
+    return request("/lookups");
+  },
+
+  async getUsers() {
+    return request("/users");
+  },
+
+  async getPendingActions(status) {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request(`/pending-actions${suffix}`);
+  },
+
+  async getProspects() {
+    return request("/evangelism/prospects");
+  },
+
+  async getNextProspectId() {
+    return request("/evangelism/prospects/next-id");
+  },
+
+  async createProspect(payload) {
+    return request("/evangelism/prospects", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateProspect(prospectId, payload) {
+    return request(`/evangelism/prospects/${prospectId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async assignProspect(prospectId, assignedUserId) {
+    return request(`/evangelism/prospects/${prospectId}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ assignedUserId }),
+    });
+  },
+
+  async moveProspectStage(prospectId, stageId) {
+    return request(`/evangelism/prospects/${prospectId}/stage`, {
+      method: "POST",
+      body: JSON.stringify({ stageId }),
+    });
+  },
+
+  async addProspectContact(prospectId, payload) {
+    return request(`/evangelism/prospects/${prospectId}/contacts`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async convertProspectToMember(prospectId, payload) {
+    return request(`/evangelism/prospects/${prospectId}/convert-to-member`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getEvangelismContacts() {
+    return request("/evangelism/contacts");
+  },
+
+  async getBibleStudies() {
+    return request("/evangelism/bible-studies");
+  },
+
+  async createBibleStudy(payload) {
+    return request("/evangelism/bible-studies", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateBibleStudy(studyId, payload) {
+    return request(`/evangelism/bible-studies/${studyId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async addBibleStudyLesson(studyId, payload) {
+    return request(`/evangelism/bible-studies/${studyId}/lessons`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getCampaigns() {
+    return request("/evangelism/campaigns");
+  },
+
+  async createCampaign(payload) {
+    return request("/evangelism/campaigns", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateCampaign(campaignId, payload) {
+    return request(`/evangelism/campaigns/${campaignId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getEvangelismDashboard() {
+    return request("/evangelism/dashboard");
+  },
+
+  async getVisitors() {
+    return request("/visitors");
+  },
+
+  async getNextVisitorId() {
+    return request("/visitors/next-id");
+  },
+
+  async createVisitor(payload) {
+    return request("/visitors", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateVisitor(visitorId, payload) {
+    return request(`/visitors/${visitorId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async addVisitorChurchVisit(visitorId, payload) {
+    return request(`/visitors/${visitorId}/church-visits`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async assignVisitorFollowUp(visitorId, assignedUserId) {
+    return request(`/visitors/${visitorId}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ assignedUserId }),
+    });
+  },
+
+  async addVisitorHomeVisit(visitorId, payload) {
+    return request(`/visitors/${visitorId}/home-visits`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async convertVisitorToProspect(visitorId) {
+    return request(`/visitors/${visitorId}/convert-to-prospect`, {
+      method: "POST",
+    });
+  },
+
+  async convertVisitorToMember(visitorId, payload) {
+    return request(`/visitors/${visitorId}/convert-to-member`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getVisitorRetentionMetrics(windowDays = 30) {
+    return request(`/visitors/retention-metrics?windowDays=${windowDays}`);
   },
 };

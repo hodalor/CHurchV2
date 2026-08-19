@@ -1,5 +1,6 @@
 import {
   FaBuilding,
+  FaBullhorn,
   FaCalendarCheck,
   FaChurch,
   FaCoins,
@@ -19,6 +20,13 @@ export const navigationSections = [
     { label: "Follow-ups", path: "/visitors/follow-ups" },
     { label: "Workflow", path: "/visitors/workflow" },
     { label: "Reports", path: "/visitors/reports" },
+  ] },
+  { label: "Evangelism", path: "/evangelism", icon: FaBullhorn, children: [
+    { label: "Pipeline", path: "/evangelism/pipeline" },
+    { label: "Contacts", path: "/evangelism/contacts" },
+    { label: "Bible Study", path: "/evangelism/bible-study" },
+    { label: "Campaigns", path: "/evangelism/campaigns" },
+    { label: "Reports", path: "/evangelism/reports" },
   ] },
   { label: "Family", path: "/family", icon: FaHome, children: [
     { label: "Overview", path: "/family/overview" },

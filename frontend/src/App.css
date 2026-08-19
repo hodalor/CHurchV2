@@ -503,6 +503,70 @@
   border-radius: 50%;
 }
 
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #eef4ff, #e2ecff 45%, #f8fbff);
+}
+
+.login-card {
+  width: min(100%, 460px);
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  border-radius: 28px;
+  background: #ffffff;
+  border: 1px solid #dbe7f6;
+  box-shadow: 0 24px 80px rgba(17, 34, 68, 0.12);
+}
+
+.login-card h1 {
+  margin: 0;
+}
+
+.login-copy,
+.login-hint {
+  color: #607594;
+}
+
+.login-card label {
+  display: grid;
+  gap: 8px;
+  color: #425f82;
+  font-weight: 700;
+}
+
+.login-button {
+  justify-content: center;
+}
+
+.form-error {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+
+.empty-table {
+  text-align: center;
+  color: #607594;
+  padding: 24px;
+}
+
+.topbar-logout {
+  border: none;
+  cursor: pointer;
+}
+
+.page-loader {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
 .family-summary-card {
   padding: 18px;
   background: #fff;
@@ -1173,6 +1237,26 @@
   border-radius: 18px;
   background: #f8fbff;
   border: 1px solid #dfe9f5;
+}
+
+.visitor-page {
+  gap: 18px;
+}
+
+.visitor-action-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.visitor-plain-button {
+  width: 100%;
+  border: none;
+  background: #f8fbff;
+  text-align: left;
+}
+
+.visitor-plain-button:hover {
+  background: #eef6ff;
 }
 
 .form-grid {
