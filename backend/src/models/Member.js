@@ -35,6 +35,27 @@ const groupSelectionSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const familyLinkSchema = new mongoose.Schema(
+  {
+    memberId: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    memberName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    relationship: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+  },
+  { _id: false }
+);
+
 const memberSchema = new mongoose.Schema(
   {
     memberId: {
@@ -53,10 +74,26 @@ const memberSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    otherName: {
+      type: String,
+      trim: true,
+    },
+    memberType: {
+      type: String,
+      enum: ["Adult", "Child"],
+      default: "Adult",
+    },
     gender: {
       type: String,
       enum: ["Male", "Female", "Child"],
       default: "Male",
+    },
+    maritalStatus: {
+      type: String,
+      trim: true,
+    },
+    dateOfBirth: {
+      type: Date,
     },
     phone: {
       type: String,
@@ -71,12 +108,53 @@ const memberSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    city: {
+      type: String,
+      trim: true,
+    },
+    country: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
+    },
+    familyId: {
+      type: String,
+      trim: true,
+    },
+    familyName: {
+      type: String,
+      trim: true,
+    },
+    householdRole: {
+      type: String,
+      trim: true,
+    },
+    membershipStatus: {
+      type: String,
+      trim: true,
+      default: "Member",
+    },
+    membershipDate: {
+      type: Date,
+    },
+    baptismStatus: {
+      type: String,
+      trim: true,
+      default: "Not Baptised",
+    },
+    baptismDate: {
+      type: Date,
+    },
     ministry: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Ministry",
       default: null,
     },
     groups: [groupSelectionSchema],
+    familyLinks: [familyLinkSchema],
     personalPhoto: photoSchema,
     idFrontPhoto: photoSchema,
     idBackPhoto: photoSchema,

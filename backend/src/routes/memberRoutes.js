@@ -3,6 +3,16 @@ const Member = require("../models/Member");
 
 const router = express.Router();
 
+router.get("/next-id", async (req, res) => {
+  try {
+    const totalMembers = await Member.countDocuments();
+    const memberId = `MB${String(totalMembers + 1).padStart(4, "0")}`;
+    res.json({ memberId });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const members = await Member.find()
