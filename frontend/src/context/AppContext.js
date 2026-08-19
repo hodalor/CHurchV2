@@ -45,12 +45,23 @@ export function AppProvider({ children }) {
   const [evangelismContacts, setEvangelismContacts] = useState([]);
   const [bibleStudies, setBibleStudies] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
+  const [discipleshipProgrammes, setDiscipleshipProgrammes] = useState([]);
+  const [discipleshipEnrollments, setDiscipleshipEnrollments] = useState([]);
+  const [discipleshipOverdue, setDiscipleshipOverdue] = useState([]);
   const [families, setFamilies] = useState(initialFamilies);
   const [financeRecords, setFinanceRecords] = useState(initialFinanceRecords);
   const [attendanceSessions, setAttendanceSessions] = useState(initialAttendanceSessions);
+  const [attendanceAbsentees, setAttendanceAbsentees] = useState([]);
   const [familyApiState, setFamilyApiState] = useState({ loading: false, error: "" });
   const [visitorApiState, setVisitorApiState] = useState({ loading: false, error: "", metrics: null });
   const [evangelismApiState, setEvangelismApiState] = useState({ loading: false, error: "", dashboard: null });
+  const [discipleshipApiState, setDiscipleshipApiState] = useState({ loading: false, error: "", dashboard: null });
+  const [attendanceApiState, setAttendanceApiState] = useState({
+    loading: false,
+    error: "",
+    report: null,
+    recordsByEvent: {},
+  });
   const [lookupState, setLookupState] = useState({ loading: false, error: "", values: [] });
   const [pendingActionState, setPendingActionState] = useState({ loading: false, error: "", items: [] });
   const [memberSearch, setMemberSearch] = useState("");
@@ -142,6 +153,21 @@ export function AppProvider({ children }) {
     [lookupState.values]
   );
 
+  const discipleshipStatusOptions = useMemo(
+    () => lookupState.values.filter((item) => item.type?.key === "discipleship_enrollment_status"),
+    [lookupState.values]
+  );
+
+  const attendanceEventTypeOptions = useMemo(
+    () => lookupState.values.filter((item) => item.type?.key === "attendance_event_type"),
+    [lookupState.values]
+  );
+
+  const attendanceCaptureModeOptions = useMemo(
+    () => lookupState.values.filter((item) => item.type?.key === "attendance_capture_mode"),
+    [lookupState.values]
+  );
+
   const openModal = (name) => setActiveModal(name);
   const closeModal = () => setActiveModal(null);
 
@@ -155,6 +181,12 @@ export function AppProvider({ children }) {
             ? hydrateProspectRecord(record)
             : type === "bibleStudy"
               ? hydrateBibleStudyRecord(record)
+              : type === "attendanceEvent"
+                ? hydrateAttendanceEventRecord(record)
+              : type === "discipleshipProgramme"
+                ? hydrateDiscipleshipProgrammeRecord(record)
+              : type === "discipleshipEnrollment"
+                ? hydrateDiscipleshipEnrollmentRecord(record)
               : record
       : buildNewRecord(type, {
           families,
@@ -163,6 +195,9 @@ export function AppProvider({ children }) {
           roles,
           prospects,
           users,
+          discipleshipProgrammes,
+          attendanceEventTypeOptions,
+          attendanceCaptureModeOptions,
         });
 
     if (!record && type === "family") {
@@ -189,6 +224,15 @@ export function AppProvider({ children }) {
         sourceRecord.prospectId = payload.prospectId || sourceRecord.prospectId;
       } catch (error) {
         // Fall back to local generated ID if the next-id request fails.
+      }
+    }
+
+    if (record && type === "attendanceEvent" && record._id && authUser) {
+      try {
+        const records = await churchApi.getAttendanceEventRecords(record._id);
+        sourceRecord.attendanceRecords = Array.isArray(records) ? records : [];
+      } catch (error) {
+        sourceRecord.attendanceRecords = [];
       }
     }
 
@@ -375,6 +419,151 @@ export function AppProvider({ children }) {
     };
   };
 
+  const syncDiscipleshipEnrollmentState = (incomingEnrollment) => {
+    if (!incomingEnrollment) {
+      return null;
+    }
+
+    const hydratedEnrollment = hydrateDiscipleshipEnrollmentRecord(incomingEnrollment);
+    const enrollmentIdentity = hydratedEnrollment._id || hydratedEnrollment.id;
+
+    setDiscipleshipEnrollments((current) =>
+      updateOrInsert(current, hydratedEnrollment, enrollmentIdentity, {
+        id: hydratedEnrollment.id || `de${Date.now()}`,
+        _id: hydratedEnrollment._id,
+      })
+    );
+
+    setRecordModal((current) => {
+      if (current.type !== "discipleshipEnrollment") {
+        return current;
+      }
+
+      const currentIdentity =
+        current.record?._id ||
+        current.record?.id ||
+        current.draft?._id ||
+        current.draft?.id;
+
+      if (currentIdentity !== enrollmentIdentity) {
+        return current;
+      }
+
+      return {
+        ...current,
+        record: hydratedEnrollment,
+        draft: hydratedEnrollment,
+      };
+    });
+
+    return hydratedEnrollment;
+  };
+
+  const refreshDiscipleshipDashboard = async () => {
+    const dashboard = await churchApi.getDiscipleshipDashboard();
+    setDiscipleshipApiState((current) => ({
+      ...current,
+      loading: false,
+      error: "",
+      dashboard,
+    }));
+    return dashboard;
+  };
+
+  const refreshDiscipleshipCollections = async () => {
+    const [programmesResponse, enrollmentsResponse, overdueResponse] = await Promise.all([
+      churchApi.getDiscipleshipProgrammes(),
+      churchApi.getDiscipleshipEnrollments(),
+      churchApi.getOverdueDiscipleshipEnrollments(14),
+    ]);
+
+    setDiscipleshipProgrammes(Array.isArray(programmesResponse) ? programmesResponse : []);
+    setDiscipleshipEnrollments(
+      Array.isArray(enrollmentsResponse)
+        ? enrollmentsResponse.map(hydrateDiscipleshipEnrollmentRecord)
+        : []
+    );
+    setDiscipleshipOverdue(
+      Array.isArray(overdueResponse)
+        ? overdueResponse.map(hydrateDiscipleshipEnrollmentRecord)
+        : []
+    );
+
+    return {
+      programmes: programmesResponse,
+      enrollments: enrollmentsResponse,
+      overdue: overdueResponse,
+    };
+  };
+
+  const syncAttendanceEventState = (incomingEvent) => {
+    if (!incomingEvent) {
+      return null;
+    }
+
+    const hydratedEvent = hydrateAttendanceEventRecord(incomingEvent);
+    const eventIdentity = hydratedEvent._id || hydratedEvent.id;
+
+    setAttendanceSessions((current) =>
+      updateOrInsert(current, hydratedEvent, eventIdentity, {
+        id: hydratedEvent.id || `ae${Date.now()}`,
+        _id: hydratedEvent._id,
+      })
+    );
+
+    setRecordModal((current) => {
+      if (current.type !== "attendanceEvent") {
+        return current;
+      }
+
+      const currentIdentity =
+        current.record?._id ||
+        current.record?.id ||
+        current.draft?._id ||
+        current.draft?.id;
+
+      if (currentIdentity !== eventIdentity) {
+        return current;
+      }
+
+      return {
+        ...current,
+        record: hydratedEvent,
+        draft: hydratedEvent,
+      };
+    });
+
+    return hydratedEvent;
+  };
+
+  const refreshAttendanceReport = async () => {
+    const report = await churchApi.getAttendanceReport(90);
+    setAttendanceApiState((current) => ({
+      ...current,
+      loading: false,
+      error: "",
+      report,
+    }));
+    return report;
+  };
+
+  const refreshAttendanceCollections = async () => {
+    const [eventsResponse, absenteesResponse] = await Promise.all([
+      churchApi.getAttendanceEvents(),
+      churchApi.getAttendanceAbsentees(28),
+    ]);
+
+    setAttendanceSessions(
+      Array.isArray(eventsResponse) ? eventsResponse.map(hydrateAttendanceEventRecord) : []
+    );
+    setAttendanceAbsentees(Array.isArray(absenteesResponse) ? absenteesResponse : []);
+
+    return {
+      events: eventsResponse,
+      absentees: absenteesResponse,
+    };
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -407,15 +596,24 @@ export function AppProvider({ children }) {
     async function loadProtectedData() {
       if (!authUser) {
         if (active) {
+          setMinistries(initialMinistries);
           setVisitors(initialVisitors);
+          setMembers(initialMembers);
           setProspects([]);
           setEvangelismContacts([]);
           setBibleStudies([]);
           setCampaigns([]);
+          setDiscipleshipProgrammes([]);
+          setDiscipleshipEnrollments([]);
+          setDiscipleshipOverdue([]);
+          setAttendanceSessions(initialAttendanceSessions);
+          setAttendanceAbsentees([]);
           setUsers(initialUsers);
           setLookupState({ loading: false, error: "", values: [] });
           setVisitorApiState({ loading: false, error: "", metrics: null });
           setEvangelismApiState({ loading: false, error: "", dashboard: null });
+          setDiscipleshipApiState({ loading: false, error: "", dashboard: null });
+          setAttendanceApiState({ loading: false, error: "", report: null, recordsByEvent: {} });
           setPendingActionState({ loading: false, error: "", items: [] });
         }
         return;
@@ -424,12 +622,16 @@ export function AppProvider({ children }) {
       setLookupState((current) => ({ ...current, loading: true, error: "" }));
       setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
       setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
+      setDiscipleshipApiState((current) => ({ ...current, loading: true, error: "" }));
+      setAttendanceApiState((current) => ({ ...current, loading: true, error: "" }));
       setPendingActionState((current) => ({ ...current, loading: true, error: "" }));
 
       try {
         const [
           lookupsResponse,
           usersResponse,
+          ministriesResponse,
+          membersResponse,
           visitorsResponse,
           retentionMetrics,
           pendingActionsResponse,
@@ -438,10 +640,19 @@ export function AppProvider({ children }) {
           bibleStudiesResponse,
           campaignsResponse,
           evangelismDashboardResponse,
+          discipleshipProgrammesResponse,
+          discipleshipEnrollmentsResponse,
+          discipleshipOverdueResponse,
+          discipleshipDashboardResponse,
+          attendanceEventsResponse,
+          attendanceReportResponse,
+          attendanceAbsenteesResponse,
         ] =
           await Promise.allSettled([
             churchApi.getLookups(),
             churchApi.getUsers(),
+            churchApi.getMinistries(),
+            churchApi.getMembers(),
             churchApi.getVisitors(),
             churchApi.getVisitorRetentionMetrics(30),
             churchApi.getPendingActions(),
@@ -450,6 +661,13 @@ export function AppProvider({ children }) {
             churchApi.getBibleStudies(),
             churchApi.getCampaigns(),
             churchApi.getEvangelismDashboard(),
+            churchApi.getDiscipleshipProgrammes(),
+            churchApi.getDiscipleshipEnrollments(),
+            churchApi.getOverdueDiscipleshipEnrollments(14),
+            churchApi.getDiscipleshipDashboard(),
+            churchApi.getAttendanceEvents(),
+            churchApi.getAttendanceReport(90),
+            churchApi.getAttendanceAbsentees(28),
           ]);
 
         if (!active) {
@@ -470,6 +688,16 @@ export function AppProvider({ children }) {
         setUsers(
           usersResponse.status === "fulfilled" && Array.isArray(usersResponse.value)
             ? usersResponse.value
+            : []
+        );
+        setMinistries(
+          ministriesResponse.status === "fulfilled" && Array.isArray(ministriesResponse.value)
+            ? ministriesResponse.value
+            : []
+        );
+        setMembers(
+          membersResponse.status === "fulfilled" && Array.isArray(membersResponse.value)
+            ? membersResponse.value
             : []
         );
         setVisitors(
@@ -497,6 +725,34 @@ export function AppProvider({ children }) {
             ? campaignsResponse.value
             : []
         );
+        setDiscipleshipProgrammes(
+          discipleshipProgrammesResponse.status === "fulfilled" &&
+            Array.isArray(discipleshipProgrammesResponse.value)
+            ? discipleshipProgrammesResponse.value
+            : []
+        );
+        setDiscipleshipEnrollments(
+          discipleshipEnrollmentsResponse.status === "fulfilled" &&
+            Array.isArray(discipleshipEnrollmentsResponse.value)
+            ? discipleshipEnrollmentsResponse.value.map(hydrateDiscipleshipEnrollmentRecord)
+            : []
+        );
+        setDiscipleshipOverdue(
+          discipleshipOverdueResponse.status === "fulfilled" &&
+            Array.isArray(discipleshipOverdueResponse.value)
+            ? discipleshipOverdueResponse.value.map(hydrateDiscipleshipEnrollmentRecord)
+            : []
+        );
+        setAttendanceSessions(
+          attendanceEventsResponse.status === "fulfilled" && Array.isArray(attendanceEventsResponse.value)
+            ? attendanceEventsResponse.value.map(hydrateAttendanceEventRecord)
+            : []
+        );
+        setAttendanceAbsentees(
+          attendanceAbsenteesResponse.status === "fulfilled" && Array.isArray(attendanceAbsenteesResponse.value)
+            ? attendanceAbsenteesResponse.value
+            : []
+        );
         setVisitorApiState({
           loading: false,
           error:
@@ -520,6 +776,33 @@ export function AppProvider({ children }) {
               ? evangelismDashboardResponse.value
               : null,
         });
+        setDiscipleshipApiState({
+          loading: false,
+          error:
+            discipleshipEnrollmentsResponse.status === "rejected"
+              ? discipleshipEnrollmentsResponse.reason?.message || "Unable to load discipleship enrollments."
+              : discipleshipDashboardResponse.status === "rejected"
+                ? discipleshipDashboardResponse.reason?.message || "Unable to load discipleship dashboard."
+                : "",
+          dashboard:
+            discipleshipDashboardResponse.status === "fulfilled"
+              ? discipleshipDashboardResponse.value
+              : null,
+        });
+        setAttendanceApiState({
+          loading: false,
+          error:
+            attendanceEventsResponse.status === "rejected"
+              ? attendanceEventsResponse.reason?.message || "Unable to load attendance events."
+              : attendanceReportResponse.status === "rejected"
+                ? attendanceReportResponse.reason?.message || "Unable to load attendance report."
+                : "",
+          report:
+            attendanceReportResponse.status === "fulfilled"
+              ? attendanceReportResponse.value
+              : null,
+          recordsByEvent: {},
+        });
         setPendingActionState({
           loading: false,
           error:
@@ -539,6 +822,8 @@ export function AppProvider({ children }) {
         setLookupState({ loading: false, error: error.message || "Unable to load lookups.", values: [] });
         setVisitorApiState({ loading: false, error: error.message || "Unable to load visitors.", metrics: null });
         setEvangelismApiState({ loading: false, error: error.message || "Unable to load evangelism data.", dashboard: null });
+        setDiscipleshipApiState({ loading: false, error: error.message || "Unable to load discipleship data.", dashboard: null });
+        setAttendanceApiState({ loading: false, error: error.message || "Unable to load attendance data.", report: null, recordsByEvent: {} });
         setPendingActionState({ loading: false, error: error.message || "Unable to load follow-up actions.", items: [] });
       }
     }
@@ -779,6 +1064,54 @@ export function AppProvider({ children }) {
       return;
     }
 
+    if (type === "discipleshipProgramme") {
+      try {
+        setDiscipleshipApiState((current) => ({ ...current, loading: true, error: "" }));
+        const payload = normalizeDiscipleshipProgrammeDraft(draft);
+        const savedProgramme = record?._id
+          ? await churchApi.updateDiscipleshipProgramme(record._id, payload)
+          : await churchApi.createDiscipleshipProgramme(payload);
+
+        setDiscipleshipProgrammes((current) =>
+          updateOrInsert(current, savedProgramme, record?._id || record?.id, {
+            id: savedProgramme.id || `dp${Date.now()}`,
+            _id: savedProgramme._id,
+          })
+        );
+
+        await refreshDiscipleshipDashboard();
+        closeRecordModal();
+      } catch (error) {
+        setDiscipleshipApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save discipleship programme.",
+        }));
+      }
+      return;
+    }
+
+    if (type === "discipleshipEnrollment") {
+      try {
+        setDiscipleshipApiState((current) => ({ ...current, loading: true, error: "" }));
+        const payload = normalizeDiscipleshipEnrollmentDraft(draft);
+        const savedEnrollment = record?._id
+          ? await churchApi.updateDiscipleshipEnrollment(record._id, payload)
+          : await churchApi.createDiscipleshipEnrollment(payload);
+
+        syncDiscipleshipEnrollmentState(savedEnrollment);
+        await Promise.all([refreshDiscipleshipDashboard(), refreshDiscipleshipCollections()]);
+        closeRecordModal();
+      } catch (error) {
+        setDiscipleshipApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save discipleship enrollment.",
+        }));
+      }
+      return;
+    }
+
     if (type === "family") {
       try {
         setFamilyApiState((current) => ({ ...current, loading: true, error: "" }));
@@ -816,19 +1149,25 @@ export function AppProvider({ children }) {
       );
     }
 
-    if (type === "attendance") {
-      setAttendanceSessions((current) => {
-        const expected = Number(draft.expected || 0);
-        const present = Number(draft.present || 0);
-        const rate = expected ? `${Math.round((present / expected) * 100)}%` : "0%";
+    if (type === "attendanceEvent") {
+      try {
+        setAttendanceApiState((current) => ({ ...current, loading: true, error: "" }));
+        const payload = normalizeAttendanceEventDraft(draft);
+        const savedEvent = record?._id
+          ? await churchApi.updateAttendanceEvent(record._id, payload)
+          : await churchApi.createAttendanceEvent(payload);
 
-        return updateOrInsert(
-          current,
-          { ...draft, expected, present, rate },
-          record?.id,
-          { id: draft.id || `a${Date.now()}` }
-        );
-      });
+        syncAttendanceEventState(savedEvent);
+        await Promise.all([refreshAttendanceCollections(), refreshAttendanceReport()]);
+        closeRecordModal();
+      } catch (error) {
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save attendance event.",
+        }));
+      }
+      return;
     }
 
     if (type === "user") {
@@ -888,14 +1227,20 @@ export function AppProvider({ children }) {
     evangelismContacts,
     bibleStudies,
     campaigns,
+    discipleshipProgrammes,
+    discipleshipEnrollments,
+    discipleshipOverdue,
     roles,
     users,
     families,
     financeRecords,
     attendanceSessions,
+    attendanceAbsentees,
     familyApiState,
     visitorApiState,
     evangelismApiState,
+    discipleshipApiState,
+    attendanceApiState,
     lookupState,
     pendingActionState,
     visitorHowHeardOptions,
@@ -903,6 +1248,9 @@ export function AppProvider({ children }) {
     evangelismSourceOptions,
     evangelismStageOptions,
     bibleStudyStatusOptions,
+    discipleshipStatusOptions,
+    attendanceEventTypeOptions,
+    attendanceCaptureModeOptions,
     attendanceTrend,
     dashboardStats,
     memberDistribution,
@@ -925,6 +1273,10 @@ export function AppProvider({ children }) {
     syncVisitorState,
     syncProspectState,
     refreshEvangelismCollections,
+    syncDiscipleshipEnrollmentState,
+    refreshDiscipleshipCollections,
+    syncAttendanceEventState,
+    refreshAttendanceCollections,
     openMemberEnrollment,
     enrolmentStep,
     setEnrolmentStep,
@@ -957,6 +1309,8 @@ export function AppProvider({ children }) {
     setAttendanceSessions,
     setFamilies,
     setCampaigns,
+    setDiscipleshipProgrammes,
+    setAttendanceAbsentees,
     async recordVisitorChurchVisit(visitorId, payload) {
       try {
         setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
@@ -1099,7 +1453,11 @@ export function AppProvider({ children }) {
         setEvangelismApiState((current) => ({ ...current, loading: true, error: "" }));
         const result = await churchApi.convertProspectToMember(prospectId, payload);
         syncProspectState(result.prospect);
-        await refreshEvangelismDashboard();
+        await Promise.all([
+          refreshEvangelismDashboard(),
+          refreshDiscipleshipDashboard(),
+          refreshDiscipleshipCollections(),
+        ]);
         return result;
       } catch (error) {
         setEvangelismApiState((current) => ({
@@ -1130,6 +1488,177 @@ export function AppProvider({ children }) {
         throw error;
       }
     },
+    async assignDiscipleshipMentor(enrollmentId, mentorId) {
+      try {
+        setDiscipleshipApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedEnrollment = await churchApi.assignDiscipleshipMentor(enrollmentId, mentorId);
+        syncDiscipleshipEnrollmentState(updatedEnrollment);
+        await refreshDiscipleshipDashboard();
+        return updatedEnrollment;
+      } catch (error) {
+        setDiscipleshipApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to assign discipleship mentor.",
+        }));
+        throw error;
+      }
+    },
+    async addDiscipleshipSession(enrollmentId, payload) {
+      try {
+        setDiscipleshipApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedEnrollment = await churchApi.addDiscipleshipSession(enrollmentId, payload);
+        syncDiscipleshipEnrollmentState(updatedEnrollment);
+        await Promise.all([refreshDiscipleshipDashboard(), refreshDiscipleshipCollections()]);
+        return updatedEnrollment;
+      } catch (error) {
+        setDiscipleshipApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to save discipleship session.",
+        }));
+        throw error;
+      }
+    },
+    async completeDiscipleshipEnrollment(enrollmentId, payload) {
+      try {
+        setDiscipleshipApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedEnrollment = await churchApi.completeDiscipleshipEnrollment(enrollmentId, payload);
+        syncDiscipleshipEnrollmentState(updatedEnrollment);
+        await Promise.all([refreshDiscipleshipDashboard(), refreshDiscipleshipCollections()]);
+        return updatedEnrollment;
+      } catch (error) {
+        setDiscipleshipApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to complete discipleship enrollment.",
+        }));
+        throw error;
+      }
+    },
+    async captureAttendanceRecord(eventId, payload) {
+      try {
+        setAttendanceApiState((current) => ({ ...current, loading: true, error: "" }));
+        const savedRecord = await churchApi.captureAttendanceRecord(eventId, payload);
+        const refreshedRecords = await churchApi.getAttendanceEventRecords(eventId);
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: "",
+          recordsByEvent: {
+            ...current.recordsByEvent,
+            [eventId]: refreshedRecords,
+          },
+        }));
+        setRecordModal((current) => {
+          if (current.type !== "attendanceEvent" || current.record?._id !== eventId) {
+            return current;
+          }
+
+          const nextDraft = {
+            ...current.draft,
+            attendanceRecords: refreshedRecords,
+          };
+
+          return {
+            ...current,
+            record: nextDraft,
+            draft: nextDraft,
+          };
+        });
+        await Promise.all([refreshAttendanceCollections(), refreshAttendanceReport()]);
+        return savedRecord;
+      } catch (error) {
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to capture attendance.",
+        }));
+        throw error;
+      }
+    },
+    async captureBulkAttendance(eventId, payload) {
+      try {
+        setAttendanceApiState((current) => ({ ...current, loading: true, error: "" }));
+        const savedRecords = await churchApi.captureBulkAttendance(eventId, payload);
+        const refreshedRecords = await churchApi.getAttendanceEventRecords(eventId);
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: "",
+          recordsByEvent: {
+            ...current.recordsByEvent,
+            [eventId]: refreshedRecords,
+          },
+        }));
+        setRecordModal((current) => {
+          if (current.type !== "attendanceEvent" || current.record?._id !== eventId) {
+            return current;
+          }
+
+          const nextDraft = {
+            ...current.draft,
+            attendanceRecords: refreshedRecords,
+          };
+
+          return {
+            ...current,
+            record: nextDraft,
+            draft: nextDraft,
+          };
+        });
+        await Promise.all([refreshAttendanceCollections(), refreshAttendanceReport()]);
+        return savedRecords;
+      } catch (error) {
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to capture bulk attendance.",
+        }));
+        throw error;
+      }
+    },
+    async correctAttendanceRecord(recordId, payload, eventId) {
+      try {
+        setAttendanceApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedRecord = await churchApi.updateAttendanceRecord(recordId, payload);
+        const refreshedRecords = await churchApi.getAttendanceEventRecords(eventId);
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: "",
+          recordsByEvent: {
+            ...current.recordsByEvent,
+            [eventId]: refreshedRecords,
+          },
+        }));
+        setRecordModal((current) => {
+          if (current.type !== "attendanceEvent" || current.record?._id !== eventId) {
+            return current;
+          }
+
+          const nextDraft = {
+            ...current.draft,
+            attendanceRecords: refreshedRecords,
+          };
+
+          return {
+            ...current,
+            record: nextDraft,
+            draft: nextDraft,
+          };
+        });
+        await Promise.all([refreshAttendanceCollections(), refreshAttendanceReport()]);
+        return updatedRecord;
+      } catch (error) {
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to correct attendance record.",
+        }));
+        throw error;
+      }
+    },
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -1146,7 +1675,7 @@ function updateOrInsert(items, draft, originalId, fallbacks = {}) {
   return items.map((item) => (getRecordIdentity(item) === originalId ? nextItem : item));
 }
 
-function buildNewRecord(type, { families, members, ministries, roles, prospects, users }) {
+function buildNewRecord(type, { families, members, ministries, roles, prospects, users, discipleshipProgrammes }) {
   if (type === "visitor") {
     return {
       visitorId: `VS${String(Date.now()).slice(-4)}`,
@@ -1220,6 +1749,28 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
     };
   }
 
+  if (type === "discipleshipProgramme") {
+    return {
+      name: "",
+      expectedDurationDays: 90,
+      modules: "Salvation Assurance, Prayer And Devotion, Bible Foundations, Church Fellowship, Ministry Integration",
+      isActive: true,
+    };
+  }
+
+  if (type === "discipleshipEnrollment") {
+    return {
+      memberId: members[0] || null,
+      programmeId: discipleshipProgrammes[0] || null,
+      mentorId: users[0] || null,
+      enrollmentDate: new Date().toISOString().slice(0, 10),
+      status: "",
+      completionDate: "",
+      sessionsCompleted: [],
+      sourceProspectId: "",
+    };
+  }
+
   if (type === "finance") {
     return {
       recordNo: `FIN-${String(Date.now()).slice(-3)}`,
@@ -1231,14 +1782,15 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
     };
   }
 
-  if (type === "attendance") {
+  if (type === "attendanceEvent") {
     return {
-      service: "",
-      zone: "",
+      title: "",
+      eventTypeId: "",
       date: new Date().toISOString().slice(0, 10),
-      expected: members.length,
-      present: "",
-      rate: "0%",
+      location: "",
+      ministryId: "",
+      qrToken: "",
+      attendanceRecords: [],
     };
   }
 
@@ -1395,6 +1947,82 @@ function normalizeBibleStudyDraft(draft) {
     teacherId: draft.teacherId?._id || draft.teacherId || null,
     startDate: draft.startDate || new Date().toISOString().slice(0, 10),
     status: draft.status?._id || draft.status || null,
+  };
+}
+
+function hydrateDiscipleshipProgrammeRecord(programme) {
+  if (!programme) {
+    return programme;
+  }
+
+  return {
+    ...programme,
+    modules: Array.isArray(programme.modules)
+      ? programme.modules.map((item) => item.title).join(", ")
+      : programme.modules || "",
+  };
+}
+
+function hydrateDiscipleshipEnrollmentRecord(enrollment) {
+  if (!enrollment) {
+    return enrollment;
+  }
+
+  return {
+    ...enrollment,
+    memberId: enrollment.memberId || null,
+    programmeId: enrollment.programmeId || null,
+    mentorId: enrollment.mentorId || null,
+    status: enrollment.status || "",
+    sessionsCompleted: Array.isArray(enrollment.sessionsCompleted) ? enrollment.sessionsCompleted : [],
+  };
+}
+
+function normalizeDiscipleshipProgrammeDraft(draft) {
+  return {
+    name: draft.name || "",
+    expectedDurationDays: Number(draft.expectedDurationDays || 90),
+    modules: String(draft.modules || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((title, index) => ({ title, order: index + 1 })),
+    isActive: draft.isActive !== false && draft.isActive !== "false",
+  };
+}
+
+function normalizeDiscipleshipEnrollmentDraft(draft) {
+  return {
+    memberId: draft.memberId?._id || draft.memberId || null,
+    programmeId: draft.programmeId?._id || draft.programmeId || null,
+    mentorId: draft.mentorId?._id || draft.mentorId || null,
+    enrollmentDate: draft.enrollmentDate || new Date().toISOString().slice(0, 10),
+    status: draft.status?._id || draft.status || null,
+    completionDate: draft.completionDate || null,
+    sourceProspectId: draft.sourceProspectId || "",
+  };
+}
+
+function hydrateAttendanceEventRecord(event) {
+  if (!event) {
+    return event;
+  }
+
+  return {
+    ...event,
+    eventTypeId: event.eventTypeId || "",
+    ministryId: event.ministryId || "",
+    attendanceRecords: Array.isArray(event.attendanceRecords) ? event.attendanceRecords : [],
+  };
+}
+
+function normalizeAttendanceEventDraft(draft) {
+  return {
+    eventTypeId: draft.eventTypeId?._id || draft.eventTypeId || null,
+    date: draft.date || new Date().toISOString().slice(0, 10),
+    title: draft.title || "",
+    ministryId: draft.ministryId?._id || draft.ministryId || null,
+    location: draft.location || "",
   };
 }
 

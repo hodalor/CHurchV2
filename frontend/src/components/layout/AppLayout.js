@@ -8,6 +8,7 @@ import SetupPage from "../../pages/SetupPage";
 import MembersPage from "../../pages/MembersPage";
 import MinistriesPage from "../../pages/MinistriesPage";
 import EvangelismPage from "../../pages/EvangelismPage";
+import DiscipleshipPage from "../../pages/DiscipleshipPage";
 import VisitorsPage from "../../pages/VisitorsPage";
 import FamilyOverviewPage from "../../pages/FamilyOverviewPage";
 import FamilyHouseholdsPage from "../../pages/FamilyHouseholdsPage";
@@ -46,6 +47,10 @@ export default function AppLayout() {
                 <Route path="/evangelism/bible-study" element={<EvangelismPage />} />
                 <Route path="/evangelism/campaigns" element={<EvangelismPage />} />
                 <Route path="/evangelism/reports" element={<EvangelismPage />} />
+                <Route path="/discipleship/programmes" element={<DiscipleshipPage />} />
+                <Route path="/discipleship/enrollments" element={<DiscipleshipPage />} />
+                <Route path="/discipleship/follow-ups" element={<DiscipleshipPage />} />
+                <Route path="/discipleship/reports" element={<DiscipleshipPage />} />
                 <Route path="/visitors/register-list" element={<VisitorsPage />} />
                 <Route path="/visitors/pipeline" element={<VisitorsPage />} />
                 <Route path="/visitors/follow-ups" element={<VisitorsPage />} />
@@ -99,6 +104,14 @@ function getPageMeta(pathname) {
       title: "Evangelism",
       subtitle: "Track prospects from first contact through Bible study and integration.",
       action: "evangelism",
+    };
+  }
+
+  if (pathname.startsWith("/discipleship")) {
+    return {
+      title: "Discipleship",
+      subtitle: "Manage programmes, mentoring, session progress, and overdue follow-up.",
+      action: "discipleship",
     };
   }
 
@@ -202,6 +215,9 @@ function getPageAction(action, activeSetupTab, handlers, pathname) {
       : pathname?.startsWith("/evangelism/bible-study")
         ? "Add Bible Study"
         : "Add Prospect",
+    discipleship: pathname?.startsWith("/discipleship/programmes")
+      ? "Add Programme"
+      : "Enroll Member",
     family: "Add Family",
     finance: "Add Finance",
     attendance: "Add Attendance",
@@ -225,6 +241,10 @@ function getPageAction(action, activeSetupTab, handlers, pathname) {
               : pathname?.startsWith("/evangelism/bible-study")
                 ? "bibleStudy"
                 : "prospect"
+            : action === "discipleship"
+              ? pathname?.startsWith("/discipleship/programmes")
+                ? "discipleshipProgramme"
+                : "discipleshipEnrollment"
             : action,
           null,
           "edit"

@@ -1,5 +1,9 @@
 import ModalShell from "./ModalShell";
 import { useAppContext } from "../../context/AppContext";
+import AttendanceEventActionPanel from "../attendance/AttendanceEventActionPanel";
+import AttendanceEventRecordFields from "../attendance/AttendanceEventRecordFields";
+import DiscipleshipEnrollmentActionPanel from "../discipleship/DiscipleshipEnrollmentActionPanel";
+import DiscipleshipEnrollmentRecordFields from "../discipleship/DiscipleshipEnrollmentRecordFields";
 import BibleStudyRecordFields from "../evangelism/BibleStudyRecordFields";
 import ProspectActionPanel from "../evangelism/ProspectActionPanel";
 import ProspectRecordFields from "../evangelism/ProspectRecordFields";
@@ -22,8 +26,12 @@ export default function RecordDetailModal() {
     evangelismSourceOptions,
     evangelismStageOptions,
     bibleStudyStatusOptions,
+    discipleshipStatusOptions,
+    attendanceEventTypeOptions,
     campaigns,
     prospects,
+    discipleshipProgrammes,
+    ministries,
   } = useAppContext();
 
   if (!recordModal.open || !recordModal.draft) {
@@ -118,6 +126,46 @@ export default function RecordDetailModal() {
             setRecordModalMode={setRecordModalMode}
           />
         </>
+      ) : type === "discipleshipEnrollment" ? (
+        <>
+          <DiscipleshipEnrollmentRecordFields
+            draft={draft}
+            isEditing={isEditing}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+            members={members}
+            programmes={discipleshipProgrammes}
+            users={users}
+            statusOptions={discipleshipStatusOptions}
+          />
+          <DiscipleshipEnrollmentActionPanel enrollment={draft} />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
+      ) : type === "attendanceEvent" ? (
+        <>
+          <AttendanceEventRecordFields
+            draft={draft}
+            isEditing={isEditing}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+            eventTypeOptions={attendanceEventTypeOptions}
+            ministries={ministries}
+          />
+          <AttendanceEventActionPanel event={draft} />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
       ) : (
         <div className="modal-form">
           <div className="form-grid">
@@ -200,8 +248,11 @@ function getTitle(type) {
     prospect: "Prospect Details",
     bibleStudy: "Bible Study Details",
     campaign: "Campaign Details",
+    discipleshipProgramme: "Discipleship Programme Details",
+    discipleshipEnrollment: "Discipleship Enrollment Details",
     finance: "Finance Details",
     attendance: "Attendance Details",
+    attendanceEvent: "Attendance Event Details",
     user: "User Details",
     ministry: "Ministry Details",
     role: "Role Details",
@@ -235,7 +286,7 @@ function getFields(type, groups, roles) {
     return [];
   }
 
-  if (type === "prospect" || type === "bibleStudy") {
+  if (type === "prospect" || type === "bibleStudy" || type === "discipleshipEnrollment" || type === "attendanceEvent") {
     return [];
   }
 
@@ -314,6 +365,15 @@ function getFields(type, groups, roles) {
     ];
   }
 
+  if (type === "discipleshipProgramme") {
+    return [
+      { name: "name", label: "Programme Name" },
+      { name: "expectedDurationDays", label: "Expected Duration (Days)", type: "number" },
+      { name: "isActive", label: "Active", type: "select", options: ["true", "false"] },
+      { name: "modules", label: "Programme Modules", type: "textarea", wide: true },
+    ];
+  }
+
   if (type === "family") {
     return [];
   }
@@ -326,6 +386,10 @@ function getFieldValue(field, draft) {
 
   if (Array.isArray(value)) {
     return value.join(", ");
+  }
+
+  if (field.type === "select" && typeof value === "boolean") {
+    return String(value);
   }
 
   if (field.type === "date" && value) {

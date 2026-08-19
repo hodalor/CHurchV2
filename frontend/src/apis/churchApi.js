@@ -121,6 +121,14 @@ export const churchApi = {
     return request("/families");
   },
 
+  async getMembers() {
+    return request("/members");
+  },
+
+  async getMinistries() {
+    return request("/ministries");
+  },
+
   async getNextFamilyId() {
     return request("/families/next-id");
   },
@@ -150,6 +158,133 @@ export const churchApi = {
   async getPendingActions(status) {
     const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
     return request(`/pending-actions${suffix}`);
+  },
+
+  async getAttendanceEvents() {
+    return request("/attendance/events");
+  },
+
+  async createAttendanceEvent(payload) {
+    return request("/attendance/events", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateAttendanceEvent(eventId, payload) {
+    return request(`/attendance/events/${eventId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAttendanceEventRecords(eventId) {
+    return request(`/attendance/events/${eventId}/records`);
+  },
+
+  async captureAttendanceRecord(eventId, payload) {
+    return request(`/attendance/events/${eventId}/records`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async captureBulkAttendance(eventId, payload) {
+    return request(`/attendance/events/${eventId}/records/bulk`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateAttendanceRecord(recordId, payload) {
+    return request(`/attendance/records/${recordId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAttendanceReport(days = 90, eventTypeId = "", ministryId = "") {
+    const params = new URLSearchParams({
+      days: String(days),
+      ...(eventTypeId ? { eventTypeId } : {}),
+      ...(ministryId ? { ministryId } : {}),
+    });
+    return request(`/attendance/reports/summary?${params.toString()}`);
+  },
+
+  async getAttendanceAbsentees(windowDays = 28, eventTypeKey = "sunday_worship") {
+    const params = new URLSearchParams({
+      windowDays: String(windowDays),
+      eventTypeKey,
+    });
+    return request(`/attendance/reports/absentees?${params.toString()}`);
+  },
+
+  async getDiscipleshipProgrammes() {
+    return request("/discipleship/programmes");
+  },
+
+  async createDiscipleshipProgramme(payload) {
+    return request("/discipleship/programmes", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateDiscipleshipProgramme(programmeId, payload) {
+    return request(`/discipleship/programmes/${programmeId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getDiscipleshipEnrollments() {
+    return request("/discipleship/enrollments");
+  },
+
+  async createDiscipleshipEnrollment(payload) {
+    return request("/discipleship/enrollments", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateDiscipleshipEnrollment(enrollmentId, payload) {
+    return request(`/discipleship/enrollments/${enrollmentId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async assignDiscipleshipMentor(enrollmentId, mentorId) {
+    return request(`/discipleship/enrollments/${enrollmentId}/mentor`, {
+      method: "POST",
+      body: JSON.stringify({ mentorId }),
+    });
+  },
+
+  async addDiscipleshipSession(enrollmentId, payload) {
+    return request(`/discipleship/enrollments/${enrollmentId}/sessions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async completeDiscipleshipEnrollment(enrollmentId, payload) {
+    return request(`/discipleship/enrollments/${enrollmentId}/complete`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getOverdueDiscipleshipEnrollments(windowDays = 14) {
+    return request(`/discipleship/overdue?windowDays=${windowDays}`);
+  },
+
+  async getDiscipleshipDashboard(mentorWindowDays = 7, overdueWindowDays = 14) {
+    return request(
+      `/discipleship/dashboard?mentorWindowDays=${mentorWindowDays}&overdueWindowDays=${overdueWindowDays}`
+    );
   },
 
   async getProspects() {

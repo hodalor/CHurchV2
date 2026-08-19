@@ -5,6 +5,7 @@ const EvangelismProspect = require("../models/EvangelismProspect");
 const Member = require("../models/Member");
 const User = require("../models/User");
 const Visitor = require("../models/Visitor");
+const { createEnrollmentFromConversion } = require("./discipleshipService");
 const { createMemberFromProfile } = require("./memberConversionService");
 const { createPendingAction } = require("./pendingActionService");
 const { getLookupValueByTypeAndKey } = require("./lookupService");
@@ -287,6 +288,12 @@ async function convertProspectToMember(prospect, payload = {}, user = null) {
     sourceVisitor.status = memberStatus?._id || sourceVisitor.status;
     await sourceVisitor.save();
   }
+
+  await createEnrollmentFromConversion({
+    memberId: member._id,
+    sourceProspectId: prospect.prospectId,
+    mentorId: prospect.assignedEvangelistId || null,
+  });
 
   const discipleshipStage = await getLookupValueByTypeAndKey("evangelism_pipeline_stage", "discipleship");
   if (discipleshipStage) {

@@ -1,5 +1,6 @@
 const LookupType = require("../models/LookupType");
 const LookupValue = require("../models/LookupValue");
+const DiscipleshipProgramme = require("../models/DiscipleshipProgramme");
 const Role = require("../models/Role");
 const User = require("../models/User");
 const { hashPin } = require("../services/authService");
@@ -8,6 +9,7 @@ const { ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
 async function bootstrapApplicationData() {
   await seedRoles();
   await seedLookupData();
+  await seedDiscipleshipProgrammes();
   await seedInitialAdminUser();
 }
 
@@ -68,6 +70,34 @@ async function seedLookupData() {
       module: "evangelism",
       values: ["In Progress", "Completed", "Paused"],
     },
+    {
+      key: "discipleship_enrollment_status",
+      label: "Discipleship Enrollment Status",
+      module: "discipleship",
+      values: ["Active", "Completed", "Overdue", "Dropped"],
+    },
+    {
+      key: "attendance_event_type",
+      label: "Attendance Event Type",
+      module: "attendance",
+      values: [
+        "Sunday Worship",
+        "Bible Class",
+        "Prayer Meeting",
+        "Ministry Meeting",
+        "Youth Activity",
+        "Retreat",
+        "Seminar",
+        "Evangelism Activity",
+        "Other",
+      ],
+    },
+    {
+      key: "attendance_capture_mode",
+      label: "Attendance Capture Mode",
+      module: "attendance",
+      values: ["Manual", "Bulk", "QR", "Mobile"],
+    },
   ];
 
   for (const seed of lookupSeeds) {
@@ -99,6 +129,26 @@ async function seedLookupData() {
       );
     }
   }
+}
+
+async function seedDiscipleshipProgrammes() {
+  const existingProgramme = await DiscipleshipProgramme.findOne({ name: "New Converts Foundation" });
+  if (existingProgramme) {
+    return;
+  }
+
+  await DiscipleshipProgramme.create({
+    name: "New Converts Foundation",
+    expectedDurationDays: 90,
+    modules: [
+      { title: "Salvation Assurance", order: 1 },
+      { title: "Prayer And Devotion", order: 2 },
+      { title: "Bible Foundations", order: 3 },
+      { title: "Church Fellowship", order: 4 },
+      { title: "Ministry Integration", order: 5 },
+    ],
+    isActive: true,
+  });
 }
 
 async function seedInitialAdminUser() {

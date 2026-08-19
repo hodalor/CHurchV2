@@ -5,7 +5,9 @@ const cors = require("cors");
 const connectDatabase = require("./config/db");
 const { bootstrapApplicationData } = require("./seed/bootstrap");
 const auditRoutes = require("./routes/auditRoutes");
+const attendanceRoutes = require("./routes/attendanceRoutes");
 const authRoutes = require("./routes/authRoutes");
+const discipleshipRoutes = require("./routes/discipleshipRoutes");
 const evangelismRoutes = require("./routes/evangelismRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const lookupRoutes = require("./routes/lookupRoutes");
@@ -32,6 +34,8 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/audit-logs", auditRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/discipleship", discipleshipRoutes);
 app.use("/api/evangelism", evangelismRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/lookups", lookupRoutes);

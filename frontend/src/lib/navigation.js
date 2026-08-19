@@ -4,6 +4,7 @@ import {
   FaCalendarCheck,
   FaChurch,
   FaCoins,
+  FaGraduationCap,
   FaHandHoldingHeart,
   FaHome,
   FaUserShield,
@@ -27,6 +28,12 @@ export const navigationSections = [
     { label: "Bible Study", path: "/evangelism/bible-study" },
     { label: "Campaigns", path: "/evangelism/campaigns" },
     { label: "Reports", path: "/evangelism/reports" },
+  ] },
+  { label: "Discipleship", path: "/discipleship", icon: FaGraduationCap, children: [
+    { label: "Programmes", path: "/discipleship/programmes" },
+    { label: "Enrollments", path: "/discipleship/enrollments" },
+    { label: "Follow-ups", path: "/discipleship/follow-ups" },
+    { label: "Reports", path: "/discipleship/reports" },
   ] },
   { label: "Family", path: "/family", icon: FaHome, children: [
     { label: "Overview", path: "/family/overview" },
