@@ -16,10 +16,14 @@ function clearStoredSession() {
 
 async function request(path, options = {}, retryOnUnauthorized = true) {
   const session = getStoredSession();
+  const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
-    "Content-Type": "application/json",
     ...(options.headers || {}),
   };
+
+  if (!isFormDataBody && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (session?.accessToken) {
     headers.Authorization = `Bearer ${session.accessToken}`;
@@ -121,12 +125,74 @@ export const churchApi = {
     return request("/families");
   },
 
+  async getGroups() {
+    return request("/groups");
+  },
+
+  async createGroup(payload) {
+    return request("/groups", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateGroup(groupId, payload) {
+    return request(`/groups/${groupId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
   async getMembers() {
     return request("/members");
   },
 
+  async getNextMemberId() {
+    return request("/members/next-id");
+  },
+
+  async createMember(payload) {
+    return request("/members", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateMember(memberId, payload) {
+    return request(`/members/${memberId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async uploadMemberMedia(file, fieldName = "file", folder = "members") {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("fieldName", fieldName);
+    formData.append("folder", folder);
+
+    return request("/media/upload", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
   async getMinistries() {
     return request("/ministries");
+  },
+
+  async createMinistry(payload) {
+    return request("/ministries", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateMinistry(ministryId, payload) {
+    return request(`/ministries/${ministryId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
   },
 
   async getNextFamilyId() {

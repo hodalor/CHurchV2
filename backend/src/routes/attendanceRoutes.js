@@ -22,8 +22,12 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get("/events", authorizePermissions(PERMISSIONS.VIEW_ATTENDANCE), async (req, res) => {
-  const events = await getAttendanceSummary();
-  res.json(events);
+  try {
+    const events = await getAttendanceSummary();
+    return res.json(events);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 });
 
 router.post("/events", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
@@ -71,13 +75,17 @@ router.put("/events/:eventId", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANC
 });
 
 router.get("/events/:eventId/records", authorizePermissions(PERMISSIONS.VIEW_ATTENDANCE), async (req, res) => {
-  const event = await AttendanceEvent.findById(req.params.eventId);
-  if (!event) {
-    return res.status(404).json({ message: "Attendance event not found." });
-  }
+  try {
+    const event = await AttendanceEvent.findById(req.params.eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Attendance event not found." });
+    }
 
-  const records = await getAttendanceRecordsForEvent(event._id);
-  return res.json(records);
+    const records = await getAttendanceRecordsForEvent(event._id);
+    return res.json(records);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 });
 
 router.post("/events/:eventId/records", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
@@ -127,14 +135,13 @@ router.post("/events/:eventId/records/bulk", authorizePermissions(PERMISSIONS.MA
 });
 
 router.put("/records/:recordId", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
-  const record = await AttendanceRecord.findById(req.params.recordId);
-  if (!record) {
-    return res.status(404).json({ message: "Attendance record not found." });
-  }
-
-  const previousValue = record.toObject();
-
   try {
+    const record = await AttendanceRecord.findById(req.params.recordId);
+    if (!record) {
+      return res.status(404).json({ message: "Attendance record not found." });
+    }
+
+    const previousValue = record.toObject();
     const updatedRecord = await correctAttendanceRecord(record, req.body, req.user);
     await logAudit({
       action: "update",
@@ -153,20 +160,28 @@ router.put("/records/:recordId", authorizePermissions(PERMISSIONS.MANAGE_ATTENDA
 });
 
 router.get("/reports/summary", authorizePermissions(PERMISSIONS.VIEW_ATTENDANCE), async (req, res) => {
-  const report = await getAttendanceReport({
-    eventTypeId: req.query.eventTypeId || "",
-    ministryId: req.query.ministryId || "",
-    days: Number(req.query.days) || 90,
-  });
-  res.json(report);
+  try {
+    const report = await getAttendanceReport({
+      eventTypeId: req.query.eventTypeId || "",
+      ministryId: req.query.ministryId || "",
+      days: Number(req.query.days) || 90,
+    });
+    return res.json(report);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 });
 
 router.get("/reports/absentees", authorizePermissions(PERMISSIONS.VIEW_ATTENDANCE), async (req, res) => {
-  const absentees = await getAbsentees({
-    windowDays: Number(req.query.windowDays) || 28,
-    eventTypeKey: req.query.eventTypeKey || "sunday_worship",
-  });
-  res.json(absentees);
+  try {
+    const absentees = await getAbsentees({
+      windowDays: Number(req.query.windowDays) || 28,
+      eventTypeKey: req.query.eventTypeKey || "sunday_worship",
+    });
+    return res.json(absentees);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 });
 
 module.exports = router;

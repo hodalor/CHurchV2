@@ -21,7 +21,7 @@ export default function FamilyOverviewPage() {
     { name: "Heads", value: families.filter((family) => family.headOfHousehold?.memberId).length },
     { name: "Spouses", value: families.filter((family) => family.spouse?.memberId).length },
     { name: "Children", value: families.reduce((sum, family) => sum + (family.children?.length || 0), 0) },
-    { name: "Dependants", value: families.reduce((sum, family) => sum + (family.dependants?.length || 0), 0) },
+    { name: "Dependents", value: families.reduce((sum, family) => sum + (family.dependants?.length || 0), 0) },
   ];
 
   const householdSizeData = families.map((family) => ({

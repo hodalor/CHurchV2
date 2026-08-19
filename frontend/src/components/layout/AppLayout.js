@@ -220,7 +220,7 @@ function getPageAction(action, activeSetupTab, handlers, pathname) {
       : "Enroll Member",
     family: "Add Family",
     finance: "Add Finance",
-    attendance: "Add Attendance",
+    attendance: "Add Event",
     user: "Add User",
     ministry: "Add Ministry",
   };
@@ -245,6 +245,8 @@ function getPageAction(action, activeSetupTab, handlers, pathname) {
               ? pathname?.startsWith("/discipleship/programmes")
                 ? "discipleshipProgramme"
                 : "discipleshipEnrollment"
+            : action === "attendance"
+              ? "attendanceEvent"
             : action,
           null,
           "edit"

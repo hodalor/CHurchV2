@@ -15,7 +15,6 @@ function GroupNode({ group, groupsByParent, depth }) {
   return (
     <div className="tree-node" style={{ marginLeft: depth * 18 }}>
       <div className="tree-label">
-        <span>{group.levelName}</span>
         <strong>{group.name}</strong>
       </div>
       {children.map((child) => (
@@ -49,7 +48,7 @@ export default function SetupPage() {
             <div className="section-headline">
               <div>
                 <h3>Hierarchy Preview</h3>
-                <p>Flexible parent and child setup for groups.</p>
+                <p>Preview of parent and child groups.</p>
               </div>
             </div>
             <div className="tree-view">
@@ -62,8 +61,8 @@ export default function SetupPage() {
           <section className="surface-card side-panel">
             <div className="section-headline">
               <div>
-                <h3>Available Levels</h3>
-                <p>Compact list of all configured group levels.</p>
+                <h3>All Groups</h3>
+                <p>Every created group with its parent and generated code.</p>
               </div>
             </div>
             <div className="simple-list">
@@ -71,7 +70,10 @@ export default function SetupPage() {
                 <div className="simple-list-item clickable-card" key={group.id} onClick={() => openRecordModal("group", group)}>
                   <div>
                     <strong>{group.name}</strong>
-                    <p>{group.levelName} {group.code ? `- ${group.code}` : ""}</p>
+                    <p>
+                      {group.parentName ? `Parent: ${group.parentName}` : "Top level group"}
+                      {group.code ? ` - ${group.code}` : ""}
+                    </p>
                   </div>
                 </div>
               ))}

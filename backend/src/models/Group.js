@@ -16,11 +16,6 @@ const groupSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    levelName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
     parent: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Group",

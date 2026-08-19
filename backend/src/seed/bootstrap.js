@@ -1,6 +1,7 @@
 const LookupType = require("../models/LookupType");
 const LookupValue = require("../models/LookupValue");
 const DiscipleshipProgramme = require("../models/DiscipleshipProgramme");
+const Ministry = require("../models/Ministry");
 const Role = require("../models/Role");
 const User = require("../models/User");
 const { hashPin } = require("../services/authService");
@@ -10,6 +11,7 @@ async function bootstrapApplicationData() {
   await seedRoles();
   await seedLookupData();
   await seedDiscipleshipProgrammes();
+  await seedMinistries();
   await seedInitialAdminUser();
 }
 
@@ -149,6 +151,32 @@ async function seedDiscipleshipProgrammes() {
     ],
     isActive: true,
   });
+}
+
+async function seedMinistries() {
+  const ministrySeeds = [
+    { name: "Evangelism", description: "Outreach, follow-up, and prospect engagement.", color: "#4f46e5" },
+    { name: "Men", description: "Men's fellowship and discipleship activities.", color: "#0ea5e9" },
+    { name: "Women", description: "Women's fellowship and care activities.", color: "#ec4899" },
+    { name: "Youth", description: "Youth services, mentoring, and events.", color: "#f59e0b" },
+    { name: "Children", description: "Children's church and teaching support.", color: "#14b8a6" },
+    { name: "Marriage", description: "Marriage enrichment and household support.", color: "#8b5cf6" },
+    { name: "Empowerment", description: "Skills, support, and empowerment initiatives.", color: "#f97316" },
+    { name: "Finance", description: "Finance stewardship and reporting support.", color: "#22c55e" },
+    { name: "Administration", description: "Operations, records, and service coordination.", color: "#64748b" },
+  ];
+
+  await Promise.all(
+    ministrySeeds.map((ministry) =>
+      Ministry.findOneAndUpdate(
+        { name: ministry.name },
+        {
+          $set: ministry,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      )
+    )
+  );
 }
 
 async function seedInitialAdminUser() {

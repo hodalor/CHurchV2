@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import AttendanceParticipantLookupField from "./AttendanceParticipantLookupField";
 import { useAppContext } from "../../context/AppContext";
 
 export default function AttendanceEventActionPanel({ event }) {
@@ -11,9 +12,10 @@ export default function AttendanceEventActionPanel({ event }) {
     captureBulkAttendance,
     correctAttendanceRecord,
   } = useAppContext();
+  const [activePanel, setActivePanel] = useState("");
   const [manualEntry, setManualEntry] = useState({
-    memberId: "",
-    visitorId: "",
+    member: null,
+    visitor: null,
     present: true,
     capturedVia: attendanceCaptureModeOptions.find((item) => item.key === "manual")?._id || "",
     correctionReason: "",
@@ -22,7 +24,11 @@ export default function AttendanceEventActionPanel({ event }) {
   const [bulkSearch, setBulkSearch] = useState("");
 
   const filteredMembers = useMemo(() => {
-    const search = bulkSearch.toLowerCase();
+    const search = bulkSearch.toLowerCase().trim();
+    if (!search) {
+      return members.slice(0, 18);
+    }
+
     return members.filter((member) =>
       `${member.memberId || ""} ${member.firstName || ""} ${member.lastName || ""}`
         .toLowerCase()
@@ -44,7 +50,7 @@ export default function AttendanceEventActionPanel({ event }) {
         </div>
         <div className="info-grid">
           <article className="info-tile">
-            <span>Expected</span>
+            <span>Recorded Entries</span>
             <strong>{records.length}</strong>
           </article>
           <article className="info-tile">
@@ -60,174 +66,207 @@ export default function AttendanceEventActionPanel({ event }) {
             <strong>{event.qrToken || "-"}</strong>
           </article>
         </div>
-      </section>
-
-      <section className="subsection-card">
-        <div className="section-headline compact">
-          <h3>Manual Capture</h3>
-        </div>
-        <div className="form-grid">
-          <label>
-            Member
-            <select
-              value={manualEntry.memberId}
-              onChange={(event) =>
-                setManualEntry((current) => ({
-                  ...current,
-                  memberId: event.target.value,
-                  visitorId: "",
-                }))
-              }
-            >
-              <option value="">Select member</option>
-              {members.map((member) => (
-                <option key={member._id || member.memberId} value={member._id || ""}>
-                  {member.memberId} - {member.firstName} {member.lastName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Visitor
-            <select
-              value={manualEntry.visitorId}
-              onChange={(event) =>
-                setManualEntry((current) => ({
-                  ...current,
-                  visitorId: event.target.value,
-                  memberId: "",
-                }))
-              }
-            >
-              <option value="">Select visitor</option>
-              {visitors.map((visitor) => (
-                <option key={visitor._id || visitor.visitorId} value={visitor._id || ""}>
-                  {visitor.visitorId} - {visitor.firstName} {visitor.surname}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Capture Mode
-            <select
-              value={manualEntry.capturedVia}
-              onChange={(event) =>
-                setManualEntry((current) => ({ ...current, capturedVia: event.target.value }))
-              }
-            >
-              <option value="">Select mode</option>
-              {attendanceCaptureModeOptions.map((option) => (
-                <option key={option._id} value={option._id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Present
-            <select
-              value={String(manualEntry.present)}
-              onChange={(event) =>
-                setManualEntry((current) => ({
-                  ...current,
-                  present: event.target.value === "true",
-                }))
-              }
-            >
-              <option value="true">Present</option>
-              <option value="false">Absent</option>
-            </select>
-          </label>
-          <label className="full-width">
-            Correction Reason
-            <textarea
-              rows="3"
-              value={manualEntry.correctionReason}
-              onChange={(event) =>
-                setManualEntry((current) => ({
-                  ...current,
-                  correctionReason: event.target.value,
-                }))
-              }
-            />
-          </label>
-        </div>
         <div className="modal-actions">
           <button
             type="button"
             className="ghost-button small"
-            disabled={attendanceApiState.loading || (!manualEntry.memberId && !manualEntry.visitorId)}
-            onClick={async () => {
-              await captureAttendanceRecord(event._id, {
-                memberId: manualEntry.memberId || null,
-                visitorId: manualEntry.visitorId || null,
-                present: manualEntry.present,
-                capturedVia: manualEntry.capturedVia,
-                correctedFlag: Boolean(manualEntry.correctionReason),
-                correctionReason: manualEntry.correctionReason,
-              });
-              setManualEntry((current) => ({
-                ...current,
-                memberId: "",
-                visitorId: "",
-                present: true,
-                correctionReason: "",
-              }));
-            }}
+            onClick={() => setActivePanel((current) => (current === "manual" ? "" : "manual"))}
           >
-            Save Attendance
+            {activePanel === "manual" ? "Hide Record Form" : "Record Attendance"}
+          </button>
+          <button
+            type="button"
+            className="ghost-button small"
+            onClick={() => setActivePanel((current) => (current === "bulk" ? "" : "bulk"))}
+          >
+            {activePanel === "bulk" ? "Hide Bulk Form" : "Bulk Record"}
           </button>
         </div>
       </section>
 
-      <section className="subsection-card">
-        <div className="section-headline compact">
-          <h3>Bulk Capture</h3>
-        </div>
-        <div className="form-grid">
-          <label className="full-width">
-            Search Members
-            <input value={bulkSearch} onChange={(event) => setBulkSearch(event.target.value)} />
-          </label>
-        </div>
-        <div className="attendance-checklist">
-          {filteredMembers.slice(0, 16).map((member) => (
-            <label key={member._id || member.memberId} className="attendance-checklist-item">
-              <input
-                type="checkbox"
-                checked={bulkSelection.includes(member._id)}
+      {activePanel === "manual" ? (
+        <section className="subsection-card">
+          <div className="section-headline compact">
+            <h3>Manual Capture</h3>
+          </div>
+          <div className="lookup-grid">
+            <AttendanceParticipantLookupField
+              label="Member"
+              placeholder="Search member by name or member ID"
+              items={members}
+              selected={manualEntry.member}
+              onSelect={(member) =>
+                setManualEntry((current) => ({
+                  ...current,
+                  member,
+                  visitor: null,
+                }))
+              }
+              onClear={() =>
+                setManualEntry((current) => ({
+                  ...current,
+                  member: null,
+                }))
+              }
+              getKey={(member) => member._id || member.memberId}
+              getLabel={(member) => `${member.memberId} - ${member.firstName} ${member.lastName}`}
+            />
+            <AttendanceParticipantLookupField
+              label="Visitor"
+              placeholder="Search visitor by name or visitor ID"
+              items={visitors}
+              selected={manualEntry.visitor}
+              onSelect={(visitor) =>
+                setManualEntry((current) => ({
+                  ...current,
+                  visitor,
+                  member: null,
+                }))
+              }
+              onClear={() =>
+                setManualEntry((current) => ({
+                  ...current,
+                  visitor: null,
+                }))
+              }
+              getKey={(visitor) => visitor._id || visitor.visitorId}
+              getLabel={(visitor) => `${visitor.visitorId} - ${visitor.firstName} ${visitor.surname}`}
+            />
+          </div>
+          <div className="form-grid">
+            <label>
+              Capture Mode
+              <select
+                value={manualEntry.capturedVia}
                 onChange={(event) =>
-                  setBulkSelection((current) =>
-                    event.target.checked
-                      ? [...current, member._id]
-                      : current.filter((item) => item !== member._id)
-                  )
+                  setManualEntry((current) => ({ ...current, capturedVia: event.target.value }))
+                }
+              >
+                <option value="">Select mode</option>
+                {attendanceCaptureModeOptions.map((option) => (
+                  <option key={option._id} value={option._id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Present
+              <select
+                value={String(manualEntry.present)}
+                onChange={(event) =>
+                  setManualEntry((current) => ({
+                    ...current,
+                    present: event.target.value === "true",
+                  }))
+                }
+              >
+                <option value="true">Present</option>
+                <option value="false">Absent</option>
+              </select>
+            </label>
+            <label className="full-width">
+              Correction Reason
+              <textarea
+                rows="3"
+                value={manualEntry.correctionReason}
+                onChange={(event) =>
+                  setManualEntry((current) => ({
+                    ...current,
+                    correctionReason: event.target.value,
+                  }))
                 }
               />
-              <span>{member.memberId} - {member.firstName} {member.lastName}</span>
             </label>
-          ))}
-        </div>
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="ghost-button small"
-            disabled={attendanceApiState.loading || !bulkSelection.length}
-            onClick={async () => {
-              await captureBulkAttendance(event._id, {
-                capturedVia: "bulk",
-                records: bulkSelection.map((memberId) => ({
-                  memberId,
+          </div>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="ghost-button small"
+              disabled={attendanceApiState.loading || (!manualEntry.member && !manualEntry.visitor)}
+              onClick={async () => {
+                await captureAttendanceRecord(event._id, {
+                  memberId: manualEntry.member?._id || null,
+                  visitorId: manualEntry.visitor?._id || null,
+                  present: manualEntry.present,
+                  capturedVia: manualEntry.capturedVia,
+                  correctedFlag: Boolean(manualEntry.correctionReason),
+                  correctionReason: manualEntry.correctionReason,
+                });
+                setManualEntry((current) => ({
+                  ...current,
+                  member: null,
+                  visitor: null,
                   present: true,
-                })),
-              });
-              setBulkSelection([]);
-            }}
-          >
-            Save Bulk Attendance
-          </button>
-        </div>
-      </section>
+                  correctionReason: "",
+                }));
+                setActivePanel("");
+              }}
+            >
+              Save Attendance
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {activePanel === "bulk" ? (
+        <section className="subsection-card">
+          <div className="section-headline compact">
+            <h3>Bulk Capture</h3>
+          </div>
+          <div className="form-grid">
+            <label className="full-width">
+              Search Members
+              <input
+                value={bulkSearch}
+                onChange={(event) => setBulkSearch(event.target.value)}
+                placeholder="Search members to mark present"
+              />
+            </label>
+          </div>
+          <div className="attendance-checklist">
+            {filteredMembers.map((member) => (
+              <label key={member._id || member.memberId} className="attendance-checklist-item">
+                <input
+                  type="checkbox"
+                  checked={bulkSelection.includes(member._id)}
+                  onChange={(event) =>
+                    setBulkSelection((current) =>
+                      event.target.checked
+                        ? [...current, member._id]
+                        : current.filter((item) => item !== member._id)
+                    )
+                  }
+                />
+                <span>
+                  {member.memberId} - {member.firstName} {member.lastName}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="ghost-button small"
+              disabled={attendanceApiState.loading || !bulkSelection.length}
+              onClick={async () => {
+                await captureBulkAttendance(event._id, {
+                  capturedVia: "bulk",
+                  records: bulkSelection.map((memberId) => ({
+                    memberId,
+                    present: true,
+                  })),
+                });
+                setBulkSelection([]);
+                setBulkSearch("");
+                setActivePanel("");
+              }}
+            >
+              Save Bulk Attendance
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="subsection-card">
         <div className="section-headline compact">

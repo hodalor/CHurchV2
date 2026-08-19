@@ -4,13 +4,16 @@ export default function PhotoUploadCard({
   title,
   description,
   value,
-  placeholder,
   actionLabel,
-  onChange,
+  placeholder,
+  onFileChange,
   round,
   type = "photo",
+  uploading = false,
 }) {
   const Icon = type === "id" ? FaIdCard : FaImage;
+  const resolvedValue = typeof value === "object" && value?.url ? value : null;
+  const previewLabel = resolvedValue?.label || (typeof value === "string" ? value : "");
 
   return (
     <div className="upload-card">
@@ -20,23 +23,34 @@ export default function PhotoUploadCard({
       </div>
 
       <div className={round ? "upload-preview round" : "upload-preview"}>
-        {value || placeholder}
+        {resolvedValue?.url ? (
+          <a href={resolvedValue.url} target="_blank" rel="noreferrer">
+            {previewLabel}
+          </a>
+        ) : (
+          previewLabel || placeholder
+        )}
       </div>
 
       <div className="upload-actions">
         {round ? (
-          <button type="button" className="ghost-button small">
+          <button type="button" className="ghost-button small" disabled={uploading}>
             <FaCamera />
             Take Photo
           </button>
         ) : null}
-        <button type="button" className="ghost-button small">
+        <label className="ghost-button small">
           <Icon />
-          {actionLabel}
-        </button>
+          {uploading ? "Uploading..." : actionLabel}
+          <input
+            className="upload-input"
+            type="file"
+            accept="image/*"
+            onChange={onFileChange}
+            disabled={uploading}
+          />
+        </label>
       </div>
-
-      <input className="upload-input" type="text" value={value} onChange={onChange} placeholder={placeholder} />
     </div>
   );
 }

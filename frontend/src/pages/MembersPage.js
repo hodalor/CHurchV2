@@ -38,7 +38,7 @@ export default function MembersPage() {
           <select className="filter-select" value={memberMinistryFilter} onChange={(event) => setMemberMinistryFilter(event.target.value)}>
             <option value="all">All ministries</option>
             {ministries.map((ministry) => (
-              <option key={ministry.id} value={ministry.id}>
+              <option key={ministry._id || ministry.id} value={ministry._id || ministry.id}>
                 {ministry.name}
               </option>
             ))}
@@ -61,7 +61,11 @@ export default function MembersPage() {
             </thead>
             <tbody>
               {filteredMembers.map((member) => {
-                const ministry = ministries.find((item) => item.id === member.ministryId);
+                const memberMinistryId = member.ministryId || member.ministry?._id || member.ministry;
+                const ministry =
+                  typeof member.ministry === "object" && member.ministry?.name
+                    ? member.ministry
+                    : ministries.find((item) => (item._id || item.id) === memberMinistryId);
                 return (
                   <tr key={member.memberId} className="clickable-row" onClick={() => openRecordModal("member", member)}>
                     <td>
@@ -87,9 +91,9 @@ export default function MembersPage() {
                     </td>
                     <td>
                       <div className="photo-stack">
-                        <span>{member.personalPhoto || "-"}</span>
-                        <span>{member.idFrontPhoto || "-"}</span>
-                        <span>{member.idBackPhoto || "-"}</span>
+                        <MediaLink value={member.personalPhoto} label="Photo" />
+                        <MediaLink value={member.idFrontPhoto} label="ID Front" />
+                        <MediaLink value={member.idBackPhoto} label="ID Back" />
                       </div>
                     </td>
                   </tr>
@@ -101,4 +105,16 @@ export default function MembersPage() {
       </section>
     </div>
   );
+}
+
+function MediaLink({ value, label }) {
+  if (value?.url) {
+    return (
+      <a href={value.url} target="_blank" rel="noreferrer">
+        {value.label || label}
+      </a>
+    );
+  }
+
+  return <span>{value || "-"}</span>;
 }

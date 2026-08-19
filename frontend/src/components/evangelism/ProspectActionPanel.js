@@ -355,9 +355,13 @@ export default function ProspectActionPanel({ prospect }) {
                 }
               >
                 <option value="Active">Active</option>
-                <option value="Dormant">Dormant</option>
                 <option value="Inactive">Inactive</option>
-                <option value="Passed On">Passed On</option>
+                <option value="New Convert">New Convert</option>
+                <option value="Transferred In">Transferred In</option>
+                <option value="Transferred Out">Transferred Out</option>
+                <option value="Relocated">Relocated</option>
+                <option value="Under Restoration">Under Restoration</option>
+                <option value="Deceased">Deceased</option>
               </select>
             </label>
             <label>

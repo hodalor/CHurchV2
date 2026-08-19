@@ -35,8 +35,8 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const { authUser } = useAuth();
   const [branding, setBranding] = useState(initialBranding);
-  const [groups, setGroups] = useState(initialGroups);
-  const [ministries, setMinistries] = useState(initialMinistries);
+  const [groups, setGroups] = useState(initialGroups.map(hydrateGroupRecord));
+  const [ministries, setMinistries] = useState(initialMinistries.map(hydrateMinistryRecord));
   const [members, setMembers] = useState(initialMembers);
   const [roles, setRoles] = useState(initialRoles);
   const [users, setUsers] = useState(initialUsers);
@@ -61,6 +61,11 @@ export function AppProvider({ children }) {
     error: "",
     report: null,
     recordsByEvent: {},
+  });
+  const [mediaUploadState, setMediaUploadState] = useState({
+    loading: false,
+    error: "",
+    fieldName: "",
   });
   const [lookupState, setLookupState] = useState({ loading: false, error: "", values: [] });
   const [pendingActionState, setPendingActionState] = useState({ loading: false, error: "", items: [] });
@@ -98,8 +103,9 @@ export function AppProvider({ children }) {
     return members.filter((member) => {
       const haystack = `${member.firstName} ${member.otherName} ${member.lastName} ${member.memberId}`.toLowerCase();
       const matchesSearch = haystack.includes(memberSearch.toLowerCase());
+      const memberMinistryId = member.ministryId || member.ministry?._id || member.ministry || "";
       const matchesMinistry =
-        memberMinistryFilter === "all" || member.ministryId === memberMinistryFilter;
+        memberMinistryFilter === "all" || memberMinistryId === memberMinistryFilter;
 
       return matchesSearch && matchesMinistry;
     });
@@ -173,8 +179,14 @@ export function AppProvider({ children }) {
 
   const openRecordModal = async (type, record, mode = "view") => {
     const sourceRecord = record
-      ? type === "family"
+      ? type === "member"
+        ? hydrateMemberRecord(record)
+        : type === "family"
         ? hydrateFamilyRecord(record)
+        : type === "group"
+          ? hydrateGroupRecord(record)
+        : type === "ministry"
+          ? hydrateMinistryRecord(record)
         : type === "visitor"
           ? hydrateVisitorRecord(record)
           : type === "prospect"
@@ -267,13 +279,33 @@ export function AppProvider({ children }) {
   };
 
   const openMemberEnrollment = () => {
+    const fallbackId = generateNextMemberId(members);
+    const today = new Date().toISOString().slice(0, 10);
+
     setMemberForm({
       ...memberFormTemplate,
-      memberId: generateNextMemberId(members),
-      membershipDate: new Date().toISOString().slice(0, 10),
+      memberId: fallbackId,
+      membershipDate: today,
+      dateJoined: today,
+      dateCaptured: today,
+      dataEntryClerk: authUser?.displayName || authUser?.username || "",
     });
     setEnrolmentStep(0);
     setActiveModal("member-enrolment");
+
+    if (authUser) {
+      churchApi
+        .getNextMemberId()
+        .then((payload) => {
+          setMemberForm((current) => ({
+            ...current,
+            memberId: payload.memberId || current.memberId || fallbackId,
+          }));
+        })
+        .catch(() => {
+          // Keep fallback member ID when the next-id endpoint is unavailable.
+        });
+    }
   };
 
   const syncVisitorState = (incomingVisitor) => {
@@ -596,7 +628,8 @@ export function AppProvider({ children }) {
     async function loadProtectedData() {
       if (!authUser) {
         if (active) {
-          setMinistries(initialMinistries);
+          setGroups(initialGroups.map(hydrateGroupRecord));
+          setMinistries(initialMinistries.map(hydrateMinistryRecord));
           setVisitors(initialVisitors);
           setMembers(initialMembers);
           setProspects([]);
@@ -629,6 +662,7 @@ export function AppProvider({ children }) {
       try {
         const [
           lookupsResponse,
+          groupsResponse,
           usersResponse,
           ministriesResponse,
           membersResponse,
@@ -650,6 +684,7 @@ export function AppProvider({ children }) {
         ] =
           await Promise.allSettled([
             churchApi.getLookups(),
+            churchApi.getGroups(),
             churchApi.getUsers(),
             churchApi.getMinistries(),
             churchApi.getMembers(),
@@ -685,6 +720,11 @@ export function AppProvider({ children }) {
               ? lookupsResponse.value.values
               : [],
         });
+        setGroups(
+          groupsResponse.status === "fulfilled" && Array.isArray(groupsResponse.value)
+            ? groupsResponse.value.map(hydrateGroupRecord)
+            : initialGroups.map(hydrateGroupRecord)
+        );
         setUsers(
           usersResponse.status === "fulfilled" && Array.isArray(usersResponse.value)
             ? usersResponse.value
@@ -692,12 +732,12 @@ export function AppProvider({ children }) {
         );
         setMinistries(
           ministriesResponse.status === "fulfilled" && Array.isArray(ministriesResponse.value)
-            ? ministriesResponse.value
+            ? ministriesResponse.value.map(hydrateMinistryRecord)
             : []
         );
         setMembers(
           membersResponse.status === "fulfilled" && Array.isArray(membersResponse.value)
-            ? membersResponse.value
+            ? membersResponse.value.map(hydrateMemberRecord)
             : []
         );
         setVisitors(
@@ -870,14 +910,14 @@ export function AppProvider({ children }) {
     }));
   };
 
-  const submitMemberForm = () => {
+  const submitMemberForm = async () => {
     const selectedGroups = buildGroupSelections(groups, memberForm.groupChain);
     const resolvedLinks = enrichFamilyLinks(memberForm.familyLinks, members);
     const inheritedHousehold = getInheritedFamilyAssignment(memberForm, members);
     const effectiveFamilyId = memberForm.familyId || inheritedHousehold.familyId || "";
     const effectiveFamilyName = memberForm.familyName || inheritedHousehold.familyName || "";
     const effectiveHouseholdRole = memberForm.householdRole || inheritedHousehold.householdRole || "";
-    const newMember = {
+    const newMember = hydrateMemberRecord({
       id: `mem${Date.now()}`,
       ...memberForm,
       familyId: effectiveFamilyId,
@@ -886,66 +926,77 @@ export function AppProvider({ children }) {
       groups: selectedGroups,
       attendanceRate: "New",
       familyLinks: resolvedLinks,
-    };
-
-    setMembers((current) => {
-      const nextMembers = [newMember, ...current];
-
-      resolvedLinks.forEach((link) => {
-        const reciprocalRelationship = getReciprocalRelationship(link.relationship);
-        const linkedMember = nextMembers.find((item) => item.memberId === link.memberId);
-
-        if (linkedMember) {
-          const alreadyExists = (linkedMember.familyLinks || []).some(
-            (item) => item.memberId === newMember.memberId && item.relationship === reciprocalRelationship
-          );
-
-          if (!alreadyExists) {
-            linkedMember.familyLinks = [
-              ...(linkedMember.familyLinks || []),
-              {
-                memberId: newMember.memberId,
-                memberName: `${newMember.firstName} ${newMember.lastName}`,
-                relationship: reciprocalRelationship,
-              },
-            ];
-          }
-        }
-      });
-
-      return [...nextMembers];
     });
 
-    if (effectiveFamilyId) {
-      setFamilies((current) =>
-        current.map((family) => {
-          if (family.familyId !== effectiveFamilyId) {
-            return family;
-          }
+    try {
+      const payload = normalizeMemberDraft(newMember, authUser);
+      const savedMember = await churchApi.createMember(payload);
+      const hydratedMember = hydrateMemberRecord(savedMember);
 
-          const exists = (family.householdMembers || []).some((item) => item.memberId === newMember.memberId);
-          const nextHouseholdMembers = exists
-            ? family.householdMembers
-            : [
-                ...(family.householdMembers || []),
+      setMembers((current) => {
+        const nextMembers = [hydratedMember, ...current];
+
+        resolvedLinks.forEach((link) => {
+          const reciprocalRelationship = getReciprocalRelationship(link.relationship, hydratedMember);
+          const linkedMember = nextMembers.find((item) => item.memberId === link.memberId);
+
+          if (linkedMember) {
+            const alreadyExists = (linkedMember.familyLinks || []).some(
+              (item) => item.memberId === hydratedMember.memberId && item.relationship === reciprocalRelationship
+            );
+
+            if (!alreadyExists) {
+              linkedMember.familyLinks = [
+                ...(linkedMember.familyLinks || []),
                 {
-                  memberId: newMember.memberId,
-                  memberName: `${newMember.firstName} ${newMember.lastName}`,
-                relationshipToHead: newMember.householdRole || "Member",
-                  status: newMember.membershipStatus,
+                  memberId: hydratedMember.memberId,
+                  memberName: `${hydratedMember.firstName} ${hydratedMember.lastName}`,
+                  relationship: reciprocalRelationship,
                 },
               ];
+            }
+          }
+        });
 
-          return {
-            ...family,
-            householdMembers: nextHouseholdMembers,
-            familyContact: family.familyContact || newMember.phone,
-          };
-        })
-      );
+        return [...nextMembers];
+      });
+
+      if (effectiveFamilyId) {
+        setFamilies((current) =>
+          current.map((family) => {
+            if (family.familyId !== effectiveFamilyId) {
+              return family;
+            }
+
+            const exists = (family.householdMembers || []).some((item) => item.memberId === hydratedMember.memberId);
+            const nextHouseholdMembers = exists
+              ? family.householdMembers
+              : [
+                  ...(family.householdMembers || []),
+                  {
+                    memberId: hydratedMember.memberId,
+                    memberName: `${hydratedMember.firstName} ${hydratedMember.lastName}`,
+                    relationshipToHead: hydratedMember.householdRole || "Other",
+                    status: hydratedMember.membershipStatus,
+                  },
+                ];
+
+            return {
+              ...family,
+              householdMembers: nextHouseholdMembers,
+              familyContact: family.familyContact || hydratedMember.phone,
+            };
+          })
+        );
+      }
+
+      closeModal();
+    } catch (error) {
+      setMediaUploadState((current) => ({
+        ...current,
+        error: error.message || "Unable to save member.",
+      }));
     }
-
-    closeModal();
   };
 
   const saveRecordModal = async () => {
@@ -956,11 +1007,26 @@ export function AppProvider({ children }) {
     }
 
     if (type === "member") {
-      setMembers((current) =>
-        updateOrInsert(current, draft, record?.id, {
-          id: draft.id || `mem${Date.now()}`,
-        })
-      );
+      try {
+        const payload = normalizeMemberDraft(draft, authUser);
+        const savedMember = record?._id
+          ? await churchApi.updateMember(record._id, payload)
+          : await churchApi.createMember(payload);
+
+        setMembers((current) =>
+          updateOrInsert(current, hydrateMemberRecord(savedMember), getRecordIdentity(record), {
+            id: savedMember.id || savedMember._id || draft.id || `mem${Date.now()}`,
+            _id: savedMember._id,
+          })
+        );
+        closeRecordModal();
+      } catch (error) {
+        setMediaUploadState((current) => ({
+          ...current,
+          error: error.message || "Unable to save member.",
+        }));
+      }
+      return;
     }
 
     if (type === "visitor") {
@@ -1179,11 +1245,25 @@ export function AppProvider({ children }) {
     }
 
     if (type === "ministry") {
-      setMinistries((current) =>
-        updateOrInsert(current, draft, record?.id, {
-          id: draft.id || `m${Date.now()}`,
-        })
-      );
+      try {
+        const payload = normalizeMinistryDraft(draft);
+        const savedMinistry = record?._id
+          ? await churchApi.updateMinistry(record._id, payload)
+          : await churchApi.createMinistry(payload);
+        const refreshedMembers = await churchApi.getMembers();
+
+        setMinistries((current) =>
+          updateOrInsert(current, hydrateMinistryRecord(savedMinistry), getRecordIdentity(record), {
+            id: savedMinistry.id || savedMinistry._id,
+            _id: savedMinistry._id,
+          })
+        );
+        setMembers(Array.isArray(refreshedMembers) ? refreshedMembers.map(hydrateMemberRecord) : []);
+        closeRecordModal();
+      } catch (error) {
+        console.error(error);
+      }
+      return;
     }
 
     if (type === "role") {
@@ -1195,14 +1275,23 @@ export function AppProvider({ children }) {
     }
 
     if (type === "group") {
-      setGroups((current) =>
-        updateOrInsert(
-          current,
-          { ...draft, parentId: draft.parentId || null },
-          record?.id,
-          { id: draft.id || `g${Date.now()}` }
-        )
-      );
+      try {
+        const payload = normalizeGroupDraft(draft);
+        const savedGroup = record?._id
+          ? await churchApi.updateGroup(record._id, payload)
+          : await churchApi.createGroup(payload);
+
+        setGroups((current) =>
+          updateOrInsert(current, hydrateGroupRecord(savedGroup), getRecordIdentity(record), {
+            id: savedGroup.id || savedGroup._id || draft.id || `g${Date.now()}`,
+            _id: savedGroup._id,
+          })
+        );
+        closeRecordModal();
+      } catch (error) {
+        console.error(error);
+      }
+      return;
     }
 
     if (type === "branding") {
@@ -1243,6 +1332,7 @@ export function AppProvider({ children }) {
     attendanceApiState,
     lookupState,
     pendingActionState,
+    mediaUploadState,
     visitorHowHeardOptions,
     visitorStatusOptions,
     evangelismSourceOptions,
@@ -1311,6 +1401,30 @@ export function AppProvider({ children }) {
     setCampaigns,
     setDiscipleshipProgrammes,
     setAttendanceAbsentees,
+    async uploadMemberMedia(file, fieldName) {
+      try {
+        setMediaUploadState({
+          loading: true,
+          error: "",
+          fieldName,
+        });
+        const uploadedFile = await churchApi.uploadMemberMedia(file, fieldName, "members");
+        const normalizedFile = normalizeMediaField(uploadedFile);
+        setMediaUploadState({
+          loading: false,
+          error: "",
+          fieldName: "",
+        });
+        return normalizedFile;
+      } catch (error) {
+        setMediaUploadState({
+          loading: false,
+          error: error.message || "Unable to upload media.",
+          fieldName,
+        });
+        throw error;
+      }
+    },
     async recordVisitorChurchVisit(visitorId, payload) {
       try {
         setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
@@ -1806,7 +1920,19 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
   if (type === "ministry") {
     return {
       name: "",
-      leader: "",
+      leadership: {
+        elderInCharge: null,
+        deaconInCharge: null,
+        chairman: null,
+        assistantChairman: null,
+        organizer: null,
+        assistantOrganizer: null,
+        secretary: null,
+        assistantSecretary: null,
+        treasurer: null,
+        assistantTreasurer: null,
+      },
+      members: [],
       description: "",
       color: "#4f46e5",
     };
@@ -1822,7 +1948,6 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
   if (type === "group") {
     return {
       name: "",
-      levelName: "",
       code: "",
       parentId: "",
       description: "",
@@ -1834,20 +1959,41 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
       id: `mem${Date.now()}`,
       memberId: generateNextMemberId(members),
       firstName: "",
+      otherName: "",
+      preferredName: "",
       lastName: "",
+      gender: "",
+      maritalStatus: "",
       phone: "",
       email: "",
+      dateOfBirth: "",
+      occupation: "",
+      employerOrBusiness: "",
+      educationOrSkills: "",
       membershipStatus: "Active",
+      membershipDate: "",
+      dateJoined: "",
       baptismStatus: "Not Baptized",
+      baptismDate: "",
+      placeBaptized: "",
+      baptizedBy: "",
+      previousCongregation: "",
+      transferDetails: "",
       city: "",
       address: "",
+      gpsLatitude: "",
+      gpsLongitude: "",
       notes: "",
+      sourceRecordRef: "",
+      dataEntryClerk: "",
+      dateCaptured: "",
       familyLinks: [],
       groups: [],
       personalPhoto: "",
       idFrontPhoto: "",
       idBackPhoto: "",
-      ministryId: ministries[0]?.id || "",
+      photoFileName: "",
+      ministryId: ministries[0]?._id || ministries[0]?.id || "",
     };
   }
 
@@ -1866,6 +2012,122 @@ function buildNewRecord(type, { families, members, ministries, roles, prospects,
 
 function getRecordIdentity(item) {
   return item?.id || item?._id || item?.visitorId || item?.prospectId || item?.familyId || item?.memberId;
+}
+
+function hydrateMemberRecord(member) {
+  if (!member) {
+    return member;
+  }
+
+  return {
+    ...member,
+    preferredName: member.preferredName || "",
+    occupation: member.occupation || "",
+    employerOrBusiness: member.employerOrBusiness || "",
+    educationOrSkills: member.educationOrSkills || "",
+    dateJoined: formatDateInputValue(member.dateJoined || member.membershipDate),
+    placeBaptized: member.placeBaptized || "",
+    baptizedBy: member.baptizedBy || "",
+    previousCongregation: member.previousCongregation || "",
+    transferDetails: member.transferDetails || "",
+    photoFileName: member.photoFileName || member.personalPhoto?.label || "",
+    sourceRecordRef: member.sourceRecordRef || "",
+    dataEntryClerk: member.dataEntryClerk || "",
+    dateCaptured: formatDateInputValue(member.dateCaptured || member.createdAt),
+    gpsLatitude: member.gpsLatitude || "",
+    gpsLongitude: member.gpsLongitude || "",
+    ministryId: member.ministryId || member.ministry?._id || member.ministry || "",
+    personalPhoto: normalizeMediaField(member.personalPhoto),
+    idFrontPhoto: normalizeMediaField(member.idFrontPhoto),
+    idBackPhoto: normalizeMediaField(member.idBackPhoto),
+  };
+}
+
+function normalizeMemberDraft(draft, authUser = null) {
+  return {
+    memberId: draft.memberId || "",
+    firstName: draft.firstName || "",
+    otherName: draft.otherName || "",
+    lastName: draft.lastName || "",
+    memberType: draft.memberType || "Adult",
+    gender: draft.gender || "",
+    maritalStatus: draft.maritalStatus || "",
+    phone: draft.phone || "",
+    email: draft.email || "",
+    dateOfBirth: draft.dateOfBirth || null,
+    preferredName: draft.preferredName || "",
+    occupation: draft.occupation || "",
+    employerOrBusiness: draft.employerOrBusiness || "",
+    educationOrSkills: draft.educationOrSkills || "",
+    membershipStatus: draft.membershipStatus || "Active",
+    membershipDate: draft.membershipDate || draft.dateJoined || null,
+    dateJoined: draft.dateJoined || draft.membershipDate || null,
+    baptismStatus: draft.baptismStatus || "Not Baptized",
+    baptismDate: draft.baptismDate || null,
+    placeBaptized: draft.placeBaptized || "",
+    baptizedBy: draft.baptizedBy || "",
+    previousCongregation: draft.previousCongregation || "",
+    transferDetails: draft.transferDetails || "",
+    ministryId: draft.ministryId?._id || draft.ministryId || null,
+    address: draft.address || "",
+    city: draft.city || "",
+    country: draft.country || "",
+    gpsLatitude: draft.gpsLatitude || "",
+    gpsLongitude: draft.gpsLongitude || "",
+    notes: draft.notes || "",
+    familyId: draft.familyId || "",
+    familyName: draft.familyName || "",
+    householdRole: draft.householdRole || "",
+    photoFileName: draft.photoFileName || normalizeMediaField(draft.personalPhoto)?.label || "",
+    sourceRecordRef: draft.sourceRecordRef || "",
+    dataEntryClerk: draft.dataEntryClerk || authUser?.displayName || authUser?.username || "",
+    dateCaptured: draft.dateCaptured || new Date().toISOString().slice(0, 10),
+    groups: Array.isArray(draft.groups) ? draft.groups : [],
+    familyLinks: Array.isArray(draft.familyLinks) ? draft.familyLinks : [],
+    personalPhoto: normalizeMediaField(draft.personalPhoto),
+    idFrontPhoto: normalizeMediaField(draft.idFrontPhoto),
+    idBackPhoto: normalizeMediaField(draft.idBackPhoto),
+  };
+}
+
+function normalizeMediaField(value) {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value.startsWith("http")
+      ? {
+          url: value,
+          label: extractMediaLabel(value),
+        }
+      : "";
+  }
+
+  if (typeof value === "object" && value.url) {
+    return {
+      url: value.url,
+      label: value.label || extractMediaLabel(value.url),
+      contentType: value.contentType || "",
+      objectName: value.objectName || "",
+    };
+  }
+
+  return "";
+}
+
+function extractMediaLabel(value = "") {
+  const cleanValue = String(value).split("?")[0];
+  const parts = cleanValue.split("/");
+  return parts[parts.length - 1] || "upload";
+}
+
+function formatDateInputValue(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).slice(0, 10);
 }
 
 function hydrateVisitorRecord(visitor) {
@@ -2000,6 +2262,100 @@ function normalizeDiscipleshipEnrollmentDraft(draft) {
     status: draft.status?._id || draft.status || null,
     completionDate: draft.completionDate || null,
     sourceProspectId: draft.sourceProspectId || "",
+  };
+}
+
+function hydrateMinistryRecord(ministry) {
+  if (!ministry) {
+    return ministry;
+  }
+
+  return {
+    ...ministry,
+    id: ministry.id || ministry._id,
+    leadership: {
+      elderInCharge: ministry.leadership?.elderInCharge || null,
+      deaconInCharge: ministry.leadership?.deaconInCharge || null,
+      chairman: ministry.leadership?.chairman || null,
+      assistantChairman: ministry.leadership?.assistantChairman || null,
+      organizer: ministry.leadership?.organizer || null,
+      assistantOrganizer: ministry.leadership?.assistantOrganizer || null,
+      secretary: ministry.leadership?.secretary || null,
+      assistantSecretary: ministry.leadership?.assistantSecretary || null,
+      treasurer: ministry.leadership?.treasurer || null,
+      assistantTreasurer: ministry.leadership?.assistantTreasurer || null,
+    },
+    members: Array.isArray(ministry.members) ? ministry.members : [],
+  };
+}
+
+function normalizeMinistryDraft(draft) {
+  return {
+    name: draft.name || "",
+    leadership: normalizeMinistryLeadership(draft.leadership),
+    members: normalizeMinistrySelectionArray(draft.members),
+    color: draft.color || "#4f46e5",
+    description: draft.description || "",
+  };
+}
+
+function normalizeMinistryLeadership(leadership = {}) {
+  return {
+    elderInCharge: normalizeMinistrySelection(leadership.elderInCharge),
+    deaconInCharge: normalizeMinistrySelection(leadership.deaconInCharge),
+    chairman: normalizeMinistrySelection(leadership.chairman),
+    assistantChairman: normalizeMinistrySelection(leadership.assistantChairman),
+    organizer: normalizeMinistrySelection(leadership.organizer),
+    assistantOrganizer: normalizeMinistrySelection(leadership.assistantOrganizer),
+    secretary: normalizeMinistrySelection(leadership.secretary),
+    assistantSecretary: normalizeMinistrySelection(leadership.assistantSecretary),
+    treasurer: normalizeMinistrySelection(leadership.treasurer),
+    assistantTreasurer: normalizeMinistrySelection(leadership.assistantTreasurer),
+  };
+}
+
+function normalizeMinistrySelectionArray(items = []) {
+  return items
+    .map((item) => normalizeMinistrySelection(item))
+    .filter(Boolean)
+    .reduce((accumulator, item) => {
+      if (accumulator.some((entry) => entry.memberId === item.memberId)) {
+        return accumulator;
+      }
+
+      return [...accumulator, item];
+    }, []);
+}
+
+function normalizeMinistrySelection(item) {
+  if (!item?.memberId) {
+    return null;
+  }
+
+  return {
+    memberId: item.memberId,
+    memberName: item.memberName || item.memberId,
+  };
+}
+
+function hydrateGroupRecord(group) {
+  if (!group) {
+    return group;
+  }
+
+  return {
+    ...group,
+    id: group.id || group._id,
+    parentId: group.parentId || group.parent?._id || group.parent || "",
+    parentName: group.parentName || group.parent?.name || "",
+  };
+}
+
+function normalizeGroupDraft(draft) {
+  return {
+    name: draft.name || "",
+    parentId: draft.parentId || null,
+    description: draft.description || "",
   };
 }
 
@@ -2140,7 +2496,7 @@ function buildHouseholdMembers(family, members) {
     { item: family.headOfHousehold, role: "Head" },
     { item: family.spouse, role: "Spouse" },
     ...(family.children || []).map((item) => ({ item, role: "Child" })),
-    ...(family.dependants || []).map((item) => ({ item, role: "Dependant" })),
+    ...(family.dependants || []).map((item) => ({ item, role: "Dependent" })),
   ];
 
   return roleBuckets
@@ -2185,7 +2541,7 @@ function syncMembersToFamily(members, family) {
 
 function getHouseholdRoleLabel(baseRole, linkedMember) {
   if (baseRole === "Spouse") {
-    return linkedMember?.gender === "Male" ? "Husband" : "Wife";
+    return "Spouse";
   }
 
   if (baseRole === "Child") {

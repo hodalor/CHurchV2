@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { useAppContext } from "../../context/AppContext";
 
-const relationshipOptions = ["Father", "Mother", "Son", "Daughter", "Husband", "Wife", "Brother", "Sister", "Guardian", "Dependent"];
+const relationshipOptions = ["Spouse", "Son", "Daughter", "Parent", "Sibling", "Dependent", "Other"];
 
 export default function FamilyLinkManager() {
   const { members, memberForm, addFamilyLink, removeFamilyLink } = useAppContext();
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [relationship, setRelationship] = useState("Son");
+  const [relationship, setRelationship] = useState("Spouse");
 
   const availableMembers = useMemo(() => {
     return members.filter((member) => {
@@ -28,7 +28,7 @@ export default function FamilyLinkManager() {
     addFamilyLink({ memberId: selectedMemberId, relationship });
     setSelectedMemberId("");
     setSearchTerm("");
-    setRelationship("Son");
+    setRelationship("Spouse");
   };
 
   return (

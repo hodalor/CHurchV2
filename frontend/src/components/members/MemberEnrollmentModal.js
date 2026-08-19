@@ -4,6 +4,19 @@ import PhotoUploadCard from "./PhotoUploadCard";
 import FamilyLinkManager from "./FamilyLinkManager";
 
 const steps = ["Basic Info", "Church Info", "Groups", "Family", "Location"];
+const genderOptions = ["Male", "Female"];
+const maritalStatusOptions = ["Single", "Married", "Widowed", "Divorced", "Separated", "Other"];
+const membershipStatusOptions = [
+  "Active",
+  "Inactive",
+  "New Convert",
+  "Transferred In",
+  "Transferred Out",
+  "Relocated",
+  "Under Restoration",
+  "Deceased",
+];
+const householdRelationshipOptions = ["Head", "Spouse", "Son", "Daughter", "Dependent", "Parent", "Sibling", "Other"];
 
 export default function MemberEnrollmentModal() {
   const {
@@ -18,6 +31,8 @@ export default function MemberEnrollmentModal() {
     families,
     handleMemberGroupChange,
     submitMemberForm,
+    uploadMemberMedia,
+    mediaUploadState,
   } = useAppContext();
 
   if (activeModal !== "member-enrolment") {
@@ -26,17 +41,35 @@ export default function MemberEnrollmentModal() {
 
   const selectedChain = memberForm.groupChain.filter(Boolean);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (enrolmentStep < steps.length - 1) {
       setEnrolmentStep((current) => current + 1);
       return;
     }
 
-    submitMemberForm();
+    await submitMemberForm();
   };
 
   const handleBack = () => {
     setEnrolmentStep((current) => Math.max(current - 1, 0));
+  };
+
+  const handleMediaUpload = async (fieldName, event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const uploadedFile = await uploadMemberMedia(file, fieldName);
+      setMemberForm((current) => ({
+        ...current,
+        [fieldName]: uploadedFile,
+        ...(fieldName === "personalPhoto" ? { photoFileName: uploadedFile.label || "" } : {}),
+      }));
+    } finally {
+      event.target.value = "";
+    }
   };
 
   return (
@@ -90,6 +123,10 @@ export default function MemberEnrollmentModal() {
                 <input value={memberForm.otherName} onChange={(event) => setMemberForm((current) => ({ ...current, otherName: event.target.value }))} />
               </label>
               <label>
+                Preferred Name
+                <input value={memberForm.preferredName} onChange={(event) => setMemberForm((current) => ({ ...current, preferredName: event.target.value }))} />
+              </label>
+              <label>
                 Last Name
                 <input value={memberForm.lastName} onChange={(event) => setMemberForm((current) => ({ ...current, lastName: event.target.value }))} />
               </label>
@@ -97,9 +134,11 @@ export default function MemberEnrollmentModal() {
                 Gender
                 <select value={memberForm.gender} onChange={(event) => setMemberForm((current) => ({ ...current, gender: event.target.value }))}>
                   <option value="">Select gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Child">Child</option>
+                  {genderOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label>
@@ -114,14 +153,20 @@ export default function MemberEnrollmentModal() {
                 Marital Status
                 <select value={memberForm.maritalStatus} onChange={(event) => setMemberForm((current) => ({ ...current, maritalStatus: event.target.value }))}>
                   <option value="">Select marital status</option>
-                  <option value="Single">Single</option>
-                  <option value="Married">Married</option>
-                  <option value="Widowed">Widowed</option>
+                  {maritalStatusOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label>
                 Date of Birth
                 <input type="date" value={memberForm.dateOfBirth} onChange={(event) => setMemberForm((current) => ({ ...current, dateOfBirth: event.target.value }))} />
+              </label>
+              <label>
+                Photo File Name
+                <input value={memberForm.photoFileName || memberForm.personalPhoto?.label || ""} readOnly />
               </label>
             </div>
 
@@ -133,7 +178,8 @@ export default function MemberEnrollmentModal() {
                 placeholder="No member photo"
                 actionLabel="Upload Photo"
                 round
-                onChange={(event) => setMemberForm((current) => ({ ...current, personalPhoto: event.target.value }))}
+                uploading={mediaUploadState.loading && mediaUploadState.fieldName === "personalPhoto"}
+                onFileChange={(event) => handleMediaUpload("personalPhoto", event)}
               />
               <PhotoUploadCard
                 title="ID Front"
@@ -142,7 +188,8 @@ export default function MemberEnrollmentModal() {
                 placeholder="No ID front uploaded"
                 actionLabel="Upload ID Front"
                 type="id"
-                onChange={(event) => setMemberForm((current) => ({ ...current, idFrontPhoto: event.target.value }))}
+                uploading={mediaUploadState.loading && mediaUploadState.fieldName === "idFrontPhoto"}
+                onFileChange={(event) => handleMediaUpload("idFrontPhoto", event)}
               />
               <PhotoUploadCard
                 title="ID Back"
@@ -151,9 +198,11 @@ export default function MemberEnrollmentModal() {
                 placeholder="No ID back uploaded"
                 actionLabel="Upload ID Back"
                 type="id"
-                onChange={(event) => setMemberForm((current) => ({ ...current, idBackPhoto: event.target.value }))}
+                uploading={mediaUploadState.loading && mediaUploadState.fieldName === "idBackPhoto"}
+                onFileChange={(event) => handleMediaUpload("idBackPhoto", event)}
               />
             </div>
+            {mediaUploadState.error ? <div className="form-error">{mediaUploadState.error}</div> : null}
           </>
         ) : null}
 
@@ -169,15 +218,26 @@ export default function MemberEnrollmentModal() {
               <label>
                 Membership Status
                 <select value={memberForm.membershipStatus} onChange={(event) => setMemberForm((current) => ({ ...current, membershipStatus: event.target.value }))}>
-                  <option value="Active">Active</option>
-                  <option value="Dormant">Dormant</option>
-                  <option value="Inactive">Inactive</option>
-                  <option value="Passed On">Passed On</option>
+                  {membershipStatusOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label>
-                Membership Date
-                <input type="date" value={memberForm.membershipDate} onChange={(event) => setMemberForm((current) => ({ ...current, membershipDate: event.target.value }))} />
+                Date Joined
+                <input
+                  type="date"
+                  value={memberForm.dateJoined || memberForm.membershipDate}
+                  onChange={(event) =>
+                    setMemberForm((current) => ({
+                      ...current,
+                      dateJoined: event.target.value,
+                      membershipDate: event.target.value,
+                    }))
+                  }
+                />
               </label>
               <label>
                 Baptism Status
@@ -187,8 +247,65 @@ export default function MemberEnrollmentModal() {
                 </select>
               </label>
               <label>
-                Baptism Date
+                Date Baptized
                 <input type="date" value={memberForm.baptismDate} onChange={(event) => setMemberForm((current) => ({ ...current, baptismDate: event.target.value }))} />
+              </label>
+              <label>
+                Place Baptized
+                <input value={memberForm.placeBaptized} onChange={(event) => setMemberForm((current) => ({ ...current, placeBaptized: event.target.value }))} />
+              </label>
+              <label>
+                Baptized By
+                <input value={memberForm.baptizedBy} onChange={(event) => setMemberForm((current) => ({ ...current, baptizedBy: event.target.value }))} />
+              </label>
+              <label>
+                Occupation
+                <input value={memberForm.occupation} onChange={(event) => setMemberForm((current) => ({ ...current, occupation: event.target.value }))} />
+              </label>
+              <label>
+                Employer or Business
+                <input
+                  value={memberForm.employerOrBusiness}
+                  onChange={(event) => setMemberForm((current) => ({ ...current, employerOrBusiness: event.target.value }))}
+                />
+              </label>
+              <label className="full-width">
+                Education or Skills
+                <textarea
+                  rows="3"
+                  value={memberForm.educationOrSkills}
+                  onChange={(event) => setMemberForm((current) => ({ ...current, educationOrSkills: event.target.value }))}
+                />
+              </label>
+              <label>
+                Previous Congregation
+                <input
+                  value={memberForm.previousCongregation}
+                  onChange={(event) => setMemberForm((current) => ({ ...current, previousCongregation: event.target.value }))}
+                />
+              </label>
+              <label className="full-width">
+                Transfer Details
+                <textarea
+                  rows="3"
+                  value={memberForm.transferDetails}
+                  onChange={(event) => setMemberForm((current) => ({ ...current, transferDetails: event.target.value }))}
+                />
+              </label>
+              <label>
+                Source Record Ref
+                <input
+                  value={memberForm.sourceRecordRef}
+                  onChange={(event) => setMemberForm((current) => ({ ...current, sourceRecordRef: event.target.value }))}
+                />
+              </label>
+              <label>
+                Data Entry Clerk
+                <input value={memberForm.dataEntryClerk} readOnly />
+              </label>
+              <label>
+                Date Captured
+                <input type="date" value={memberForm.dateCaptured} readOnly />
               </label>
             </div>
           </div>
@@ -206,11 +323,11 @@ export default function MemberEnrollmentModal() {
 
             <div className="group-selectors">
               <label>
-                Zone
+                Group
                 <select value={selectedChain[0] || ""} onChange={(event) => handleMemberGroupChange(0, event.target.value)}>
-                  <option value="">Select zone</option>
+                  <option value="">Select group</option>
                   {topLevelGroups.map((group) => (
-                    <option key={group.id} value={group.id}>
+                    <option key={group._id || group.id} value={group._id || group.id}>
                       {group.name}
                     </option>
                   ))}
@@ -225,11 +342,11 @@ export default function MemberEnrollmentModal() {
 
                 return (
                   <label key={groupId}>
-                    {childGroups[0].levelName}
+                    {`Child Group ${index + 1}`}
                     <select value={selectedChain[index + 1] || ""} onChange={(event) => handleMemberGroupChange(index + 1, event.target.value)}>
-                      <option value="">Select {childGroups[0].levelName}</option>
+                      <option value="">Select child group</option>
                       {childGroups.map((group) => (
-                        <option key={group.id} value={group.id}>
+                        <option key={group._id || group.id} value={group._id || group.id}>
                           {group.name}
                         </option>
                       ))}
@@ -285,7 +402,7 @@ export default function MemberEnrollmentModal() {
                               ...current,
                               familyId: family.familyId,
                               familyName: family.familyName,
-                              householdRole: current.householdRole || "Member",
+                              householdRole: current.householdRole || "Other",
                             }))
                           }
                         >
@@ -301,12 +418,11 @@ export default function MemberEnrollmentModal() {
                 onChange={(event) => setMemberForm((current) => ({ ...current, householdRole: event.target.value }))}
               >
                 <option value="">Relationship to head</option>
-                <option value="Head">Head</option>
-                <option value="Wife">Wife</option>
-                <option value="Husband">Husband</option>
-                <option value="Son">Son</option>
-                <option value="Daughter">Daughter</option>
-                <option value="Dependant">Dependant</option>
+                {householdRelationshipOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -333,6 +449,14 @@ export default function MemberEnrollmentModal() {
                 Country
                 <input value={memberForm.country} onChange={(event) => setMemberForm((current) => ({ ...current, country: event.target.value }))} />
               </label>
+              <label>
+                GPS Latitude
+                <input value={memberForm.gpsLatitude} onChange={(event) => setMemberForm((current) => ({ ...current, gpsLatitude: event.target.value }))} />
+              </label>
+              <label>
+                GPS Longitude
+                <input value={memberForm.gpsLongitude} onChange={(event) => setMemberForm((current) => ({ ...current, gpsLongitude: event.target.value }))} />
+              </label>
               <label className="full-width">
                 Notes
                 <textarea value={memberForm.notes} onChange={(event) => setMemberForm((current) => ({ ...current, notes: event.target.value }))} rows="5" />
@@ -349,7 +473,7 @@ export default function MemberEnrollmentModal() {
         <button type="button" className="ghost-button" onClick={handleBack} disabled={enrolmentStep === 0}>
           Back
         </button>
-        <button type="button" className="primary-button" onClick={handleNext}>
+        <button type="button" className="primary-button" onClick={handleNext} disabled={mediaUploadState.loading}>
           {enrolmentStep === steps.length - 1 ? "Save Member" : "Next"}
         </button>
       </div>

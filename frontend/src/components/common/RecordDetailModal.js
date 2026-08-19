@@ -8,6 +8,8 @@ import BibleStudyRecordFields from "../evangelism/BibleStudyRecordFields";
 import ProspectActionPanel from "../evangelism/ProspectActionPanel";
 import ProspectRecordFields from "../evangelism/ProspectRecordFields";
 import FamilyRecordFields from "../family/FamilyRecordFields";
+import MinistryRecordFields from "../ministries/MinistryRecordFields";
+import GroupRecordFields from "../setup/GroupRecordFields";
 import VisitorActionPanel from "../visitors/VisitorActionPanel";
 import VisitorRecordFields from "../visitors/VisitorRecordFields";
 
@@ -166,6 +168,40 @@ export default function RecordDetailModal() {
             setRecordModalMode={setRecordModalMode}
           />
         </>
+      ) : type === "ministry" ? (
+        <>
+          <MinistryRecordFields
+            draft={draft}
+            isEditing={isEditing}
+            members={members}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+          />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
+      ) : type === "group" ? (
+        <>
+          <GroupRecordFields
+            draft={draft}
+            isEditing={isEditing}
+            groups={groups}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+          />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
       ) : (
         <div className="modal-form">
           <div className="form-grid">
@@ -272,7 +308,12 @@ function getFields(type, groups, roles) {
       { name: "lastName", label: "Last Name" },
       { name: "phone", label: "Phone" },
       { name: "email", label: "Email" },
-      { name: "membershipStatus", label: "Membership Status", type: "select", options: ["Active", "Dormant", "Inactive", "Passed On"] },
+      {
+        name: "membershipStatus",
+        label: "Membership Status",
+        type: "select",
+        options: ["Active", "Inactive", "New Convert", "Transferred In", "Transferred Out", "Relocated", "Under Restoration", "Deceased"],
+      },
       { name: "baptismStatus", label: "Baptism Status", type: "select", options: ["Not Baptized", "Baptized"] },
       { name: "city", label: "City" },
       { name: "familyName", label: "Household" },
@@ -320,28 +361,9 @@ function getFields(type, groups, roles) {
     ];
   }
 
-  if (type === "ministry") {
-    return [
-      { name: "name", label: "Name" },
-      { name: "leader", label: "Leader" },
-      { name: "color", label: "Color" },
-      { name: "description", label: "Description", wide: true },
-    ];
-  }
-
   if (type === "role") {
     return [
       { name: "name", label: "Role Name" },
-      { name: "description", label: "Description", wide: true },
-    ];
-  }
-
-  if (type === "group") {
-    return [
-      { name: "name", label: "Group Name" },
-      { name: "levelName", label: "Level Name" },
-      { name: "code", label: "Code" },
-      { name: "parentId", label: "Parent Group", type: "select", options: ["", ...groups.map((group) => group.id)] },
       { name: "description", label: "Description", wide: true },
     ];
   }

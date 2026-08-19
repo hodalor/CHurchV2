@@ -23,12 +23,15 @@ const groupSelectionSchema = new mongoose.Schema(
     },
     levelName: {
       type: String,
-      required: true,
       trim: true,
     },
     groupName: {
       type: String,
       required: true,
+      trim: true,
+    },
+    groupCode: {
+      type: String,
       trim: true,
     },
   },
@@ -78,6 +81,10 @@ const memberSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    preferredName: {
+      type: String,
+      trim: true,
+    },
     memberType: {
       type: String,
       enum: ["Adult", "Child"],
@@ -85,7 +92,7 @@ const memberSchema = new mongoose.Schema(
     },
     gender: {
       type: String,
-      enum: ["Male", "Female", "Child"],
+      enum: ["Male", "Female"],
       default: "Male",
     },
     maritalStatus: {
@@ -135,18 +142,49 @@ const memberSchema = new mongoose.Schema(
     membershipStatus: {
       type: String,
       trim: true,
-      default: "Member",
+      default: "Active",
     },
     membershipDate: {
+      type: Date,
+    },
+    dateJoined: {
       type: Date,
     },
     baptismStatus: {
       type: String,
       trim: true,
-      default: "Not Baptised",
+      default: "Not Baptized",
     },
     baptismDate: {
       type: Date,
+    },
+    placeBaptized: {
+      type: String,
+      trim: true,
+    },
+    baptizedBy: {
+      type: String,
+      trim: true,
+    },
+    previousCongregation: {
+      type: String,
+      trim: true,
+    },
+    transferDetails: {
+      type: String,
+      trim: true,
+    },
+    occupation: {
+      type: String,
+      trim: true,
+    },
+    employerOrBusiness: {
+      type: String,
+      trim: true,
+    },
+    educationOrSkills: {
+      type: String,
+      trim: true,
     },
     ministry: {
       type: mongoose.Schema.Types.ObjectId,
@@ -158,6 +196,29 @@ const memberSchema = new mongoose.Schema(
     personalPhoto: photoSchema,
     idFrontPhoto: photoSchema,
     idBackPhoto: photoSchema,
+    photoFileName: {
+      type: String,
+      trim: true,
+    },
+    gpsLatitude: {
+      type: String,
+      trim: true,
+    },
+    gpsLongitude: {
+      type: String,
+      trim: true,
+    },
+    sourceRecordRef: {
+      type: String,
+      trim: true,
+    },
+    dataEntryClerk: {
+      type: String,
+      trim: true,
+    },
+    dateCaptured: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

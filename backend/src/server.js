@@ -1,4 +1,6 @@
-require("dotenv").config();
+const path = require("path");
+
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const express = require("express");
 const cors = require("cors");
@@ -11,6 +13,7 @@ const discipleshipRoutes = require("./routes/discipleshipRoutes");
 const evangelismRoutes = require("./routes/evangelismRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const lookupRoutes = require("./routes/lookupRoutes");
+const mediaRoutes = require("./routes/mediaRoutes");
 const ministryRoutes = require("./routes/ministryRoutes");
 const memberRoutes = require("./routes/memberRoutes");
 const familyRoutes = require("./routes/familyRoutes");
@@ -39,6 +42,7 @@ app.use("/api/discipleship", discipleshipRoutes);
 app.use("/api/evangelism", evangelismRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/lookups", lookupRoutes);
+app.use("/api/media", mediaRoutes);
 app.use("/api/ministries", ministryRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/families", familyRoutes);

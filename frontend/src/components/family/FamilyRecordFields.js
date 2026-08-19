@@ -15,7 +15,7 @@ export default function FamilyRecordFields({
       ? { ...draft.spouse, relationshipToHead: getPreviewRole("Spouse", draft.spouse, members) }
       : null,
     ...(draft.children || []).map((item) => ({ ...item, relationshipToHead: getPreviewRole("Child", item, members) })),
-    ...(draft.dependants || []).map((item) => ({ ...item, relationshipToHead: "Dependant" })),
+    ...(draft.dependants || []).map((item) => ({ ...item, relationshipToHead: "Dependent" })),
   ].filter(Boolean);
 
   const selectedIds = [
@@ -57,8 +57,8 @@ export default function FamilyRecordFields({
           >
             <option value="">Select group</option>
             {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.levelName}: {group.name}
+              <option key={group._id || group.id} value={group._id || group.id}>
+                {group.name}
               </option>
             ))}
           </select>
@@ -130,7 +130,7 @@ export default function FamilyRecordFields({
           />
 
           <MemberLookupField
-            label="Dependants"
+            label="Dependents"
             placeholder="Search dependant"
             members={members}
             selected={draft.dependants || []}
@@ -187,7 +187,7 @@ function getPreviewRole(baseRole, selection, members) {
   const linkedMember = members.find((member) => member.memberId === selection?.memberId);
 
   if (baseRole === "Spouse") {
-    return linkedMember?.gender === "Male" ? "Husband" : "Wife";
+    return "Spouse";
   }
 
   if (baseRole === "Child") {

@@ -245,7 +245,15 @@ async function getAbsentees({ windowDays = 28, eventTypeKey = "sunday_worship" }
 }
 
 async function validateEventDependencies(payload, requireType = true) {
-  if (requireType && payload.eventTypeId && !(await resolveEventType(payload.eventTypeId))) {
+  if (requireType && !payload.eventTypeId) {
+    throw new Error("Selected event type was not found.");
+  }
+
+  if (
+    payload.eventTypeId !== undefined &&
+    payload.eventTypeId !== null &&
+    !(await resolveEventType(payload.eventTypeId))
+  ) {
     throw new Error("Selected event type was not found.");
   }
 
