@@ -17,6 +17,13 @@ import { churchApi } from "../apis/churchApi";
 
 const STATUS_COLORS = ["#4f46e5", "#0ea5e9", "#f59e0b", "#ef476f", "#14b8a6"];
 const WORKLOAD_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
+const VISITOR_PIPELINE_STAGES = [
+  { statusKey: "first_time", label: "First-Time", summaryLabel: "First-Time" },
+  { statusKey: "repeat_staying", label: "Repeat", summaryLabel: "Repeat" },
+  { statusKey: "lapsed", label: "Lapsed", summaryLabel: "Lapsed" },
+  { statusKey: "converted_to_prospect", label: "Prospects", summaryLabel: "Prospects" },
+  { statusKey: "converted_to_member", label: "Members", summaryLabel: "Members" },
+];
 
 export default function VisitorsPage() {
   const location = useLocation();
@@ -29,7 +36,7 @@ export default function VisitorsPage() {
         ...visitor,
         fullName: `${visitor.firstName || ""} ${visitor.surname || ""}`.trim(),
         statusLabel: visitor.status?.label || "Pending",
-        statusKey: visitor.status?.key || "pending",
+        statusKey: visitor.status?.key || slugifyStatusKey(visitor.status?.label || "pending"),
         lastChurchVisit: getLatestEntryDate(visitor.visitDates),
         lastHomeVisit: getLatestEntryDate(visitor.visitationHistory),
         assigneeName: visitor.assignedFollowUpUserId?.displayName || "Unassigned",
@@ -45,13 +52,12 @@ export default function VisitorsPage() {
     [pendingActionState.items]
   );
 
-  const statusCounts = [
-    { name: "First-Time", value: countVisitorsByStatus(visitorRows, "first_time") },
-    { name: "Repeat", value: countVisitorsByStatus(visitorRows, "repeat_staying") },
-    { name: "Lapsed", value: countVisitorsByStatus(visitorRows, "lapsed") },
-    { name: "Prospects", value: countVisitorsByStatus(visitorRows, "converted_to_prospect") },
-    { name: "Members", value: countVisitorsByStatus(visitorRows, "converted_to_member") },
-  ];
+  const statusCounts = VISITOR_PIPELINE_STAGES.map((stage) => ({
+    name: stage.summaryLabel,
+    label: stage.label,
+    statusKey: stage.statusKey,
+    value: countVisitorsByStatus(visitorRows, stage.statusKey),
+  }));
 
   const sourceMix = buildCountData(visitorRows, (visitor) => visitor.howHeard?.label || "Unknown Source");
   const assigneeWorkload = buildCountData(visitorRows, (visitor) => visitor.assigneeName);
@@ -217,12 +223,14 @@ function PipelineView({ visitors, statusCounts, onOpenVisitor, onMoveVisitor }) 
     ...visitor,
     nextStep: getPipelineNextStep(visitor),
   }));
-  const boardColumns = statusCounts.filter((item) => item.name).map((item, index) => ({
-    key: `${item.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_${index}`,
-    statusKey: item.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
-    label: item.name,
-    items: pipelineRows.filter((visitor) => visitor.statusKey === item.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")),
-  }));
+  const boardColumns = statusCounts
+    .filter((item) => item.name)
+    .map((item, index) => ({
+      key: `${item.statusKey}_${index}`,
+      statusKey: item.statusKey,
+      label: item.label || item.name,
+      items: pipelineRows.filter((visitor) => visitor.statusKey === item.statusKey),
+    }));
 
   return (
     <>
@@ -705,6 +713,13 @@ function buildRecentVisitTrend(visitors) {
 
 function countVisitorsByStatus(visitors, statusKey) {
   return visitors.filter((visitor) => visitor.statusKey === statusKey).length;
+}
+
+function slugifyStatusKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
 }
 
 function getPipelineNextStep(visitor) {

@@ -64,15 +64,17 @@ export default function EvangelismPage() {
           stageData={stageData}
           stageOptions={evangelismStageOptions}
           onOpen={(item) => openRecordModal("prospect", item)}
-          onMoveProspect={async (prospect, nextStageLabel) => {
+          onMoveProspect={async (prospect, nextStageId, nextStageLabel) => {
             try {
-              const matchingStage = evangelismStageOptions.find((stage) => stage?.label === nextStageLabel);
-              if (!matchingStage?._id) {
+              if (!nextStageId) {
                 throw new Error("Selected stage was not found.");
               }
-              const updated = await churchApi.moveProspectStage(prospect.prospectId, matchingStage._id);
+              const matchingStage = evangelismStageOptions.find((stage) => stage?._id === nextStageId);
+              const updated = await churchApi.moveProspectStage(prospect.prospectId, nextStageId);
               syncProspectState(updated);
-              notifySuccess(`${prospect.firstName} ${prospect.surname} moved to ${nextStageLabel}.`);
+              notifySuccess(
+                `${prospect.firstName} ${prospect.surname} moved to ${nextStageLabel || matchingStage?.label || "the new stage"}.`
+              );
             } catch (error) {
               notifyError(error.message || "Unable to move prospect.");
             }
@@ -107,20 +109,26 @@ export default function EvangelismPage() {
 
 function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspect }) {
   const [viewMode, setViewMode] = useState("table");
-  const stageLabels = [
-    ...new Set(
-      [
-        ...(stageOptions || []).map((item) => item?.label).filter(Boolean),
-        ...stageData.map((entry) => entry.name).filter(Boolean),
-        "Unassigned",
-      ]
-    ),
+  const boardColumns = [
+    ...(stageOptions || []).map((stage, index) => ({
+      key: stage?._id || stage?.key || `${stage?.label || "stage"}-${index}`,
+      stageId: stage?._id || null,
+      stageKey: stage?.key || "",
+      label: stage?.label || `Stage ${index + 1}`,
+      items: prospects.filter(
+        (prospect) =>
+          (stage?._id && prospect.currentStage?._id === stage._id) ||
+          (!stage?._id && prospect.currentStage?.label === stage?.label)
+      ),
+    })),
+    {
+      key: "unassigned",
+      stageId: null,
+      stageKey: "unassigned",
+      label: "Unassigned",
+      items: prospects.filter((prospect) => !prospect.currentStage?._id && !prospect.currentStage?.label),
+    },
   ];
-  const boardColumns = stageLabels.map((label, index) => ({
-    key: `${label}-${index}`,
-    label,
-    items: prospects.filter((prospect) => (prospect.currentStage?.label || "Unassigned") === label),
-  }));
 
   return (
     <>
@@ -512,8 +520,8 @@ function ProspectBoard({ columns, onOpen, onDropItem }) {
           className="pipeline-column"
           onDragOver={(event) => event.preventDefault()}
           onDrop={() => {
-            if (draggedItem && (draggedItem.currentStage?.label || "Unassigned") !== column.label) {
-              onDropItem(draggedItem, column.label);
+            if (draggedItem && column.stageId && draggedItem.currentStage?._id !== column.stageId) {
+              onDropItem(draggedItem, column.stageId, column.label);
             }
             setDraggedItem(null);
           }}
@@ -542,7 +550,7 @@ function ProspectBoard({ columns, onOpen, onDropItem }) {
                 </button>
               ))
             ) : columns.some((entry) => entry.items.length) ? (
-              <div className="empty-note">Drop prospects here.</div>
+              <div className="empty-note">{column.stageId ? "Drop prospects here." : "No assigned stage yet."}</div>
             ) : (
               <div className="empty-note">No prospects in this stage yet.</div>
             )}

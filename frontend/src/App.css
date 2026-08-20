@@ -846,9 +846,14 @@
 }
 
 .pipeline-board-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  display: flex;
+  align-items: stretch;
+  flex-wrap: nowrap;
   gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
 }
 
 .pipeline-column {
@@ -860,6 +865,8 @@
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.12);
   min-height: 320px;
+  min-width: 270px;
+  flex: 0 0 270px;
 }
 
 .pipeline-column-head {
