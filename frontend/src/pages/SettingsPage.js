@@ -1,12 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { churchApi } from "../apis/churchApi";
 import { useAppContext } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
 
 export default function SettingsPage() {
-  const { branding, openRecordModal, settingsState } = useAppContext();
+  const { branding, openRecordModal, settingsState, setBranding, notifySuccess, notifyError } = useAppContext();
   const { authUser } = useAuth();
   const [activeTab, setActiveTab] = useState("app-config");
+  const [currencies, setCurrencies] = useState([]);
+  const [defaultCurrencyCode, setDefaultCurrencyCode] = useState("");
+  const [currencyForm, setCurrencyForm] = useState({ code: "", name: "", symbol: "" });
+  const [savingCurrencies, setSavingCurrencies] = useState(false);
   const canManageSettings = authUser?.permissions?.includes("manage_settings");
+
+  useEffect(() => {
+    setCurrencies(Array.isArray(branding.currencies) ? branding.currencies : []);
+    setDefaultCurrencyCode(branding.defaultCurrencyCode || branding.currencies?.[0]?.code || "");
+  }, [branding]);
 
   if (!canManageSettings) {
     return (
@@ -35,6 +45,9 @@ export default function SettingsPage() {
           <div className="tab-row">
             <button type="button" className={`tab-button ${activeTab === "app-config" ? "active" : ""}`} onClick={() => setActiveTab("app-config")}>
               App Config
+            </button>
+            <button type="button" className={`tab-button ${activeTab === "currencies" ? "active" : ""}`} onClick={() => setActiveTab("currencies")}>
+              Currencies
             </button>
           </div>
         </div>
@@ -70,6 +83,164 @@ export default function SettingsPage() {
           ) : (
             <div className="empty-note">Add an app logo URL to show it in the sidebar and topbar.</div>
           )}
+        </section>
+      ) : null}
+
+      {activeTab === "currencies" ? (
+        <section className="surface-card data-card">
+          <div className="section-headline compact">
+            <div>
+              <h3>System Currencies</h3>
+              <p>Create the currencies available to this church and choose the one used across finance screens.</p>
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <label>
+              Currency Code
+              <input
+                value={currencyForm.code}
+                placeholder="GHS"
+                maxLength={3}
+                onChange={(event) =>
+                  setCurrencyForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))
+                }
+              />
+            </label>
+            <label>
+              Currency Name
+              <input
+                value={currencyForm.name}
+                placeholder="Ghana Cedi"
+                onChange={(event) =>
+                  setCurrencyForm((current) => ({ ...current, name: event.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Symbol
+              <input
+                value={currencyForm.symbol}
+                placeholder="GH¢"
+                onChange={(event) =>
+                  setCurrencyForm((current) => ({ ...current, symbol: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                const nextCurrency = {
+                  code: currencyForm.code.trim().toUpperCase(),
+                  name: currencyForm.name.trim(),
+                  symbol: currencyForm.symbol.trim(),
+                };
+
+                if (!nextCurrency.code || !nextCurrency.name) {
+                  notifyError("Currency code and currency name are required.");
+                  return;
+                }
+
+                if (currencies.some((item) => item.code === nextCurrency.code)) {
+                  notifyError("That currency code already exists.");
+                  return;
+                }
+
+                setCurrencies((current) => [...current, nextCurrency]);
+                setDefaultCurrencyCode((current) => current || nextCurrency.code);
+                setCurrencyForm({ code: "", name: "", symbol: "" });
+                notifySuccess(`${nextCurrency.code} added to the system currencies.`);
+              }}
+            >
+              Add Currency
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              disabled={savingCurrencies}
+              onClick={async () => {
+                try {
+                  if (!currencies.length) {
+                    throw new Error("Add at least one currency before saving.");
+                  }
+
+                  setSavingCurrencies(true);
+                  const savedConfig = await churchApi.updateAppConfig({
+                    appName: branding.appName,
+                    appLogoUrl: branding.appLogoUrl,
+                    currencies,
+                    defaultCurrencyCode,
+                  });
+                  setBranding((current) => ({ ...current, ...savedConfig }));
+                  notifySuccess("System currencies saved successfully.");
+                } catch (error) {
+                  notifyError(error.message || "Unable to save currencies.");
+                } finally {
+                  setSavingCurrencies(false);
+                }
+              }}
+            >
+              {savingCurrencies ? "Saving..." : "Save Currency Settings"}
+            </button>
+          </div>
+
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Default</th>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Symbol</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currencies.length ? (
+                  currencies.map((currency) => (
+                    <tr key={currency.code}>
+                      <td>
+                        <input
+                          type="radio"
+                          name="defaultCurrency"
+                          checked={defaultCurrencyCode === currency.code}
+                          onChange={() => setDefaultCurrencyCode(currency.code)}
+                        />
+                      </td>
+                      <td>{currency.code}</td>
+                      <td>{currency.name}</td>
+                      <td>{currency.symbol || "-"}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="ghost-button small delete-button"
+                          onClick={() => {
+                            const nextCurrencies = currencies.filter((item) => item.code !== currency.code);
+                            setCurrencies(nextCurrencies);
+                            if (defaultCurrencyCode === currency.code) {
+                              setDefaultCurrencyCode(nextCurrencies[0]?.code || "");
+                            }
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="empty-table">
+                      No currencies configured yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       ) : null}
     </div>

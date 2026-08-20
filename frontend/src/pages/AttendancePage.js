@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import { useAppContext } from "../context/AppContext";
 
 const CHART_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
@@ -229,6 +230,13 @@ function ReportsView({ report, eventTypeData }) {
         <StatCard color="blue" label="Average Rate" value={`${report?.averageAttendanceRate || 0}%`} />
         <StatCard color="orange" label="Tracked Types" value={eventTypeData.length} />
       </section>
+
+      <AiAssistGeneratorCard
+        title="AI Attendance Anomalies"
+        description="Generate advisory notes for unusual attendance changes and ministry attendance drops."
+        moduleKey="attendance"
+        buttonLabel="Generate Attendance Notes"
+      />
 
       <section className="family-chart-grid">
         <ChartCard title="Attendance Trend">

@@ -12,6 +12,38 @@ const churchProfileSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    currencies: {
+      type: [
+        {
+          code: {
+            type: String,
+            trim: true,
+            uppercase: true,
+          },
+          name: {
+            type: String,
+            trim: true,
+          },
+          symbol: {
+            type: String,
+            trim: true,
+          },
+        },
+      ],
+      default: [
+        {
+          code: "GHS",
+          name: "Ghana Cedi",
+          symbol: "GH¢",
+        },
+      ],
+    },
+    defaultCurrencyCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "GHS",
+    },
     churchName: {
       type: String,
       required: true,

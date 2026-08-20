@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import { useAppContext } from "../context/AppContext";
 import { churchApi } from "../apis/churchApi";
 
@@ -129,6 +130,13 @@ function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspe
         <StatCard color="blue" label="Bible Study Stage" value={prospects.filter((item) => item.currentStage?.key === "bible_study").length} />
         <StatCard color="orange" label="From Visitors" value={prospects.filter((item) => item.sourceVisitorId).length} />
       </section>
+
+      <AiAssistGeneratorCard
+        title="AI Evangelism Suggestions"
+        description="Generate stalled-prospect follow-up drafts and current campaign digests for human review."
+        moduleKey="evangelism"
+        buttonLabel="Generate Evangelism Suggestions"
+      />
 
       <section className="surface-card data-card">
         <div className="section-headline compact">

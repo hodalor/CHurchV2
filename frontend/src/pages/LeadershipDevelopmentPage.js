@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { churchApi } from "../apis/churchApi";
+import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
@@ -125,6 +126,15 @@ export default function LeadershipDevelopmentPage() {
         <StatCard color="orange" label="Succession" value={state.readiness.length} />
         <StatCard color="pink" label="Mentors" value={state.mentors.length} />
       </section>
+
+      {activeSection === "succession" && canViewSuccession ? (
+        <AiAssistGeneratorCard
+          title="AI Leadership Gap Summary"
+          description="Generate administrative summaries for key roles that do not yet have ready or developing candidates recorded."
+          moduleKey="leadership"
+          buttonLabel="Generate Leadership Summary"
+        />
+      ) : null}
 
       {activeSection === "roles" ? (
         <>

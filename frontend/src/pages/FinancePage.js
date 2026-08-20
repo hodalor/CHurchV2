@@ -3,7 +3,7 @@ import { useAppContext } from "../context/AppContext";
 
 export default function FinancePage() {
   const location = useLocation();
-  const { financeRecords, openRecordModal } = useAppContext();
+  const { financeRecords, openRecordModal, formatCurrency } = useAppContext();
   const activeSection = location.pathname.split("/")[2] || "overview";
   const totalFinance = financeRecords.reduce((sum, item) => sum + Number(item.amount), 0);
 
@@ -20,7 +20,7 @@ export default function FinancePage() {
         </article>
         <article className="compact-stat-card orange">
           <div className="compact-stat-label">Total</div>
-          <div className="compact-stat-value">${totalFinance}</div>
+          <div className="compact-stat-value">{formatCurrency(totalFinance)}</div>
         </article>
         <article className="compact-stat-card blue">
           <div className="compact-stat-label">Section</div>
@@ -48,7 +48,7 @@ export default function FinancePage() {
                   <td>{record.recordNo}</td>
                   <td>{record.category}</td>
                   <td>{record.description}</td>
-                  <td>${record.amount}</td>
+                  <td>{formatCurrency(record.amount)}</td>
                   <td>{record.date}</td>
                   <td>
                     <span className={`status-pill ${record.status.toLowerCase()}`}>{record.status}</span>

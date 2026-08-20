@@ -3,6 +3,8 @@ export const APP_NAME = "ChurchSuite Pro";
 export const initialBranding = {
   appName: "ChurchSuite Pro",
   appLogoUrl: "",
+  currencies: [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }],
+  defaultCurrencyCode: "GHS",
   churchName: "ChurchFlow Central",
   address: "123 Church Street, Accra",
   phone: "+233 20 700 8899",

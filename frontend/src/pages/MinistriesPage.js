@@ -1,4 +1,5 @@
 import { useState } from "react";
+import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import BulkImportModal from "../components/common/BulkImportModal";
 import { useAppContext } from "../context/AppContext";
 
@@ -38,6 +39,13 @@ export default function MinistriesPage() {
           </div>
         </div>
       </section>
+
+      <AiAssistGeneratorCard
+        title="AI Ministry Engagement Summary"
+        description="Generate review-only summaries for ministries with leader gaps or low recent activity."
+        moduleKey="ministry"
+        buttonLabel="Generate Ministry Summaries"
+      />
 
       <section className="ministry-grid">
         {ministries.map((ministry) => (

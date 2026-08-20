@@ -26,6 +26,20 @@ export default function AppConfigFields({ draft, isEditing, onChange }) {
             onChange={(event) => onChange("appLogoUrl", event.target.value)}
           />
         </label>
+        <label>
+          Default Currency
+          <input
+            value={draft.defaultCurrencyCode || ""}
+            readOnly
+          />
+        </label>
+        <label className="full-width">
+          Available Currencies
+          <input
+            value={(draft.currencies || []).map((item) => `${item.code} (${item.symbol || item.code})`).join(", ")}
+            readOnly
+          />
+        </label>
       </div>
 
       {draft.appLogoUrl ? (

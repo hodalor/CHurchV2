@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { churchApi } from "../apis/churchApi";
+import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
@@ -168,6 +169,56 @@ export default function CommunicationPage() {
               </div>
             ) : null}
           </section>
+
+          <div className="content-layout">
+            <AiAssistGeneratorCard
+              title="AI Message Draft"
+              description="Generate a communication draft from a short instruction, then review it in AI Assist before using it."
+              moduleKey="communication-draft"
+              buttonLabel="Generate Draft"
+              initialValues={{ groupId: "", channelId: "", promptText: "" }}
+              fields={[
+                {
+                  name: "groupId",
+                  label: "Communication Group",
+                  type: "select",
+                  placeholder: "Optional group",
+                  options: state.groups.map((group) => ({ value: group._id, label: group.name })),
+                },
+                {
+                  name: "channelId",
+                  label: "Channel",
+                  type: "select",
+                  placeholder: "Optional channel",
+                  options: channelOptions.map((option) => ({ value: option._id, label: option.label })),
+                },
+                {
+                  name: "promptText",
+                  label: "Prompt",
+                  type: "textarea",
+                  wide: true,
+                  placeholder: "Reminder for Sunday's youth event",
+                },
+              ]}
+            />
+
+            <AiAssistGeneratorCard
+              title="AI Audience Suggestion"
+              description="Translate a plain-language audience request into a reviewable structured filter proposal."
+              moduleKey="communication-audience"
+              buttonLabel="Suggest Audience Filter"
+              initialValues={{ requestText: "" }}
+              fields={[
+                {
+                  name: "requestText",
+                  label: "Audience Request",
+                  type: "textarea",
+                  wide: true,
+                  placeholder: "everyone in youth ministry who hasn't been contacted this month",
+                },
+              ]}
+            />
+          </div>
 
           <ActionTableCard
             title="Communication Groups"

@@ -114,6 +114,19 @@ export function AppProvider({ children }) {
     [attendanceSessions.length, families.length, financeRecords.length, members.length, visitors.length]
   );
 
+  const activeCurrency = useMemo(() => {
+    const currencies = Array.isArray(branding.currencies) && branding.currencies.length
+      ? branding.currencies
+      : initialBranding.currencies;
+    return (
+      currencies.find((item) => item.code === branding.defaultCurrencyCode) ||
+      currencies[0] ||
+      initialBranding.currencies[0]
+    );
+  }, [branding.currencies, branding.defaultCurrencyCode]);
+
+  const formatCurrency = (value) => formatCurrencyValue(value, activeCurrency);
+
   const memberDistribution = useMemo(() => {
     const adultCount = members.filter((member) => member.memberType === "Adult").length;
     const childCount = members.filter((member) => member.memberType === "Child").length;
@@ -1539,6 +1552,8 @@ export function AppProvider({ children }) {
   const value = {
     authUser,
     branding,
+    activeCurrency,
+    formatCurrency,
     setBranding,
     groups,
     groupsByParent,
@@ -2410,6 +2425,8 @@ function buildNewRecord(type, { families, members, ministries, roles, users, aut
     return {
       appName: "ChurchSuite Pro",
       appLogoUrl: "",
+      currencies: [...initialBranding.currencies],
+      defaultCurrencyCode: initialBranding.defaultCurrencyCode,
     };
   }
 
@@ -2526,10 +2543,41 @@ function normalizeBrandingDraft(draft) {
 }
 
 function normalizeAppConfigDraft(draft) {
+  const currencies = Array.isArray(draft.currencies)
+    ? draft.currencies
+        .map((item) => ({
+          code: String(item?.code || "").trim().toUpperCase(),
+          name: String(item?.name || "").trim(),
+          symbol: String(item?.symbol || "").trim(),
+        }))
+        .filter((item) => item.code && item.name)
+    : [];
+
   return {
     appName: draft.appName || "ChurchSuite Pro",
     appLogoUrl: draft.appLogoUrl || "",
+    currencies: currencies.length ? currencies : initialBranding.currencies,
+    defaultCurrencyCode:
+      currencies.find((item) => item.code === draft.defaultCurrencyCode)?.code ||
+      currencies[0]?.code ||
+      initialBranding.defaultCurrencyCode,
   };
+}
+
+function formatCurrencyValue(value, currency) {
+  const amount = Number(value || 0);
+  const currencyCode = currency?.code || "GHS";
+
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch (error) {
+    const symbol = currency?.symbol || currencyCode;
+    return `${symbol}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  }
 }
 
 function buildPermissionCatalog() {

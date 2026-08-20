@@ -13,7 +13,7 @@ import {
 import { useAppContext } from "../context/AppContext";
 
 export default function DashboardPage() {
-  const { dashboardStats, attendanceTrend, memberDistribution, members, financeRecords } = useAppContext();
+  const { dashboardStats, attendanceTrend, memberDistribution, members, financeRecords, formatCurrency } = useAppContext();
 
   return (
     <div className="page-grid">
@@ -113,7 +113,7 @@ export default function DashboardPage() {
               <div className="simple-list-item" key={record.id}>
                 <div>
                   <strong>{record.category}</strong>
-                  <p>{record.recordNo} - ${record.amount}</p>
+                  <p>{record.recordNo} - {formatCurrency(record.amount)}</p>
                 </div>
                 <span className={`status-pill ${record.status.toLowerCase()}`}>{record.status}</span>
               </div>

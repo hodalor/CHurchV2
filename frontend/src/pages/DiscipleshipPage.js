@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import { useAppContext } from "../context/AppContext";
 
 const CHART_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
@@ -166,6 +167,13 @@ function FollowUpsView({ overdue, onOpen }) {
         <StatCard color="blue" label="Without Mentor" value={overdue.filter((item) => !item.mentorId?._id).length} />
         <StatCard color="orange" label="High Priority" value={overdue.length} />
       </section>
+
+      <AiAssistGeneratorCard
+        title="AI Mentor-Match Suggestions"
+        description="Generate ranked mentor suggestions for enrollments that still need mentor assignment."
+        moduleKey="discipleship"
+        buttonLabel="Generate Mentor Suggestions"
+      />
 
       <section className="surface-card data-card">
         <div className="table-wrap">

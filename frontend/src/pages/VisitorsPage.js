@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import { useAppContext } from "../context/AppContext";
 import { churchApi } from "../apis/churchApi";
 
@@ -371,6 +372,13 @@ function FollowUpsView({ pendingActions, visitors, followUpOpenCount, unassigned
           <div className="compact-stat-value">{visitors.length - unassignedVisitors}</div>
         </article>
       </section>
+
+      <AiAssistGeneratorCard
+        title="AI Visitor Follow-Up Drafts"
+        description="Generate warm, review-only follow-up drafts for visitors who have not returned within the configured window."
+        moduleKey="visitor"
+        buttonLabel="Generate Visitor Drafts"
+      />
 
       <section className="content-layout">
         <article className="surface-card data-card">

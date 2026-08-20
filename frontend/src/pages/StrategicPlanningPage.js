@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { churchApi } from "../apis/churchApi";
+import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
@@ -166,6 +167,15 @@ export default function StrategicPlanningPage() {
         <StatCard color="orange" label="KPIs" value={state.kpis.length} />
         <StatCard color="pink" label="Actuals" value={state.actuals.length} />
       </section>
+
+      {activeSection === "scorecards" ? (
+        <AiAssistGeneratorCard
+          title="AI Strategic Commentary"
+          description="Generate first-pass KPI commentary drafts and a church-wide cross-pillar insight for review."
+          moduleKey="strategic"
+          buttonLabel="Generate Strategic Commentary"
+        />
+      ) : null}
 
       {activeSection === "plans" ? (
         <>
