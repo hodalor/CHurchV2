@@ -18,6 +18,7 @@ export default function RecordDetailModal() {
     recordModal,
     closeRecordModal,
     saveRecordModal,
+    deleteRecordModal,
     setRecordModalDraft,
     setRecordModalMode,
     groups,
@@ -34,6 +35,8 @@ export default function RecordDetailModal() {
     prospects,
     discipleshipProgrammes,
     ministries,
+    regenerateMemberQr,
+    mediaUploadState,
   } = useAppContext();
 
   if (!recordModal.open || !recordModal.draft) {
@@ -50,7 +53,100 @@ export default function RecordDetailModal() {
       subtitle="Click Edit to update details, then Save when you are done."
       onClose={closeRecordModal}
     >
-      {type === "family" ? (
+      {type === "member" ? (
+        <div className="modal-form">
+          <div className="section-headline compact">
+            <div>
+              <h3>Member QR</h3>
+              <p>Staff can view, print, or reissue the member check-in QR here.</p>
+            </div>
+            <div className="modal-actions">
+              {draft.qrCodeImageUrl ? (
+                <div className="qr-preview-card">
+                  <img src={draft.qrCodeImageUrl} alt={`${draft.firstName || "Member"} QR code`} className="qr-preview-image" />
+                </div>
+              ) : null}
+              {draft.qrCodeImageUrl ? (
+                <a className="ghost-button small" href={draft.qrCodeImageUrl} target="_blank" rel="noreferrer">
+                  View / Print QR
+                </a>
+              ) : null}
+              {draft._id ? (
+                <button
+                  type="button"
+                  className="ghost-button small"
+                  disabled={mediaUploadState.loading}
+                  onClick={() => regenerateMemberQr(draft._id)}
+                >
+                  Reissue QR
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="form-grid">
+            {fields.map((field) => (
+              <label key={field.name} className={field.wide ? "full-width" : ""}>
+                {field.label}
+                {field.type === "select" ? (
+                  <select
+                    value={getFieldValue(field, draft)}
+                    disabled={!isEditing}
+                    onChange={(event) =>
+                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                    }
+                  >
+                    {field.options.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : field.type === "textarea" ? (
+                  <textarea
+                    rows="4"
+                    value={getFieldValue(field, draft)}
+                    readOnly={!isEditing}
+                    onChange={(event) =>
+                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                    }
+                  />
+                ) : (
+                  <input
+                    type={field.type || "text"}
+                    value={getFieldValue(field, draft)}
+                    readOnly={!isEditing}
+                    onChange={(event) =>
+                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                    }
+                  />
+                )}
+              </label>
+            ))}
+            <label>
+              QR Active
+              <input value={draft.qrActive !== false ? "Yes" : "No"} readOnly />
+            </label>
+            <label>
+              QR Generated
+              <input value={draft.qrGeneratedAt || ""} readOnly />
+            </label>
+            <label className="full-width">
+              QR Token
+              <input value={draft.qrToken || ""} readOnly />
+            </label>
+          </div>
+
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft._id)}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </div>
+      ) : type === "family" ? (
         <>
           <FamilyRecordFields
             draft={draft}
@@ -65,6 +161,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft._id)}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -85,6 +183,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft.visitorId)}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -107,6 +207,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft.prospectId)}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -127,6 +229,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft._id)}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -148,6 +252,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft._id)}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -167,6 +273,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft._id)}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -184,6 +292,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft._id)}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -201,6 +311,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft._id)}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -251,6 +363,8 @@ export default function RecordDetailModal() {
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={Boolean(draft._id)}
             setRecordModalMode={setRecordModalMode}
           />
         </div>
@@ -259,12 +373,17 @@ export default function RecordDetailModal() {
   );
 }
 
-function RecordModalActions({ isEditing, closeRecordModal, saveRecordModal, setRecordModalMode }) {
+function RecordModalActions({ isEditing, closeRecordModal, saveRecordModal, deleteRecordModal, canDelete, setRecordModalMode }) {
   return (
     <div className="modal-actions">
       <button type="button" className="ghost-button" onClick={closeRecordModal}>
         Close
       </button>
+      {canDelete ? (
+        <button type="button" className="ghost-button delete-button" onClick={deleteRecordModal}>
+          Delete
+        </button>
+      ) : null}
       <button
         type="button"
         className="ghost-button"

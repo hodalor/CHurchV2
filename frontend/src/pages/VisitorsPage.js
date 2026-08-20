@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
   Bar,
@@ -12,13 +12,14 @@ import {
   YAxis,
 } from "recharts";
 import { useAppContext } from "../context/AppContext";
+import { churchApi } from "../apis/churchApi";
 
 const STATUS_COLORS = ["#4f46e5", "#0ea5e9", "#f59e0b", "#ef476f", "#14b8a6"];
 const WORKLOAD_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
 
 export default function VisitorsPage() {
   const location = useLocation();
-  const { visitors, openRecordModal, visitorApiState, pendingActionState } = useAppContext();
+  const { visitors, openRecordModal, visitorApiState, pendingActionState, syncVisitorState, notifySuccess, notifyError, visitorStatusOptions } = useAppContext();
   const sectionName = location.pathname.split("/")[2] || "register-list";
 
   const visitorRows = useMemo(
@@ -90,6 +91,21 @@ export default function VisitorsPage() {
           visitors={visitorRows}
           statusCounts={statusCounts}
           onOpenVisitor={openVisitorById}
+          onMoveVisitor={async (visitor, nextStatusKey) => {
+            try {
+              const nextStatus = visitorStatusOptions.find((item) => item.key === nextStatusKey);
+              if (!nextStatus) {
+                throw new Error("Selected visitor status was not found.");
+              }
+              const savedVisitor = await churchApi.updateVisitor(visitor.visitorId, {
+                status: nextStatus._id,
+              });
+              syncVisitorState(savedVisitor);
+              notifySuccess(`${visitor.fullName} moved to ${nextStatus.label}.`);
+            } catch (error) {
+              notifyError(error.message || "Unable to move visitor.");
+            }
+          }}
         />
       ) : null}
 
@@ -194,10 +210,17 @@ function RegisterListView({ visitors, repeatVisitors, retentionRate, onOpenVisit
   );
 }
 
-function PipelineView({ visitors, statusCounts, onOpenVisitor }) {
+function PipelineView({ visitors, statusCounts, onOpenVisitor, onMoveVisitor }) {
+  const [viewMode, setViewMode] = useState("table");
   const pipelineRows = visitors.map((visitor) => ({
     ...visitor,
     nextStep: getPipelineNextStep(visitor),
+  }));
+  const boardColumns = statusCounts.filter((item) => item.name).map((item, index) => ({
+    key: `${item.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_${index}`,
+    statusKey: item.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+    label: item.name,
+    items: pipelineRows.filter((visitor) => visitor.statusKey === item.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")),
   }));
 
   return (
@@ -214,89 +237,113 @@ function PipelineView({ visitors, statusCounts, onOpenVisitor }) {
         ))}
       </section>
 
-      <section className="family-chart-grid">
-        <article className="surface-card chart-card">
-          <div className="section-headline compact">
-            <h3>Visitor Funnel</h3>
-          </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={statusCounts}>
-              <XAxis dataKey="name" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-                {statusCounts.map((entry, index) => (
-                  <Cell key={entry.name} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </article>
-
-        <article className="surface-card chart-card">
-          <div className="section-headline compact">
-            <h3>Status Mix</h3>
-          </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie data={statusCounts} dataKey="value" nameKey="name" innerRadius={70} outerRadius={102}>
-                {statusCounts.map((entry, index) => (
-                  <Cell key={entry.name} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="chart-legend-grid">
-            {statusCounts.map((entry, index) => (
-              <span key={entry.name}>
-                <i style={{ background: STATUS_COLORS[index % STATUS_COLORS.length] }} />
-                {entry.name} {entry.value}
-              </span>
-            ))}
-          </div>
-        </article>
-      </section>
-
       <section className="surface-card data-card">
         <div className="section-headline compact">
-          <h3>Pipeline Register</h3>
-        </div>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Visitor</th>
-                <th>Status</th>
-                <th>Visits</th>
-                <th>Assigned To</th>
-                <th>Last Visit</th>
-                <th>Next Step</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pipelineRows.length ? (
-                pipelineRows.map((visitor) => (
-                  <tr
-                    key={visitor._id || visitor.visitorId}
-                    className="clickable-row"
-                    onClick={() => onOpenVisitor(visitor.visitorId)}
-                  >
-                    <td>{visitor.fullName}</td>
-                    <td>{visitor.statusLabel}</td>
-                    <td>{visitor.visitCount || 0}</td>
-                    <td>{visitor.assigneeName}</td>
-                    <td>{visitor.lastChurchVisit || "-"}</td>
-                    <td>{visitor.nextStep}</td>
-                  </tr>
-                ))
-              ) : (
-                <EmptyTable message="No visitor pipeline records yet." columns={6} />
-              )}
-            </tbody>
-          </table>
+          <h3>Pipeline View</h3>
+          <div className="tab-row">
+            <button type="button" className={`tab-button ${viewMode === "table" ? "active" : ""}`} onClick={() => setViewMode("table")}>
+              Table View
+            </button>
+            <button type="button" className={`tab-button ${viewMode === "board" ? "active" : ""}`} onClick={() => setViewMode("board")}>
+              Board View
+            </button>
+          </div>
         </div>
       </section>
+
+      {viewMode === "table" ? (
+        <>
+          <section className="family-chart-grid">
+            <article className="surface-card chart-card">
+              <div className="section-headline compact">
+                <h3>Visitor Funnel</h3>
+              </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={statusCounts}>
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                    {statusCounts.map((entry, index) => (
+                      <Cell key={`${entry.name}-${index}`} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </article>
+
+            <article className="surface-card chart-card">
+              <div className="section-headline compact">
+                <h3>Status Mix</h3>
+              </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie data={statusCounts} dataKey="value" nameKey="name" innerRadius={70} outerRadius={102}>
+                    {statusCounts.map((entry, index) => (
+                      <Cell key={`${entry.name}-${index}`} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="chart-legend-grid">
+                {statusCounts.map((entry, index) => (
+                  <span key={`${entry.name}-${index}`}>
+                    <i style={{ background: STATUS_COLORS[index % STATUS_COLORS.length] }} />
+                    {entry.name} {entry.value}
+                  </span>
+                ))}
+              </div>
+            </article>
+          </section>
+
+          <section className="surface-card data-card">
+            <div className="section-headline compact">
+              <h3>Pipeline Register</h3>
+            </div>
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Visitor</th>
+                    <th>Status</th>
+                    <th>Visits</th>
+                    <th>Assigned To</th>
+                    <th>Last Visit</th>
+                    <th>Next Step</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pipelineRows.length ? (
+                    pipelineRows.map((visitor) => (
+                      <tr
+                        key={visitor._id || visitor.visitorId}
+                        className="clickable-row"
+                        onClick={() => onOpenVisitor(visitor.visitorId)}
+                      >
+                        <td>{visitor.fullName}</td>
+                        <td>{visitor.statusLabel}</td>
+                        <td>{visitor.visitCount || 0}</td>
+                        <td>{visitor.assigneeName}</td>
+                        <td>{visitor.lastChurchVisit || "-"}</td>
+                        <td>{visitor.nextStep}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <EmptyTable message="No visitor pipeline records yet." columns={6} />
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      ) : (
+        <PipelineBoard
+          columns={boardColumns}
+          onOpen={(visitor) => onOpenVisitor(visitor.visitorId)}
+          onDropItem={onMoveVisitor}
+        />
+      )}
     </>
   );
 }
@@ -699,4 +746,54 @@ function formatShortDate(value) {
 
   const date = new Date(value);
   return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function PipelineBoard({ columns, onOpen, onDropItem }) {
+  const [draggedItem, setDraggedItem] = useState(null);
+
+  return (
+    <section className="pipeline-board-grid">
+      {columns.map((column) => (
+        <article
+          key={column.key}
+          className="pipeline-column"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={() => {
+            if (draggedItem && draggedItem.statusKey !== column.statusKey) {
+              onDropItem(draggedItem, column.statusKey);
+            }
+            setDraggedItem(null);
+          }}
+        >
+          <div className="pipeline-column-head">
+            <div>
+              <h3>{column.label}</h3>
+              <p>{column.items.length} visitors</p>
+            </div>
+            <span className="family-badge-soft">{column.items.length}</span>
+          </div>
+          <div className="pipeline-column-list">
+            {column.items.length ? (
+              column.items.map((item) => (
+                <button
+                  key={item._id || item.visitorId}
+                  type="button"
+                  draggable
+                  className="pipeline-card"
+                  onDragStart={() => setDraggedItem(item)}
+                  onClick={() => onOpen(item)}
+                >
+                  <strong>{item.fullName}</strong>
+                  <p>{item.assigneeName}</p>
+                  <span>{item.visitCount || 0} visits</span>
+                </button>
+              ))
+            ) : (
+              <div className="empty-note">Drop visitors here.</div>
+            )}
+          </div>
+        </article>
+      ))}
+    </section>
+  );
 }

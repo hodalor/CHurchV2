@@ -3,8 +3,11 @@ const LookupValue = require("../models/LookupValue");
 const DiscipleshipProgramme = require("../models/DiscipleshipProgramme");
 const Ministry = require("../models/Ministry");
 const Role = require("../models/Role");
+const StrategicPillar = require("../models/StrategicPillar");
+const StrategicPlan = require("../models/StrategicPlan");
 const User = require("../models/User");
 const { hashPin } = require("../services/authService");
+const { getLookupValueByTypeAndKey } = require("../services/lookupService");
 const { ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
 
 async function bootstrapApplicationData() {
@@ -12,6 +15,7 @@ async function bootstrapApplicationData() {
   await seedLookupData();
   await seedDiscipleshipProgrammes();
   await seedMinistries();
+  await seedStrategicPlanningData();
   await seedInitialAdminUser();
 }
 
@@ -100,6 +104,66 @@ async function seedLookupData() {
       module: "attendance",
       values: ["Manual", "Bulk", "QR", "Mobile"],
     },
+    {
+      key: "communication_channel",
+      label: "Communication Channel",
+      module: "communication",
+      values: ["SMS", "Email", "WhatsApp"],
+    },
+    {
+      key: "communication_log_status",
+      label: "Communication Log Status",
+      module: "communication",
+      values: ["Pending", "Sent", "Failed"],
+    },
+    {
+      key: "trigger_source_module",
+      label: "Trigger Source Module",
+      module: "spiritual_health",
+      values: ["Attendance", "Evangelism", "Discipleship", "Care", "Visitor"],
+    },
+    {
+      key: "leadership_role_type",
+      label: "Leadership Role Type",
+      module: "leadership",
+      values: ["Elder", "Deacon", "Ministry Leader", "Department Head", "Teacher", "Coordinator"],
+    },
+    {
+      key: "emerging_leader_status",
+      label: "Emerging Leader Status",
+      module: "leadership",
+      values: ["Identified", "In Development", "Deployed"],
+    },
+    {
+      key: "mentor_assignment_status",
+      label: "Mentor Assignment Status",
+      module: "leadership",
+      values: ["Active", "Completed", "Paused"],
+    },
+    {
+      key: "succession_readiness_category",
+      label: "Succession Readiness Category",
+      module: "leadership",
+      values: ["Not Yet", "Developing", "Ready", "Ready With Development Needs"],
+    },
+    {
+      key: "strategic_plan_status",
+      label: "Strategic Plan Status",
+      module: "strategic",
+      values: ["Draft", "Active", "Closed"],
+    },
+    {
+      key: "kpi_target_frequency",
+      label: "KPI Target Frequency",
+      module: "strategic",
+      values: ["Annual", "Quarterly", "Monthly"],
+    },
+    {
+      key: "rag_status",
+      label: "RAG Status",
+      module: "strategic",
+      values: ["Green", "Amber", "Red"],
+    },
   ];
 
   for (const seed of lookupSeeds) {
@@ -172,6 +236,56 @@ async function seedMinistries() {
         { name: ministry.name },
         {
           $set: ministry,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      )
+    )
+  );
+}
+
+async function seedStrategicPlanningData() {
+  const activeStatus = await getLookupValueByTypeAndKey("strategic_plan_status", "active");
+  const plan = await StrategicPlan.findOneAndUpdate(
+    { name: "Church Strategic Plan" },
+    {
+      $set: {
+        periodStart: new Date("2026-01-01"),
+        periodEnd: new Date("2028-12-31"),
+        status: activeStatus?._id || null,
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  const pillarSeeds = [
+    {
+      name: "Pillar 1 – Faith-Based Church",
+      description:
+        "Worship attendance, Bible study participation, prayer participation, discipleship, spiritual development, Men/Women/Youth and Children ministries, teaching and fellowship.",
+    },
+    {
+      name: "Pillar 2 – Financial Sustainability and Stewardship",
+      description:
+        "Giving trends, financial reporting, budget performance, internal control and audit, asset management, maintenance, infrastructure development, Barnabas School performance, and resource stewardship.",
+    },
+    {
+      name: "Pillar 3 – Strong Evangelism and Edification",
+      description:
+        "Evangelism contacts, door-to-door campaigns, crusades and outreach, Bible studies, visitors, visitor retention, baptisms, discipleship, community outreach, marriage, and family strengthening.",
+    },
+    {
+      name: "Pillar 4 – Organisational Strength and Operational Excellence",
+      description:
+        "Governance meetings, AGM and statutory reporting, ministry reporting, leadership development, succession, administration, membership data quality, ICT adoption, property management, and operational effectiveness.",
+    },
+  ];
+
+  await Promise.all(
+    pillarSeeds.map((pillar) =>
+      StrategicPillar.findOneAndUpdate(
+        { planId: plan._id, name: pillar.name },
+        {
+          $set: pillar,
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       )

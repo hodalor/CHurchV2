@@ -26,6 +26,10 @@ const attendanceEventSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    isCheckInOpen: {
+      type: Boolean,
+      default: true,
+    },
     qrToken: {
       type: String,
       trim: true,

@@ -102,6 +102,34 @@ router.put(
   }
 );
 
+router.delete(
+  "/prospects/:prospectId",
+  authorizePermissions(PERMISSIONS.MANAGE_EVANGELISM),
+  async (req, res) => {
+    const prospect = await EvangelismProspect.findOne({ prospectId: req.params.prospectId });
+    if (!prospect) {
+      return res.status(404).json({ message: "Prospect not found." });
+    }
+
+    if (prospect.convertedMemberId) {
+      return res.status(400).json({ message: "Converted prospects cannot be deleted." });
+    }
+
+    const previousValue = prospect.toObject();
+    await EvangelismProspect.deleteOne({ _id: prospect._id });
+    await logAudit({
+      action: "delete",
+      module: "Evangelism",
+      recordType: "EvangelismProspect",
+      recordId: prospect.prospectId,
+      previousValue,
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.json({ success: true });
+  }
+);
+
 router.post(
   "/prospects/:prospectId/assign",
   authorizePermissions(PERMISSIONS.MANAGE_EVANGELISM),
@@ -297,6 +325,30 @@ router.put(
   }
 );
 
+router.delete(
+  "/bible-studies/:studyId",
+  authorizePermissions(PERMISSIONS.MANAGE_EVANGELISM),
+  async (req, res) => {
+    const study = await BibleStudy.findById(req.params.studyId);
+    if (!study) {
+      return res.status(404).json({ message: "Bible study not found." });
+    }
+
+    const previousValue = study.toObject();
+    await BibleStudy.deleteOne({ _id: study._id });
+    await logAudit({
+      action: "delete",
+      module: "Evangelism",
+      recordType: "BibleStudy",
+      recordId: study._id.toString(),
+      previousValue,
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.json({ success: true });
+  }
+);
+
 router.post(
   "/bible-studies/:studyId/lessons",
   authorizePermissions(PERMISSIONS.MANAGE_EVANGELISM),
@@ -381,6 +433,30 @@ router.put(
     } catch (error) {
       return res.status(400).json({ message: error.message });
     }
+  }
+);
+
+router.delete(
+  "/campaigns/:campaignId",
+  authorizePermissions(PERMISSIONS.MANAGE_EVANGELISM),
+  async (req, res) => {
+    const campaign = await Campaign.findById(req.params.campaignId);
+    if (!campaign) {
+      return res.status(404).json({ message: "Campaign not found." });
+    }
+
+    const previousValue = campaign.toObject();
+    await Campaign.deleteOne({ _id: campaign._id });
+    await logAudit({
+      action: "delete",
+      module: "Evangelism",
+      recordType: "Campaign",
+      recordId: campaign._id.toString(),
+      previousValue,
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.json({ success: true });
   }
 );
 

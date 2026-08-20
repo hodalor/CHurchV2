@@ -67,6 +67,7 @@ export function AppProvider({ children }) {
     error: "",
     fieldName: "",
   });
+  const [toasts, setToasts] = useState([]);
   const [lookupState, setLookupState] = useState({ loading: false, error: "", values: [] });
   const [pendingActionState, setPendingActionState] = useState({ loading: false, error: "", items: [] });
   const [memberSearch, setMemberSearch] = useState("");
@@ -173,6 +174,26 @@ export function AppProvider({ children }) {
     () => lookupState.values.filter((item) => item.type?.key === "attendance_capture_mode"),
     [lookupState.values]
   );
+
+  const dismissToast = (toastId) => {
+    setToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
+  const pushToast = (type, message, title = "") => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setToasts((current) => [...current, { id, type, message, title }]);
+    window.setTimeout(() => {
+      dismissToast(id);
+    }, 3600);
+  };
+
+  const notifySuccess = (message, title = "Success") => {
+    pushToast("success", message, title);
+  };
+
+  const notifyError = (message, title = "Error") => {
+    pushToast("error", message, title);
+  };
 
   const openModal = (name) => setActiveModal(name);
   const closeModal = () => setActiveModal(null);
@@ -286,6 +307,66 @@ export function AppProvider({ children }) {
 
   const setRecordModalMode = (mode) => {
     setRecordModal((current) => ({ ...current, mode }));
+  };
+
+  const deleteRecordModal = async () => {
+    const { type, record, draft } = recordModal;
+    const identity = record || draft;
+
+    if (!type || !identity) {
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm("Delete this record?");
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    try {
+      if (type === "member" && identity._id) {
+        await churchApi.deleteMember(identity._id);
+        setMembers((current) => current.filter((item) => (item._id || item.memberId) !== (identity._id || identity.memberId)));
+      } else if (type === "visitor" && identity.visitorId) {
+        await churchApi.deleteVisitor(identity.visitorId);
+        setVisitors((current) => current.filter((item) => item.visitorId !== identity.visitorId));
+      } else if (type === "prospect" && identity.prospectId) {
+        await churchApi.deleteProspect(identity.prospectId);
+        setProspects((current) => current.filter((item) => item.prospectId !== identity.prospectId));
+      } else if (type === "bibleStudy" && identity._id) {
+        await churchApi.deleteBibleStudy(identity._id);
+        setBibleStudies((current) => current.filter((item) => item._id !== identity._id));
+      } else if (type === "campaign" && identity._id) {
+        await churchApi.deleteCampaign(identity._id);
+        setCampaigns((current) => current.filter((item) => item._id !== identity._id));
+      } else if (type === "discipleshipProgramme" && identity._id) {
+        await churchApi.deleteDiscipleshipProgramme(identity._id);
+        setDiscipleshipProgrammes((current) => current.filter((item) => item._id !== identity._id));
+      } else if (type === "discipleshipEnrollment" && identity._id) {
+        await churchApi.deleteDiscipleshipEnrollment(identity._id);
+        setDiscipleshipEnrollments((current) => current.filter((item) => item._id !== identity._id));
+      } else if (type === "family" && identity._id) {
+        await churchApi.deleteFamily(identity._id);
+        setFamilies((current) => current.filter((item) => item._id !== identity._id));
+      } else if (type === "attendanceEvent" && identity._id) {
+        await churchApi.deleteAttendanceEvent(identity._id);
+        setAttendanceSessions((current) => current.filter((item) => item._id !== identity._id));
+      } else if (type === "ministry" && identity._id) {
+        await churchApi.deleteMinistry(identity._id);
+        setMinistries((current) => current.filter((item) => (item._id || item.id) !== identity._id));
+      } else if (type === "group" && identity._id) {
+        await churchApi.deleteGroup(identity._id);
+        setGroups((current) => current.filter((item) => (item._id || item.id) !== identity._id));
+      } else {
+        throw new Error("Delete is not available for this record yet.");
+      }
+
+      closeRecordModal();
+      notifySuccess("Record deleted successfully.");
+    } catch (error) {
+      notifyError(error.message || "Unable to delete record.");
+    }
   };
 
   const openMemberEnrollment = () => {
@@ -1014,11 +1095,13 @@ export function AppProvider({ children }) {
       }
 
       closeModal();
+      notifySuccess(`Member ${hydratedMember.memberId || ""} created successfully.`);
     } catch (error) {
       setMediaUploadState((current) => ({
         ...current,
         error: error.message || "Unable to save member.",
       }));
+      notifyError(error.message || "Unable to save member.");
     }
   };
 
@@ -1048,11 +1131,13 @@ export function AppProvider({ children }) {
           })
         );
         closeRecordModal();
+        notifySuccess(`Member ${savedMember.memberId || ""} saved successfully.`);
       } catch (error) {
         setMediaUploadState((current) => ({
           ...current,
           error: error.message || "Unable to save member.",
         }));
+        notifyError(error.message || "Unable to save member.");
       }
       return;
     }
@@ -1068,12 +1153,14 @@ export function AppProvider({ children }) {
         syncVisitorState(savedVisitor);
         await refreshVisitorMetrics();
         closeRecordModal();
+        notifySuccess(`Visitor ${savedVisitor.visitorId || ""} saved successfully.`);
       } catch (error) {
         setVisitorApiState((current) => ({
           ...current,
           loading: false,
           error: error.message || "Unable to save visitor.",
         }));
+        notifyError(error.message || "Unable to save visitor.");
       }
       return;
     }
@@ -1089,12 +1176,14 @@ export function AppProvider({ children }) {
         syncProspectState(savedProspect);
         await refreshEvangelismDashboard();
         closeRecordModal();
+        notifySuccess(`Prospect ${savedProspect.prospectId || ""} saved successfully.`);
       } catch (error) {
         setEvangelismApiState((current) => ({
           ...current,
           loading: false,
           error: error.message || "Unable to save prospect.",
         }));
+        notifyError(error.message || "Unable to save prospect.");
       }
       return;
     }
@@ -1116,12 +1205,14 @@ export function AppProvider({ children }) {
 
         await refreshEvangelismDashboard();
         closeRecordModal();
+        notifySuccess("Bible study saved successfully.");
       } catch (error) {
         setEvangelismApiState((current) => ({
           ...current,
           loading: false,
           error: error.message || "Unable to save Bible study.",
         }));
+        notifyError(error.message || "Unable to save Bible study.");
       }
       return;
     }
@@ -1148,12 +1239,14 @@ export function AppProvider({ children }) {
 
         await refreshEvangelismDashboard();
         closeRecordModal();
+        notifySuccess("Campaign saved successfully.");
       } catch (error) {
         setEvangelismApiState((current) => ({
           ...current,
           loading: false,
           error: error.message || "Unable to save campaign.",
         }));
+        notifyError(error.message || "Unable to save campaign.");
       }
       return;
     }
@@ -1175,12 +1268,14 @@ export function AppProvider({ children }) {
 
         await refreshDiscipleshipDashboard();
         closeRecordModal();
+        notifySuccess("Programme saved successfully.");
       } catch (error) {
         setDiscipleshipApiState((current) => ({
           ...current,
           loading: false,
           error: error.message || "Unable to save discipleship programme.",
         }));
+        notifyError(error.message || "Unable to save discipleship programme.");
       }
       return;
     }
@@ -1196,12 +1291,14 @@ export function AppProvider({ children }) {
         syncDiscipleshipEnrollmentState(savedEnrollment);
         await Promise.all([refreshDiscipleshipDashboard(), refreshDiscipleshipCollections()]);
         closeRecordModal();
+        notifySuccess("Enrollment saved successfully.");
       } catch (error) {
         setDiscipleshipApiState((current) => ({
           ...current,
           loading: false,
           error: error.message || "Unable to save discipleship enrollment.",
         }));
+        notifyError(error.message || "Unable to save discipleship enrollment.");
       }
       return;
     }
@@ -1229,8 +1326,10 @@ export function AppProvider({ children }) {
         setMembers((current) => syncMembersToFamily(current, hydrateFamilyRecord(savedFamily)));
         setFamilyApiState({ loading: false, error: "" });
         closeRecordModal();
+        notifySuccess(`Household ${savedFamily.familyId || ""} saved successfully.`);
       } catch (error) {
         setFamilyApiState({ loading: false, error: error.message || "Unable to save family." });
+        notifyError(error.message || "Unable to save family.");
       }
       return;
     }
@@ -1254,12 +1353,14 @@ export function AppProvider({ children }) {
         syncAttendanceEventState(savedEvent);
         await Promise.all([refreshAttendanceCollections(), refreshAttendanceReport()]);
         closeRecordModal();
+        notifySuccess("Attendance event saved successfully.");
       } catch (error) {
         setAttendanceApiState((current) => ({
           ...current,
           loading: false,
           error: error.message || "Unable to save attendance event.",
         }));
+        notifyError(error.message || "Unable to save attendance event.");
       }
       return;
     }
@@ -1288,8 +1389,10 @@ export function AppProvider({ children }) {
         );
         setMembers(Array.isArray(refreshedMembers) ? refreshedMembers.map(hydrateMemberRecord) : []);
         closeRecordModal();
+        notifySuccess("Ministry saved successfully.");
       } catch (error) {
         console.error(error);
+        notifyError(error.message || "Unable to save ministry.");
       }
       return;
     }
@@ -1316,8 +1419,10 @@ export function AppProvider({ children }) {
           })
         );
         closeRecordModal();
+        notifySuccess("Group saved successfully.");
       } catch (error) {
         console.error(error);
+        notifyError(error.message || "Unable to save group.");
       }
       return;
     }
@@ -1385,8 +1490,13 @@ export function AppProvider({ children }) {
     openRecordModal,
     closeRecordModal,
     saveRecordModal,
+    deleteRecordModal,
     setRecordModalDraft,
     setRecordModalMode,
+    toasts,
+    dismissToast,
+    notifySuccess,
+    notifyError,
     refreshPendingActions,
     syncVisitorState,
     syncProspectState,
@@ -1443,6 +1553,7 @@ export function AppProvider({ children }) {
           error: "",
           fieldName: "",
         });
+        notifySuccess("Media uploaded successfully.");
         return normalizedFile;
       } catch (error) {
         setMediaUploadState({
@@ -1450,8 +1561,63 @@ export function AppProvider({ children }) {
           error: error.message || "Unable to upload media.",
           fieldName,
         });
+        notifyError(error.message || "Unable to upload media.");
         throw error;
       }
+    },
+    async regenerateMemberQr(memberId) {
+      try {
+        setMediaUploadState((current) => ({
+          ...current,
+          loading: true,
+          error: "",
+          fieldName: "memberQr",
+        }));
+        const updatedMember = await churchApi.regenerateMemberQr(memberId);
+        const hydratedMember = hydrateMemberRecord(updatedMember);
+        setMembers((current) =>
+          updateOrInsert(current, hydratedMember, hydratedMember._id || hydratedMember.memberId, {
+            _id: hydratedMember._id,
+            id: hydratedMember.id || hydratedMember._id,
+          })
+        );
+        setRecordModal((current) => {
+          if (current.type !== "member") {
+            return current;
+          }
+
+          const currentIdentity =
+            current.record?._id ||
+            current.record?.memberId ||
+            current.draft?._id ||
+            current.draft?.memberId;
+          const nextIdentity = hydratedMember._id || hydratedMember.memberId;
+
+          if (currentIdentity !== nextIdentity) {
+            return current;
+          }
+
+          return {
+            ...current,
+            record: hydratedMember,
+            draft: hydratedMember,
+          };
+        });
+        setMediaUploadState({ loading: false, error: "", fieldName: "" });
+        notifySuccess("Member QR reissued successfully.");
+        return hydratedMember;
+      } catch (error) {
+        setMediaUploadState({
+          loading: false,
+          error: error.message || "Unable to regenerate member QR.",
+          fieldName: "memberQr",
+        });
+        notifyError(error.message || "Unable to regenerate member QR.");
+        throw error;
+      }
+    },
+    async migrateMemberQrs(limit = 0) {
+      return churchApi.migrateMemberQrs(limit);
     },
     async recordVisitorChurchVisit(visitorId, payload) {
       try {
@@ -1805,6 +1971,66 @@ export function AppProvider({ children }) {
         throw error;
       }
     },
+    async toggleAttendanceCheckIn(eventId, isCheckInOpen) {
+      try {
+        setAttendanceApiState((current) => ({ ...current, loading: true, error: "" }));
+        const updatedEvent = await churchApi.toggleAttendanceCheckIn(eventId, isCheckInOpen);
+        syncAttendanceEventState(updatedEvent);
+        await refreshAttendanceCollections();
+        return updatedEvent;
+      } catch (error) {
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to update check-in status.",
+        }));
+        throw error;
+      }
+    },
+    async fetchAttendanceCheckInDashboard(eventId) {
+      return churchApi.getAttendanceCheckInDashboard(eventId);
+    },
+    async checkInMemberByQr(eventId, payload) {
+      try {
+        setAttendanceApiState((current) => ({ ...current, loading: true, error: "" }));
+        const result = await churchApi.checkInMemberByQr(eventId, payload);
+        const refreshedRecords = await churchApi.getAttendanceEventRecords(eventId);
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: "",
+          recordsByEvent: {
+            ...current.recordsByEvent,
+            [eventId]: refreshedRecords,
+          },
+        }));
+        setRecordModal((current) => {
+          if (current.type !== "attendanceEvent" || current.record?._id !== eventId) {
+            return current;
+          }
+
+          const nextDraft = {
+            ...current.draft,
+            attendanceRecords: refreshedRecords,
+          };
+
+          return {
+            ...current,
+            record: nextDraft,
+            draft: nextDraft,
+          };
+        });
+        await Promise.all([refreshAttendanceCollections(), refreshAttendanceReport()]);
+        return result;
+      } catch (error) {
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to check in member with QR.",
+        }));
+        throw error;
+      }
+    },
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -1960,6 +2186,7 @@ function buildNewRecord(type, { families, members, ministries, roles, users, aut
       date: new Date().toISOString().slice(0, 10),
       location: "",
       ministryId: "",
+      isCheckInOpen: true,
       qrToken: "",
       attendanceRecords: [],
     };
@@ -2093,6 +2320,12 @@ function hydrateMemberRecord(member) {
     sourceRecordRef: member.sourceRecordRef || "",
     dataEntryClerk: member.dataEntryClerk || "",
     dateCaptured: formatDateInputValue(member.dateCaptured || member.createdAt),
+    qrToken: member.qrToken || "",
+    qrCodeImageUrl: member.qrCodeImageUrl || "",
+    qrGeneratedAt: formatDateInputValue(member.qrGeneratedAt),
+    qrRegeneratedAt: formatDateInputValue(member.qrRegeneratedAt),
+    qrRegeneratedBy: member.qrRegeneratedBy || null,
+    qrActive: member.qrActive !== false,
     gpsLatitude: member.gpsLatitude || "",
     gpsLongitude: member.gpsLongitude || "",
     ministryId: member.ministryId || member.ministry?._id || member.ministry || "",
@@ -2142,6 +2375,12 @@ function normalizeMemberDraft(draft, authUser = null) {
     sourceRecordRef: draft.sourceRecordRef || "",
     dataEntryClerk: draft.dataEntryClerk || authUser?.displayName || authUser?.username || "",
     dateCaptured: draft.dateCaptured || new Date().toISOString().slice(0, 10),
+    qrToken: draft.qrToken || "",
+    qrCodeImageUrl: draft.qrCodeImageUrl || "",
+    qrGeneratedAt: draft.qrGeneratedAt || null,
+    qrRegeneratedAt: draft.qrRegeneratedAt || null,
+    qrRegeneratedBy: draft.qrRegeneratedBy || null,
+    qrActive: draft.qrActive !== false,
     groups: Array.isArray(draft.groups) ? draft.groups : [],
     familyLinks: Array.isArray(draft.familyLinks) ? draft.familyLinks : [],
     personalPhoto: normalizeMediaField(draft.personalPhoto),
@@ -2524,6 +2763,7 @@ function hydrateAttendanceEventRecord(event) {
     ...event,
     eventTypeId: event.eventTypeId || "",
     ministryId: event.ministryId || "",
+    isCheckInOpen: event.isCheckInOpen !== false,
     attendanceRecords: Array.isArray(event.attendanceRecords) ? event.attendanceRecords : [],
   };
 }
@@ -2535,6 +2775,7 @@ function normalizeAttendanceEventDraft(draft) {
     title: draft.title || "",
     ministryId: draft.ministryId?._id || draft.ministryId || null,
     location: draft.location || "",
+    isCheckInOpen: draft.isCheckInOpen !== false,
   };
 }
 

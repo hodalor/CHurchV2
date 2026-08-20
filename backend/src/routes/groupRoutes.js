@@ -43,6 +43,25 @@ router.put("/:groupId", async (req, res) => {
   }
 });
 
+router.delete("/:groupId", async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.groupId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+
+    const hasChildren = await Group.exists({ parent: group._id });
+    if (hasChildren) {
+      return res.status(400).json({ message: "Delete child groups first." });
+    }
+
+    await Group.deleteOne({ _id: group._id });
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
 async function normalizeGroupPayload(payload = {}, currentGroupId = null) {
   const name = String(payload.name || "").trim();
   if (!name) {

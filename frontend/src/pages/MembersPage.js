@@ -10,6 +10,8 @@ export default function MembersPage() {
     memberMinistryFilter,
     setMemberMinistryFilter,
     openRecordModal,
+    regenerateMemberQr,
+    mediaUploadState,
   } = useAppContext();
 
   const memberCards = [
@@ -56,11 +58,12 @@ export default function MembersPage() {
                 <th>Church Info</th>
                 <th>Family</th>
                 <th>Location</th>
+                <th>QR</th>
                 <th>Photos</th>
               </tr>
             </thead>
             <tbody>
-              {filteredMembers.map((member) => {
+              {filteredMembers.length ? filteredMembers.map((member) => {
                 const memberMinistryId = member.ministryId || member.ministry?._id || member.ministry;
                 const ministry =
                   typeof member.ministry === "object" && member.ministry?.name
@@ -91,6 +94,33 @@ export default function MembersPage() {
                     </td>
                     <td>
                       <div className="photo-stack">
+                        {member.qrCodeImageUrl ? (
+                          <a
+                            href={member.qrCodeImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            View QR
+                          </a>
+                        ) : (
+                          <span>-</span>
+                        )}
+                        <button
+                          type="button"
+                          className="ghost-button small"
+                          onClick={async (event) => {
+                            event.stopPropagation();
+                            await regenerateMemberQr(member._id);
+                          }}
+                          disabled={mediaUploadState.loading}
+                        >
+                          Reissue
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="photo-stack">
                         <MediaLink value={member.personalPhoto} label="Photo" />
                         <MediaLink value={member.idFrontPhoto} label="ID Front" />
                         <MediaLink value={member.idBackPhoto} label="ID Back" />
@@ -98,7 +128,13 @@ export default function MembersPage() {
                     </td>
                   </tr>
                 );
-              })}
+              }) : (
+                <tr>
+                  <td colSpan={7} className="empty-table">
+                    No members found for the current filter.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

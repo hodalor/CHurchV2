@@ -2,11 +2,15 @@ import {
   FaBuilding,
   FaBullhorn,
   FaCalendarCheck,
+  FaChartLine,
   FaChurch,
+  FaComments,
   FaCoins,
   FaGraduationCap,
   FaHandHoldingHeart,
+  FaHeartbeat,
   FaHome,
+  FaSitemap,
   FaUserShield,
   FaUsers,
 } from "react-icons/fa";
@@ -52,6 +56,27 @@ export const navigationSections = [
     { label: "Services", path: "/attendance/services" },
     { label: "Reports", path: "/attendance/reports" },
     { label: "Absentees", path: "/attendance/absentees" },
+  ] },
+  { label: "Communication", path: "/communication", icon: FaComments, children: [
+    { label: "Groups", path: "/communication/groups" },
+    { label: "Preferences", path: "/communication/preferences" },
+    { label: "Logs", path: "/communication/logs" },
+  ] },
+  { label: "Spiritual Health", path: "/spiritual-health", icon: FaHeartbeat, children: [
+    { label: "Dashboard", path: "/spiritual-health/dashboard" },
+    { label: "Alerts", path: "/spiritual-health/alerts" },
+    { label: "Rules", path: "/spiritual-health/rules" },
+  ] },
+  { label: "Leadership", path: "/leadership", icon: FaSitemap, children: [
+    { label: "Roles", path: "/leadership/roles" },
+    { label: "Talent", path: "/leadership/talent" },
+    { label: "Succession", path: "/leadership/succession" },
+    { label: "Reports", path: "/leadership/reports" },
+  ] },
+  { label: "Strategic", path: "/strategic", icon: FaChartLine, children: [
+    { label: "Plans", path: "/strategic/plans" },
+    { label: "KPIs", path: "/strategic/kpis" },
+    { label: "Scorecards", path: "/strategic/scorecards" },
   ] },
   { label: "Users", path: "/users", icon: FaUserShield },
 ];

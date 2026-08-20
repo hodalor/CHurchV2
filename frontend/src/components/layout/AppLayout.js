@@ -14,14 +14,19 @@ import FamilyOverviewPage from "../../pages/FamilyOverviewPage";
 import FamilyHouseholdsPage from "../../pages/FamilyHouseholdsPage";
 import FinancePage from "../../pages/FinancePage";
 import AttendancePage from "../../pages/AttendancePage";
+import CommunicationPage from "../../pages/CommunicationPage";
+import SpiritualHealthPage from "../../pages/SpiritualHealthPage";
+import LeadershipDevelopmentPage from "../../pages/LeadershipDevelopmentPage";
+import StrategicPlanningPage from "../../pages/StrategicPlanningPage";
 import UsersPage from "../../pages/UsersPage";
 import MemberEnrollmentModal from "../members/MemberEnrollmentModal";
 import RecordDetailModal from "../common/RecordDetailModal";
+import ToastViewport from "../common/ToastViewport";
 import { useAppContext } from "../../context/AppContext";
 
 export default function AppLayout() {
   const location = useLocation();
-  const { openMemberEnrollment, openRecordModal, activeSetupTab, branding } = useAppContext();
+  const { openMemberEnrollment, openRecordModal, activeSetupTab, branding, toasts, dismissToast } = useAppContext();
   const pageMeta = getPageMeta(location.pathname);
   const pageAction = getPageAction(pageMeta.action, activeSetupTab, { openMemberEnrollment, openRecordModal, branding }, location.pathname);
 
@@ -67,6 +72,23 @@ export default function AppLayout() {
                 <Route path="/attendance/services" element={<AttendancePage />} />
                 <Route path="/attendance/reports" element={<AttendancePage />} />
                 <Route path="/attendance/absentees" element={<AttendancePage />} />
+                <Route path="/communication" element={<Navigate to="/communication/groups" replace />} />
+                <Route path="/communication/groups" element={<CommunicationPage />} />
+                <Route path="/communication/preferences" element={<CommunicationPage />} />
+                <Route path="/communication/logs" element={<CommunicationPage />} />
+                <Route path="/spiritual-health" element={<Navigate to="/spiritual-health/dashboard" replace />} />
+                <Route path="/spiritual-health/dashboard" element={<SpiritualHealthPage />} />
+                <Route path="/spiritual-health/alerts" element={<SpiritualHealthPage />} />
+                <Route path="/spiritual-health/rules" element={<SpiritualHealthPage />} />
+                <Route path="/leadership" element={<Navigate to="/leadership/roles" replace />} />
+                <Route path="/leadership/roles" element={<LeadershipDevelopmentPage />} />
+                <Route path="/leadership/talent" element={<LeadershipDevelopmentPage />} />
+                <Route path="/leadership/succession" element={<LeadershipDevelopmentPage />} />
+                <Route path="/leadership/reports" element={<LeadershipDevelopmentPage />} />
+                <Route path="/strategic" element={<Navigate to="/strategic/plans" replace />} />
+                <Route path="/strategic/plans" element={<StrategicPlanningPage />} />
+                <Route path="/strategic/kpis" element={<StrategicPlanningPage />} />
+                <Route path="/strategic/scorecards" element={<StrategicPlanningPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -78,6 +100,7 @@ export default function AppLayout() {
 
       <MemberEnrollmentModal />
       <RecordDetailModal />
+      <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </>
   );
 }
@@ -144,6 +167,34 @@ function getPageMeta(pathname) {
       title: "Users",
       subtitle: "User accounts and roles stay separate from church membership records.",
       action: "user",
+    };
+  }
+
+  if (pathname.startsWith("/communication")) {
+    return {
+      title: "Communication",
+      subtitle: "Build filtered audiences, respect preferences, and keep a clean communication history.",
+    };
+  }
+
+  if (pathname.startsWith("/spiritual-health")) {
+    return {
+      title: "Spiritual Health",
+      subtitle: "Surface administrative follow-up signals from existing ministry activity without duplicating records.",
+    };
+  }
+
+  if (pathname.startsWith("/leadership")) {
+    return {
+      title: "Leadership Development",
+      subtitle: "Track service history, mentoring, talent, and succession records with restricted visibility where needed.",
+    };
+  }
+
+  if (pathname.startsWith("/strategic")) {
+    return {
+      title: "Strategic Planning",
+      subtitle: "Manage plans, KPI tracking, and scorecards for ministries and the whole church.",
     };
   }
 

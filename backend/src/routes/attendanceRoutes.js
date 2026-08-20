@@ -5,14 +5,18 @@ const authenticate = require("../middleware/authenticate");
 const { authorizePermissions } = require("../middleware/authorize");
 const { logAudit } = require("../services/auditService");
 const {
+  checkInMemberByQrToken,
+  checkInVisitorForEvent,
   captureAttendanceRecord,
   captureBulkAttendance,
   correctAttendanceRecord,
   createAttendanceEvent,
   getAbsentees,
+  getAttendanceCheckInDashboard,
   getAttendanceRecordsForEvent,
   getAttendanceReport,
   getAttendanceSummary,
+  toggleAttendanceCheckIn,
   updateAttendanceEvent,
 } = require("../services/attendanceService");
 const { PERMISSIONS } = require("../utils/permissions");
@@ -74,6 +78,27 @@ router.put("/events/:eventId", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANC
   }
 });
 
+router.delete("/events/:eventId", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
+  const event = await AttendanceEvent.findById(req.params.eventId);
+  if (!event) {
+    return res.status(404).json({ message: "Attendance event not found." });
+  }
+
+  const previousValue = event.toObject();
+  await AttendanceRecord.deleteMany({ eventId: event._id });
+  await AttendanceEvent.deleteOne({ _id: event._id });
+  await logAudit({
+    action: "delete",
+    module: "Attendance",
+    recordType: "AttendanceEvent",
+    recordId: event._id.toString(),
+    previousValue,
+    user: req.user,
+    ipAddress: req.ip,
+  });
+  return res.json({ success: true });
+});
+
 router.get("/events/:eventId/records", authorizePermissions(PERMISSIONS.VIEW_ATTENDANCE), async (req, res) => {
   try {
     const event = await AttendanceEvent.findById(req.params.eventId);
@@ -86,6 +111,111 @@ router.get("/events/:eventId/records", authorizePermissions(PERMISSIONS.VIEW_ATT
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
+});
+
+router.get("/events/:eventId/check-in/dashboard", authorizePermissions(PERMISSIONS.VIEW_ATTENDANCE), async (req, res) => {
+  try {
+    const dashboard = await getAttendanceCheckInDashboard(req.params.eventId);
+    return res.json(dashboard);
+  } catch (error) {
+    return res.status(error.message === "Attendance event not found." ? 404 : 400).json({ message: error.message });
+  }
+});
+
+router.post("/events/:eventId/check-in/status", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
+  const event = await AttendanceEvent.findById(req.params.eventId);
+  if (!event) {
+    return res.status(404).json({ message: "Attendance event not found." });
+  }
+
+  try {
+    const previousValue = event.toObject();
+    const updatedEvent = await toggleAttendanceCheckIn(event, req.body.isCheckInOpen);
+    await logAudit({
+      action: "update",
+      module: "Attendance",
+      recordType: "AttendanceEvent",
+      recordId: updatedEvent._id.toString(),
+      previousValue,
+      newValue: updatedEvent.toObject(),
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.json(updatedEvent);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/events/:eventId/check-in/qr", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
+  const event = await AttendanceEvent.findById(req.params.eventId);
+  if (!event) {
+    return res.status(404).json({ message: "Attendance event not found." });
+  }
+
+  try {
+    const result = await checkInMemberByQrToken(event, req.body.qrToken, req.user, req.body.capturedVia || "qr");
+    await logAudit({
+      action: "create",
+      module: "Attendance",
+      recordType: "AttendanceRecord",
+      recordId: result.record._id.toString(),
+      newValue: result.record.toObject(),
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/events/:eventId/check-in/visitor", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
+  const event = await AttendanceEvent.findById(req.params.eventId);
+  if (!event) {
+    return res.status(404).json({ message: "Attendance event not found." });
+  }
+
+  try {
+    const result = await checkInVisitorForEvent(event, req.body, req.user);
+    await logAudit({
+      action: "create",
+      module: "Attendance",
+      recordType: "AttendanceRecord",
+      recordId: result.record._id.toString(),
+      newValue: result.record.toObject(),
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/events/:eventId/check-in/biometric", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
+  const event = await AttendanceEvent.findById(req.params.eventId);
+  if (!event) {
+    return res.status(404).json({ message: "Attendance event not found." });
+  }
+
+  return res.status(501).json({
+    message: "Biometric check-in is not connected yet. Confirm the device or SDK before implementation.",
+    eventId: event._id,
+    biometricMatchToken: req.body.biometricMatchToken || "",
+  });
+});
+
+router.post("/events/:eventId/check-in/children", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {
+  const event = await AttendanceEvent.findById(req.params.eventId);
+  if (!event) {
+    return res.status(404).json({ message: "Attendance event not found." });
+  }
+
+  return res.status(501).json({
+    message: "Child check-in needs the pickup matching flow confirmed before full implementation.",
+    eventId: event._id,
+  });
 });
 
 router.post("/events/:eventId/records", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {

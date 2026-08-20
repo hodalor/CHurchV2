@@ -55,7 +55,16 @@ async function request(path, options = {}, retryOnUnauthorized = true) {
 
 async function safeJson(response) {
   const text = await response.text();
-  return text ? JSON.parse(text) : {};
+  if (!text) {
+    return {};
+  }
+
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
+    throw new Error("The server returned an HTML page instead of API JSON. Check that the backend is running on the expected API port.");
+  }
+
+  return JSON.parse(text);
 }
 
 async function refreshSession(refreshToken) {
@@ -143,6 +152,12 @@ export const churchApi = {
     });
   },
 
+  async deleteGroup(groupId) {
+    return request(`/groups/${groupId}`, {
+      method: "DELETE",
+    });
+  },
+
   async getMembers() {
     return request("/members");
   },
@@ -158,10 +173,34 @@ export const churchApi = {
     });
   },
 
+  async getMemberQr(memberId) {
+    return request(`/members/${memberId}/qr`);
+  },
+
+  async regenerateMemberQr(memberId) {
+    return request(`/members/${memberId}/qr/regenerate`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
+  async migrateMemberQrs(limit = 0) {
+    return request("/members/qr/migrate", {
+      method: "POST",
+      body: JSON.stringify({ limit }),
+    });
+  },
+
   async updateMember(memberId, payload) {
     return request(`/members/${memberId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteMember(memberId) {
+    return request(`/members/${memberId}`, {
+      method: "DELETE",
     });
   },
 
@@ -195,6 +234,12 @@ export const churchApi = {
     });
   },
 
+  async deleteMinistry(ministryId) {
+    return request(`/ministries/${ministryId}`, {
+      method: "DELETE",
+    });
+  },
+
   async getNextFamilyId() {
     return request("/families/next-id");
   },
@@ -210,6 +255,12 @@ export const churchApi = {
     return request(`/families/${id}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteFamily(id) {
+    return request(`/families/${id}`, {
+      method: "DELETE",
     });
   },
 
@@ -244,8 +295,39 @@ export const churchApi = {
     });
   },
 
+  async deleteAttendanceEvent(eventId) {
+    return request(`/attendance/events/${eventId}`, {
+      method: "DELETE",
+    });
+  },
+
   async getAttendanceEventRecords(eventId) {
     return request(`/attendance/events/${eventId}/records`);
+  },
+
+  async getAttendanceCheckInDashboard(eventId) {
+    return request(`/attendance/events/${eventId}/check-in/dashboard`);
+  },
+
+  async toggleAttendanceCheckIn(eventId, isCheckInOpen) {
+    return request(`/attendance/events/${eventId}/check-in/status`, {
+      method: "POST",
+      body: JSON.stringify({ isCheckInOpen }),
+    });
+  },
+
+  async checkInMemberByQr(eventId, payload) {
+    return request(`/attendance/events/${eventId}/check-in/qr`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async checkInVisitorForEvent(eventId, payload) {
+    return request(`/attendance/events/${eventId}/check-in/visitor`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   async captureAttendanceRecord(eventId, payload) {
@@ -304,6 +386,12 @@ export const churchApi = {
     });
   },
 
+  async deleteDiscipleshipProgramme(programmeId) {
+    return request(`/discipleship/programmes/${programmeId}`, {
+      method: "DELETE",
+    });
+  },
+
   async getDiscipleshipEnrollments() {
     return request("/discipleship/enrollments");
   },
@@ -319,6 +407,12 @@ export const churchApi = {
     return request(`/discipleship/enrollments/${enrollmentId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteDiscipleshipEnrollment(enrollmentId) {
+    return request(`/discipleship/enrollments/${enrollmentId}`, {
+      method: "DELETE",
     });
   },
 
@@ -372,6 +466,12 @@ export const churchApi = {
     return request(`/evangelism/prospects/${prospectId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteProspect(prospectId) {
+    return request(`/evangelism/prospects/${prospectId}`, {
+      method: "DELETE",
     });
   },
 
@@ -429,6 +529,12 @@ export const churchApi = {
     });
   },
 
+  async deleteBibleStudy(studyId) {
+    return request(`/evangelism/bible-studies/${studyId}`, {
+      method: "DELETE",
+    });
+  },
+
   async addBibleStudyLesson(studyId, payload) {
     return request(`/evangelism/bible-studies/${studyId}/lessons`, {
       method: "POST",
@@ -451,6 +557,12 @@ export const churchApi = {
     return request(`/evangelism/campaigns/${campaignId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteCampaign(campaignId) {
+    return request(`/evangelism/campaigns/${campaignId}`, {
+      method: "DELETE",
     });
   },
 
@@ -477,6 +589,12 @@ export const churchApi = {
     return request(`/visitors/${visitorId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteVisitor(visitorId) {
+    return request(`/visitors/${visitorId}`, {
+      method: "DELETE",
     });
   },
 
@@ -516,5 +634,462 @@ export const churchApi = {
 
   async getVisitorRetentionMetrics(windowDays = 30) {
     return request(`/visitors/retention-metrics?windowDays=${windowDays}`);
+  },
+
+  async getCommunicationGroups() {
+    return request("/communication/groups");
+  },
+
+  async createCommunicationGroup(payload) {
+    return request("/communication/groups", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateCommunicationGroup(groupId, payload) {
+    return request(`/communication/groups/${groupId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteCommunicationGroup(groupId) {
+    return request(`/communication/groups/${groupId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async freezeCommunicationGroup(groupId) {
+    return request(`/communication/groups/${groupId}/freeze`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
+  async previewCommunicationAudience(payload) {
+    return request("/communication/audience/preview", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getCommunicationPreferences() {
+    return request("/communication/preferences");
+  },
+
+  async saveCommunicationPreference(payload) {
+    return request("/communication/preferences", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getCommunicationLogs() {
+    return request("/communication/logs");
+  },
+
+  async sendCommunication(payload) {
+    return request("/communication/send", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async exportCommunicationContacts(payload) {
+    return request("/communication/export", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getTriggerRules() {
+    return request("/spiritual-health/trigger-rules");
+  },
+
+  async createTriggerRule(payload) {
+    return request("/spiritual-health/trigger-rules", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateTriggerRule(ruleId, payload) {
+    return request(`/spiritual-health/trigger-rules/${ruleId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteTriggerRule(ruleId) {
+    return request(`/spiritual-health/trigger-rules/${ruleId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async evaluateSpiritualAlerts() {
+    return request("/spiritual-health/alerts/evaluate", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
+  async getSpiritualAlerts(resolved = false) {
+    return request(`/spiritual-health/alerts?resolved=${resolved ? "true" : "false"}`);
+  },
+
+  async assignSpiritualAlert(alertId, payload) {
+    return request(`/spiritual-health/alerts/${alertId}/assign`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async resolveSpiritualAlert(alertId) {
+    return request(`/spiritual-health/alerts/${alertId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
+  async getLeadershipRoles() {
+    return request("/leadership/roles");
+  },
+
+  async createLeadershipRole(payload) {
+    return request("/leadership/roles", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateLeadershipRole(id, payload) {
+    return request(`/leadership/roles/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteLeadershipRole(id) {
+    return request(`/leadership/roles/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getLeadershipSkills() {
+    return request("/leadership/skills");
+  },
+
+  async createLeadershipSkill(payload) {
+    return request("/leadership/skills", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateLeadershipSkill(id, payload) {
+    return request(`/leadership/skills/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteLeadershipSkill(id) {
+    return request(`/leadership/skills/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getEmergingLeaderFlags() {
+    return request("/leadership/emerging-flags");
+  },
+
+  async createEmergingLeaderFlag(payload) {
+    return request("/leadership/emerging-flags", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateEmergingLeaderFlag(id, payload) {
+    return request(`/leadership/emerging-flags/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteEmergingLeaderFlag(id) {
+    return request(`/leadership/emerging-flags/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getMentorAssignments() {
+    return request("/leadership/mentors");
+  },
+
+  async createMentorAssignment(payload) {
+    return request("/leadership/mentors", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateMentorAssignment(id, payload) {
+    return request(`/leadership/mentors/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteMentorAssignment(id) {
+    return request(`/leadership/mentors/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getLeadershipTrainingRecords() {
+    return request("/leadership/training-records");
+  },
+
+  async createLeadershipTrainingRecord(payload) {
+    return request("/leadership/training-records", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateLeadershipTrainingRecord(id, payload) {
+    return request(`/leadership/training-records/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteLeadershipTrainingRecord(id) {
+    return request(`/leadership/training-records/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getSuccessionRequirements() {
+    return request("/leadership/succession-requirements");
+  },
+
+  async createSuccessionRequirement(payload) {
+    return request("/leadership/succession-requirements", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateSuccessionRequirement(id, payload) {
+    return request(`/leadership/succession-requirements/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteSuccessionRequirement(id) {
+    return request(`/leadership/succession-requirements/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getSuccessionReadiness() {
+    return request("/leadership/succession-readiness");
+  },
+
+  async createSuccessionReadiness(payload) {
+    return request("/leadership/succession-readiness", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateSuccessionReadiness(id, payload) {
+    return request(`/leadership/succession-readiness/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteSuccessionReadiness(id) {
+    return request(`/leadership/succession-readiness/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getLeadershipPipelineReport() {
+    return request("/leadership/reports/pipeline");
+  },
+
+  async getStrategicPlans() {
+    return request("/strategic/plans");
+  },
+
+  async createStrategicPlan(payload) {
+    return request("/strategic/plans", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateStrategicPlan(id, payload) {
+    return request(`/strategic/plans/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteStrategicPlan(id) {
+    return request(`/strategic/plans/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getStrategicPillars() {
+    return request("/strategic/pillars");
+  },
+
+  async createStrategicPillar(payload) {
+    return request("/strategic/pillars", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateStrategicPillar(id, payload) {
+    return request(`/strategic/pillars/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteStrategicPillar(id) {
+    return request(`/strategic/pillars/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getStrategicObjectives() {
+    return request("/strategic/objectives");
+  },
+
+  async createStrategicObjective(payload) {
+    return request("/strategic/objectives", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateStrategicObjective(id, payload) {
+    return request(`/strategic/objectives/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteStrategicObjective(id) {
+    return request(`/strategic/objectives/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getStrategicInitiatives() {
+    return request("/strategic/initiatives");
+  },
+
+  async createStrategicInitiative(payload) {
+    return request("/strategic/initiatives", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateStrategicInitiative(id, payload) {
+    return request(`/strategic/initiatives/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteStrategicInitiative(id) {
+    return request(`/strategic/initiatives/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getKpis() {
+    return request("/strategic/kpis");
+  },
+
+  async createKpi(payload) {
+    return request("/strategic/kpis", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateKpi(id, payload) {
+    return request(`/strategic/kpis/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteKpi(id) {
+    return request(`/strategic/kpis/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getKpiTargets() {
+    return request("/strategic/targets");
+  },
+
+  async createKpiTarget(payload) {
+    return request("/strategic/targets", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateKpiTarget(id, payload) {
+    return request(`/strategic/targets/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteKpiTarget(id) {
+    return request(`/strategic/targets/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getKpiActuals() {
+    return request("/strategic/actuals");
+  },
+
+  async createKpiActual(payload) {
+    return request("/strategic/actuals", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteKpiActual(id) {
+    return request(`/strategic/actuals/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getChurchScorecard() {
+    return request("/strategic/scorecards/church");
+  },
+
+  async getMinistryScorecard(ministryId) {
+    return request(`/strategic/scorecards/ministry/${ministryId}`);
   },
 };

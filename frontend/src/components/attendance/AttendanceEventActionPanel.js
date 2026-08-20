@@ -1,6 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AttendanceParticipantLookupField from "./AttendanceParticipantLookupField";
 import { useAppContext } from "../../context/AppContext";
+
+function getDefaultManualMode(options) {
+  return options.find((item) => item.key === "manual")?._id || "";
+}
 
 export default function AttendanceEventActionPanel({ event }) {
   const {
@@ -11,14 +15,22 @@ export default function AttendanceEventActionPanel({ event }) {
     captureAttendanceRecord,
     captureBulkAttendance,
     correctAttendanceRecord,
+    toggleAttendanceCheckIn,
+    fetchAttendanceCheckInDashboard,
+    checkInMemberByQr,
   } = useAppContext();
   const [activePanel, setActivePanel] = useState("");
   const [manualEntry, setManualEntry] = useState({
     member: null,
     visitor: null,
     present: true,
-    capturedVia: attendanceCaptureModeOptions.find((item) => item.key === "manual")?._id || "",
+    capturedVia: getDefaultManualMode(attendanceCaptureModeOptions),
     correctionReason: "",
+  });
+  const [qrEntry, setQrEntry] = useState("");
+  const [dashboard, setDashboard] = useState({
+    counters: { members: 0, visitors: 0, children: 0, online: 0, total: 0 },
+    recentCheckIns: [],
   });
   const [bulkSelection, setBulkSelection] = useState([]);
   const [bulkSearch, setBulkSearch] = useState("");
@@ -36,58 +48,170 @@ export default function AttendanceEventActionPanel({ event }) {
     );
   }, [bulkSearch, members]);
 
+  const records = Array.isArray(event.attendanceRecords) ? event.attendanceRecords : [];
+  const resolvedDashboard = {
+    counters: {
+      members: dashboard.counters?.members || records.filter((record) => Boolean(record.memberId)).length,
+      visitors: dashboard.counters?.visitors || records.filter((record) => Boolean(record.visitorId)).length,
+      children:
+        dashboard.counters?.children ||
+        records.filter((record) => record.memberId?.memberType === "Child").length,
+      online: dashboard.counters?.online || 0,
+      total: dashboard.counters?.total || records.length,
+    },
+    recentCheckIns:
+      dashboard.recentCheckIns?.length ? dashboard.recentCheckIns : records.slice(0, 10),
+  };
+
+  useEffect(() => {
+    if (!event?._id) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const loadDashboard = async () => {
+      try {
+        const payload = await fetchAttendanceCheckInDashboard(event._id);
+        if (isMounted) {
+          setDashboard(payload);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setDashboard({
+            counters: { members: 0, visitors: 0, children: 0, online: 0, total: 0 },
+            recentCheckIns: [],
+          });
+        }
+      }
+    };
+
+    loadDashboard();
+    const intervalId = window.setInterval(loadDashboard, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [event?._id, fetchAttendanceCheckInDashboard, records.length]);
+
   if (!event?._id) {
     return null;
   }
-
-  const records = Array.isArray(event.attendanceRecords) ? event.attendanceRecords : [];
 
   return (
     <div className="visitor-action-stack">
       <section className="subsection-card">
         <div className="section-headline compact">
-          <h3>Attendance Snapshot</h3>
+          <div>
+            <h3>Check-In Snapshot</h3>
+            <p>Live event view with QR, manual, and bulk recording options.</p>
+          </div>
         </div>
         <div className="info-grid">
           <article className="info-tile">
-            <span>Recorded Entries</span>
-            <strong>{records.length}</strong>
+            <span>Check-In Window</span>
+            <strong>{event.isCheckInOpen !== false ? "Open" : "Closed"}</strong>
           </article>
           <article className="info-tile">
-            <span>Present</span>
-            <strong>{records.filter((record) => record.present).length}</strong>
+            <span>Recorded Entries</span>
+            <strong>{resolvedDashboard.counters.total}</strong>
+          </article>
+          <article className="info-tile">
+            <span>Present Members</span>
+            <strong>{resolvedDashboard.counters.members}</strong>
+          </article>
+          <article className="info-tile">
+            <span>Visitors</span>
+            <strong>{resolvedDashboard.counters.visitors}</strong>
+          </article>
+          <article className="info-tile">
+            <span>Children</span>
+            <strong>{resolvedDashboard.counters.children}</strong>
           </article>
           <article className="info-tile">
             <span>Attendance Rate</span>
             <strong>{event.attendanceRate || 0}%</strong>
-          </article>
-          <article className="info-tile">
-            <span>QR Token</span>
-            <strong>{event.qrToken || "-"}</strong>
           </article>
         </div>
         <div className="modal-actions">
           <button
             type="button"
             className="ghost-button small"
+            disabled={attendanceApiState.loading}
+            onClick={() => toggleAttendanceCheckIn(event._id, event.isCheckInOpen === false)}
+          >
+            {event.isCheckInOpen !== false ? "Close Check-In" : "Open Check-In"}
+          </button>
+          <button
+            type="button"
+            className="ghost-button small"
+            onClick={() => setActivePanel((current) => (current === "qr" ? "" : "qr"))}
+          >
+            {activePanel === "qr" ? "Hide QR Entry" : "QR Check-In"}
+          </button>
+          <button
+            type="button"
+            className="ghost-button small"
             onClick={() => setActivePanel((current) => (current === "manual" ? "" : "manual"))}
           >
-            {activePanel === "manual" ? "Hide Record Form" : "Record Attendance"}
+            {activePanel === "manual" ? "Hide Manual Entry" : "Manual Search"}
           </button>
           <button
             type="button"
             className="ghost-button small"
             onClick={() => setActivePanel((current) => (current === "bulk" ? "" : "bulk"))}
           >
-            {activePanel === "bulk" ? "Hide Bulk Form" : "Bulk Record"}
+            {activePanel === "bulk" ? "Hide Bulk Entry" : "Bulk Record"}
           </button>
         </div>
       </section>
 
+      {activePanel === "qr" ? (
+        <section className="subsection-card">
+          <div className="section-headline compact">
+            <div>
+              <h3>QR Scan / Manual Token Entry</h3>
+              <p>Paste or type the member QR token when a scanner or camera decodes it.</p>
+            </div>
+          </div>
+          <div className="form-grid">
+            <label className="full-width">
+              Member QR Token
+              <input
+                value={qrEntry}
+                onChange={(eventValue) => setQrEntry(eventValue.target.value)}
+                placeholder="Paste scanned token or enter it manually"
+              />
+            </label>
+          </div>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="primary-button"
+              disabled={attendanceApiState.loading || !qrEntry.trim()}
+              onClick={async () => {
+                await checkInMemberByQr(event._id, {
+                  qrToken: qrEntry.trim(),
+                  capturedVia: "qr",
+                });
+                setQrEntry("");
+                setActivePanel("");
+              }}
+            >
+              Resolve And Check In
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {activePanel === "manual" ? (
         <section className="subsection-card">
           <div className="section-headline compact">
-            <h3>Manual Capture</h3>
+            <div>
+              <h3>Manual Search</h3>
+              <p>Search a member or visitor, then record attendance directly.</p>
+            </div>
           </div>
           <div className="lookup-grid">
             <AttendanceParticipantLookupField
@@ -138,8 +262,8 @@ export default function AttendanceEventActionPanel({ event }) {
               Capture Mode
               <select
                 value={manualEntry.capturedVia}
-                onChange={(event) =>
-                  setManualEntry((current) => ({ ...current, capturedVia: event.target.value }))
+                onChange={(eventValue) =>
+                  setManualEntry((current) => ({ ...current, capturedVia: eventValue.target.value }))
                 }
               >
                 <option value="">Select mode</option>
@@ -154,10 +278,10 @@ export default function AttendanceEventActionPanel({ event }) {
               Present
               <select
                 value={String(manualEntry.present)}
-                onChange={(event) =>
+                onChange={(eventValue) =>
                   setManualEntry((current) => ({
                     ...current,
-                    present: event.target.value === "true",
+                    present: eventValue.target.value === "true",
                   }))
                 }
               >
@@ -170,10 +294,10 @@ export default function AttendanceEventActionPanel({ event }) {
               <textarea
                 rows="3"
                 value={manualEntry.correctionReason}
-                onChange={(event) =>
+                onChange={(eventValue) =>
                   setManualEntry((current) => ({
                     ...current,
-                    correctionReason: event.target.value,
+                    correctionReason: eventValue.target.value,
                   }))
                 }
               />
@@ -182,7 +306,7 @@ export default function AttendanceEventActionPanel({ event }) {
           <div className="modal-actions">
             <button
               type="button"
-              className="ghost-button small"
+              className="primary-button"
               disabled={attendanceApiState.loading || (!manualEntry.member && !manualEntry.visitor)}
               onClick={async () => {
                 await captureAttendanceRecord(event._id, {
@@ -212,14 +336,17 @@ export default function AttendanceEventActionPanel({ event }) {
       {activePanel === "bulk" ? (
         <section className="subsection-card">
           <div className="section-headline compact">
-            <h3>Bulk Capture</h3>
+            <div>
+              <h3>Bulk Record</h3>
+              <p>Select multiple expected members and record them in one pass.</p>
+            </div>
           </div>
           <div className="form-grid">
             <label className="full-width">
               Search Members
               <input
                 value={bulkSearch}
-                onChange={(event) => setBulkSearch(event.target.value)}
+                onChange={(eventValue) => setBulkSearch(eventValue.target.value)}
                 placeholder="Search members to mark present"
               />
             </label>
@@ -230,9 +357,9 @@ export default function AttendanceEventActionPanel({ event }) {
                 <input
                   type="checkbox"
                   checked={bulkSelection.includes(member._id)}
-                  onChange={(event) =>
+                  onChange={(eventValue) =>
                     setBulkSelection((current) =>
-                      event.target.checked
+                      eventValue.target.checked
                         ? [...current, member._id]
                         : current.filter((item) => item !== member._id)
                     )
@@ -247,7 +374,7 @@ export default function AttendanceEventActionPanel({ event }) {
           <div className="modal-actions">
             <button
               type="button"
-              className="ghost-button small"
+              className="primary-button"
               disabled={attendanceApiState.loading || !bulkSelection.length}
               onClick={async () => {
                 await captureBulkAttendance(event._id, {
@@ -270,7 +397,55 @@ export default function AttendanceEventActionPanel({ event }) {
 
       <section className="subsection-card">
         <div className="section-headline compact">
-          <h3>Recorded Entries</h3>
+          <div>
+            <h3>Last 10 Check-Ins</h3>
+            <p>A near-live feed of the most recent event entries.</p>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Participant</th>
+                <th>Mode</th>
+                <th>Present</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resolvedDashboard.recentCheckIns.length ? (
+                resolvedDashboard.recentCheckIns.map((record) => (
+                  <tr key={record._id}>
+                    <td>
+                      {record.memberId
+                        ? `${record.memberId.memberId} - ${record.memberId.firstName} ${record.memberId.lastName}`
+                        : record.visitorId
+                          ? `${record.visitorId.visitorId} - ${record.visitorId.firstName} ${record.visitorId.surname}`
+                          : "-"}
+                    </td>
+                    <td>{record.capturedVia?.label || "-"}</td>
+                    <td>{record.present ? "Yes" : "No"}</td>
+                    <td>{formatTimestamp(record.createdAt || record.updatedAt)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="empty-table">
+                    No check-ins captured yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="subsection-card">
+        <div className="section-headline compact">
+          <div>
+            <h3>Recorded Entries</h3>
+            <p>Click any row to flip present status and record a correction.</p>
+          </div>
         </div>
         <div className="table-wrap">
           <table className="data-table">
@@ -325,4 +500,12 @@ export default function AttendanceEventActionPanel({ event }) {
       </section>
     </div>
   );
+}
+
+function formatTimestamp(value) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Date(value).toLocaleString();
 }

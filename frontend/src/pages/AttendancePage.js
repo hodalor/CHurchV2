@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
   Bar,
@@ -71,70 +71,152 @@ export default function AttendancePage() {
 }
 
 function ServicesView({ events, members, onOpen }) {
+  const { upcomingEvents, pastEvents } = splitAttendanceEvents(events);
   const latestRate = events[0]?.attendanceRate ? `${events[0].attendanceRate}%` : "0%";
+  const openCheckInCount = events.filter((event) => event.isCheckInOpen !== false).length;
+  const [serviceTab, setServiceTab] = useState("upcoming");
+  const serviceTabs = [
+    {
+      key: "upcoming",
+      title: "Upcoming Services",
+      subtitle: "Events ahead of today, ready for check-in and prep.",
+      events: upcomingEvents,
+      emptyMessage: "No upcoming services yet.",
+    },
+    {
+      key: "past",
+      title: "Past Services",
+      subtitle: "Completed services with captured attendance and review history.",
+      events: pastEvents,
+      emptyMessage: "No past services recorded yet.",
+    },
+    {
+      key: "all",
+      title: "All Services",
+      subtitle: "A full register of every service and attendance event.",
+      events,
+      emptyMessage: "No attendance events recorded yet.",
+    },
+  ];
+  const activeTab = serviceTabs.find((item) => item.key === serviceTab) || serviceTabs[0];
 
   return (
     <>
       <section className="compact-stats-grid">
         <StatCard color="purple" label="Events" value={events.length} />
-        <StatCard color="blue" label="Expected Pool" value={members.length} />
-        <StatCard color="orange" label="Latest Rate" value={latestRate} />
+        <StatCard color="blue" label="Upcoming" value={upcomingEvents.length} />
+        <StatCard color="pink" label="Open Check-In" value={openCheckInCount} />
+        <StatCard color="orange" label="Expected Pool" value={members.length} />
+      </section>
+
+      <section className="compact-stats-grid">
+        <StatCard color="purple" label="Past Events" value={pastEvents.length} />
+        <StatCard color="blue" label="Latest Rate" value={latestRate} />
+        <StatCard color="orange" label="Present Count" value={events.reduce((sum, item) => sum + (item.presentCount || 0), 0)} />
         <StatCard
           color="pink"
-          label="Present Count"
-          value={events.reduce((sum, item) => sum + (item.presentCount || 0), 0)}
+          label="Expected Pool"
+          value={members.length}
         />
       </section>
 
       <section className="surface-card data-card">
-        <div className="table-accent-bar" />
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Event</th>
-                <th>Type</th>
-                <th>Date</th>
-                <th>Location</th>
-                <th>Expected</th>
-                <th>Present</th>
-                <th>Rate</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.length ? (
-                events.map((event) => (
-                  <tr key={event._id || event.id} className="clickable-row" onClick={() => onOpen(event)}>
-                    <td>{event.title}</td>
-                    <td>{event.eventTypeId?.label || "-"}</td>
-                    <td>{formatDate(event.date)}</td>
-                    <td>{event.location || "-"}</td>
-                    <td>{event.expectedCount || 0}</td>
-                    <td>{event.presentCount || 0}</td>
-                    <td>{event.attendanceRate || 0}%</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="ghost-button small"
-                        onClick={(actionEvent) => {
-                          actionEvent.stopPropagation();
-                          onOpen(event);
-                        }}
-                      >
-                        Record
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <EmptyTable columns={8} message="No attendance events recorded yet." />
-              )}
-            </tbody>
-          </table>
+        <div className="tab-row service-filter-tabs">
+          {serviceTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`tab-button ${serviceTab === tab.key ? "active" : ""}`}
+              onClick={() => setServiceTab(tab.key)}
+            >
+              {tab.key === "all" ? "All" : tab.title.replace(" Services", "")}
+            </button>
+          ))}
         </div>
       </section>
+
+      <ServiceTableCard
+        title={activeTab.title}
+        subtitle={activeTab.subtitle}
+        events={activeTab.events}
+        emptyMessage={activeTab.emptyMessage}
+        onOpen={onOpen}
+      />
     </>
+  );
+}
+
+function ServiceTableCard({ title, subtitle, events, emptyMessage, onOpen }) {
+  return (
+    <section className="surface-card data-card">
+      <div className="section-headline compact">
+        <div>
+          <h3>{title}</h3>
+          <p>{subtitle}</p>
+        </div>
+      </div>
+      <div className="table-accent-bar" />
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th>Type</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Check-In</th>
+              <th>Location</th>
+              <th>Expected</th>
+              <th>Present</th>
+              <th>Rate</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.length ? (
+              events.map((event) => (
+                <tr key={event._id || event.id} className="clickable-row" onClick={() => onOpen(event)}>
+                  <td>
+                    <strong>{event.title}</strong>
+                    <p>{event.ministryId?.name || "General church event"}</p>
+                  </td>
+                  <td>{event.eventTypeId?.label || "-"}</td>
+                  <td>{formatDate(event.date)}</td>
+                  <td>
+                    <span className={`status-pill ${isUpcomingEvent(event) ? "active" : "disabled"}`}>
+                      {isUpcomingEvent(event) ? "Upcoming" : "Past"}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-pill ${event.isCheckInOpen !== false ? "active" : "disabled"}`}>
+                      {event.isCheckInOpen !== false ? "Open" : "Closed"}
+                    </span>
+                  </td>
+                  <td>{event.location || "-"}</td>
+                  <td>{event.expectedCount || 0}</td>
+                  <td>{event.presentCount || 0}</td>
+                  <td>{event.attendanceRate || 0}%</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="ghost-button small"
+                      onClick={(actionEvent) => {
+                        actionEvent.stopPropagation();
+                        onOpen(event);
+                      }}
+                    >
+                      Record
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <EmptyTable columns={10} message={emptyMessage} />
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -267,4 +349,29 @@ function formatDate(value) {
   }
 
   return new Date(value).toLocaleDateString();
+}
+
+function splitAttendanceEvents(events = []) {
+  return events.reduce(
+    (accumulator, event) => {
+      if (isUpcomingEvent(event)) {
+        accumulator.upcomingEvents.push(event);
+      } else {
+        accumulator.pastEvents.push(event);
+      }
+
+      return accumulator;
+    },
+    {
+      upcomingEvents: [],
+      pastEvents: [],
+    }
+  );
+}
+
+function isUpcomingEvent(event) {
+  const eventDate = new Date(event?.date || Date.now());
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return eventDate.getTime() >= startOfToday.getTime();
 }

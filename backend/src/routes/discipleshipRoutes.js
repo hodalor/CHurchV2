@@ -72,6 +72,26 @@ router.put("/programmes/:programmeId", authorizePermissions(PERMISSIONS.MANAGE_D
   }
 });
 
+router.delete("/programmes/:programmeId", authorizePermissions(PERMISSIONS.MANAGE_DISCIPLESHIP), async (req, res) => {
+  const programme = await DiscipleshipProgramme.findById(req.params.programmeId);
+  if (!programme) {
+    return res.status(404).json({ message: "Programme not found." });
+  }
+
+  const previousValue = programme.toObject();
+  await DiscipleshipProgramme.deleteOne({ _id: programme._id });
+  await logAudit({
+    action: "delete",
+    module: "Discipleship",
+    recordType: "DiscipleshipProgramme",
+    recordId: programme._id.toString(),
+    previousValue,
+    user: req.user,
+    ipAddress: req.ip,
+  });
+  return res.json({ success: true });
+});
+
 router.get("/enrollments", authorizePermissions(PERMISSIONS.VIEW_DISCIPLESHIP), async (req, res) => {
   const enrollments = await populateEnrollmentQuery();
   res.json(enrollments);
@@ -119,6 +139,26 @@ router.put("/enrollments/:enrollmentId", authorizePermissions(PERMISSIONS.MANAGE
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
+});
+
+router.delete("/enrollments/:enrollmentId", authorizePermissions(PERMISSIONS.MANAGE_DISCIPLESHIP), async (req, res) => {
+  const enrollment = await DiscipleshipEnrollment.findById(req.params.enrollmentId);
+  if (!enrollment) {
+    return res.status(404).json({ message: "Enrollment not found." });
+  }
+
+  const previousValue = enrollment.toObject();
+  await DiscipleshipEnrollment.deleteOne({ _id: enrollment._id });
+  await logAudit({
+    action: "delete",
+    module: "Discipleship",
+    recordType: "DiscipleshipEnrollment",
+    recordId: enrollment._id.toString(),
+    previousValue,
+    user: req.user,
+    ipAddress: req.ip,
+  });
+  return res.json({ success: true });
 });
 
 router.post("/enrollments/:enrollmentId/mentor", authorizePermissions(PERMISSIONS.MANAGE_DISCIPLESHIP), async (req, res) => {

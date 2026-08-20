@@ -6,8 +6,10 @@ const Ministry = require("../models/Ministry");
 const PendingAction = require("../models/PendingAction");
 const User = require("../models/User");
 const Visitor = require("../models/Visitor");
+const { findMemberByQrToken } = require("./memberQrService");
 const { createPendingAction } = require("./pendingActionService");
 const { getLookupValueByTypeAndKey, listLookupValuesByType } = require("./lookupService");
+const { createVisitor } = require("./visitorService");
 
 async function createAttendanceEvent(payload, user = null) {
   if (!payload.eventTypeId) {
@@ -26,6 +28,7 @@ async function createAttendanceEvent(payload, user = null) {
     title: payload.title,
     ministryId: payload.ministryId || null,
     location: payload.location || "",
+    isCheckInOpen: payload.isCheckInOpen !== undefined ? Boolean(payload.isCheckInOpen) : true,
     qrToken: createQrToken(),
     createdBy: user?._id || null,
   });
@@ -39,6 +42,9 @@ async function updateAttendanceEvent(event, payload) {
   event.title = payload.title ?? event.title;
   event.location = payload.location ?? event.location;
   event.ministryId = payload.ministryId ?? event.ministryId;
+  if (payload.isCheckInOpen !== undefined) {
+    event.isCheckInOpen = Boolean(payload.isCheckInOpen);
+  }
   if (payload.date) {
     event.date = new Date(payload.date);
   }
@@ -47,6 +53,8 @@ async function updateAttendanceEvent(event, payload) {
 }
 
 async function captureAttendanceRecord(event, payload, user = null) {
+  assertCheckInOpen(event);
+
   if (!payload.memberId && !payload.visitorId) {
     throw new Error("Select a member or visitor for attendance capture.");
   }
@@ -84,6 +92,7 @@ async function captureAttendanceRecord(event, payload, user = null) {
 }
 
 async function captureBulkAttendance(event, payload, user = null) {
+  assertCheckInOpen(event);
   const entries = Array.isArray(payload.records) ? payload.records : [];
   const results = [];
 
@@ -138,9 +147,100 @@ async function getAttendanceSummary(query = {}) {
   });
 }
 
+async function toggleAttendanceCheckIn(event, isOpen) {
+  event.isCheckInOpen = Boolean(isOpen);
+  await event.save();
+  return populateAttendanceEventById(event._id);
+}
+
+async function checkInMemberByQrToken(event, qrToken, user = null, captureMode = "qr") {
+  assertCheckInOpen(event);
+  const member = await findMemberByQrToken(qrToken);
+  const record = await captureAttendanceRecord(
+    event,
+    {
+      memberId: member._id,
+      present: true,
+      capturedVia: captureMode,
+    },
+    user
+  );
+
+  return {
+    member,
+    record,
+  };
+}
+
+async function checkInVisitorForEvent(event, payload = {}, user = null) {
+  assertCheckInOpen(event);
+
+  let visitor = null;
+  if (payload.visitorId) {
+    visitor = await Visitor.findById(payload.visitorId);
+  }
+
+  if (!visitor && payload.phone) {
+    visitor = await Visitor.findOne({
+      phone: payload.phone,
+      firstName: payload.firstName || undefined,
+      surname: payload.surname || undefined,
+    });
+  }
+
+  if (!visitor) {
+    visitor = await createVisitor({
+      firstName: payload.firstName || "",
+      surname: payload.surname || "",
+      gender: payload.gender || "",
+      phone: payload.phone || "",
+      email: payload.email || "",
+      residentialArea: payload.residentialArea || "",
+      firstVisitDate: event.date || new Date(),
+    });
+  }
+
+  const record = await captureAttendanceRecord(
+    event,
+    {
+      visitorId: visitor._id,
+      present: true,
+      capturedVia: payload.capturedVia || "manual",
+    },
+    user
+  );
+
+  return {
+    visitor,
+    record,
+  };
+}
+
+async function getAttendanceCheckInDashboard(eventId) {
+  const event = await populateAttendanceEventById(eventId);
+  if (!event) {
+    throw new Error("Attendance event not found.");
+  }
+
+  const records = await getAttendanceRecordsForEvent(eventId);
+  const recentCheckIns = records.slice(0, 10);
+
+  return {
+    event,
+    recentCheckIns,
+    counters: {
+      members: records.filter((record) => Boolean(record.memberId)).length,
+      visitors: records.filter((record) => Boolean(record.visitorId)).length,
+      children: records.filter((record) => record.memberId?.memberType === "Child").length,
+      online: 0,
+      total: records.length,
+    },
+  };
+}
+
 async function getAttendanceRecordsForEvent(eventId) {
   return AttendanceRecord.find({ eventId })
-    .populate("memberId", "memberId firstName lastName")
+    .populate("memberId", "memberId firstName lastName memberType qrCodeImageUrl")
     .populate("visitorId", "visitorId firstName surname")
     .populate("capturedVia", "label key")
     .populate("capturedBy", "displayName username")
@@ -301,7 +401,7 @@ async function populateAttendanceEventQuery(query = {}) {
 
 async function populateAttendanceRecordById(id) {
   return AttendanceRecord.findById(id)
-    .populate("memberId", "memberId firstName lastName")
+    .populate("memberId", "memberId firstName lastName memberType qrCodeImageUrl")
     .populate("visitorId", "visitorId firstName surname")
     .populate("capturedVia", "label key")
     .populate("capturedBy", "displayName username");
@@ -311,16 +411,26 @@ function createQrToken() {
   return crypto.randomBytes(12).toString("hex");
 }
 
+function assertCheckInOpen(event) {
+  if (event?.isCheckInOpen === false) {
+    throw new Error("Check-in is closed for this event.");
+  }
+}
+
 module.exports = {
+  checkInMemberByQrToken,
+  checkInVisitorForEvent,
   captureAttendanceRecord,
   captureBulkAttendance,
   correctAttendanceRecord,
   createAttendanceEvent,
   getAbsentees,
+  getAttendanceCheckInDashboard,
   getAttendanceRecordsForEvent,
   getAttendanceReport,
   getAttendanceSummary,
   populateAttendanceEventById,
   populateAttendanceEventQuery,
+  toggleAttendanceCheckIn,
   updateAttendanceEvent,
 };

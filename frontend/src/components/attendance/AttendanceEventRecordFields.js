@@ -69,6 +69,17 @@ export default function AttendanceEventRecordFields({
             onChange={(event) => onChange("location", event.target.value)}
           />
         </label>
+        <label>
+          Check-In Window
+          <select
+            value={draft.isCheckInOpen !== false ? "open" : "closed"}
+            disabled={!isEditing}
+            onChange={(event) => onChange("isCheckInOpen", event.target.value === "open")}
+          >
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
         <label className="full-width">
           QR Token
           <input value={draft.qrToken || "Generated automatically after save"} readOnly />

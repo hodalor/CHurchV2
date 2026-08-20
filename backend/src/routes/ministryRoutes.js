@@ -74,6 +74,28 @@ router.put("/:ministryId", authorizePermissions(PERMISSIONS.MANAGE_MINISTRIES), 
   }
 });
 
+router.delete("/:ministryId", authorizePermissions(PERMISSIONS.MANAGE_MINISTRIES), async (req, res) => {
+  const ministry = await Ministry.findById(req.params.ministryId);
+  if (!ministry) {
+    return res.status(404).json({ message: "Ministry not found." });
+  }
+
+  const previousValue = ministry.toObject();
+
+  await Member.updateMany({ ministry: ministry._id }, { $set: { ministry: null } });
+  await Ministry.deleteOne({ _id: ministry._id });
+  await logAudit({
+    action: "delete",
+    module: "Ministry",
+    recordType: "Ministry",
+    recordId: ministry._id.toString(),
+    previousValue,
+    user: req.user,
+    ipAddress: req.ip,
+  });
+  return res.json({ success: true });
+});
+
 function normalizeMinistryPayload(payload = {}) {
   const leadership = normalizeLeadership(payload.leadership || payload);
   const members = normalizeSelectionArray(payload.members);

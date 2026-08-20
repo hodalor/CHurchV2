@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
   Bar,
@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { useAppContext } from "../context/AppContext";
+import { churchApi } from "../apis/churchApi";
 
 const CHART_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
 
@@ -24,6 +25,10 @@ export default function EvangelismPage() {
     campaigns,
     evangelismApiState,
     openRecordModal,
+    syncProspectState,
+    notifySuccess,
+    notifyError,
+    evangelismStageOptions,
   } = useAppContext();
   const sectionName = location.pathname.split("/")[2] || "pipeline";
 
@@ -53,7 +58,25 @@ export default function EvangelismPage() {
       {evangelismApiState.error ? <div className="form-error">{evangelismApiState.error}</div> : null}
 
       {sectionName === "pipeline" ? (
-        <PipelineView prospects={prospects} stageData={stageData} onOpen={(item) => openRecordModal("prospect", item)} />
+        <PipelineView
+          prospects={prospects}
+          stageData={stageData}
+          stageOptions={evangelismStageOptions}
+          onOpen={(item) => openRecordModal("prospect", item)}
+          onMoveProspect={async (prospect, nextStageLabel) => {
+            try {
+              const matchingStage = evangelismStageOptions.find((stage) => stage?.label === nextStageLabel);
+              if (!matchingStage?._id) {
+                throw new Error("Selected stage was not found.");
+              }
+              const updated = await churchApi.moveProspectStage(prospect.prospectId, matchingStage._id);
+              syncProspectState(updated);
+              notifySuccess(`${prospect.firstName} ${prospect.surname} moved to ${nextStageLabel}.`);
+            } catch (error) {
+              notifyError(error.message || "Unable to move prospect.");
+            }
+          }}
+        />
       ) : null}
 
       {sectionName === "contacts" ? (
@@ -81,7 +104,23 @@ export default function EvangelismPage() {
   );
 }
 
-function PipelineView({ prospects, stageData, onOpen }) {
+function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspect }) {
+  const [viewMode, setViewMode] = useState("table");
+  const stageLabels = [
+    ...new Set(
+      [
+        ...(stageOptions || []).map((item) => item?.label).filter(Boolean),
+        ...stageData.map((entry) => entry.name).filter(Boolean),
+        "Unassigned",
+      ]
+    ),
+  ];
+  const boardColumns = stageLabels.map((label, index) => ({
+    key: `${label}-${index}`,
+    label,
+    items: prospects.filter((prospect) => (prospect.currentStage?.label || "Unassigned") === label),
+  }));
+
   return (
     <>
       <section className="compact-stats-grid">
@@ -91,76 +130,96 @@ function PipelineView({ prospects, stageData, onOpen }) {
         <StatCard color="orange" label="From Visitors" value={prospects.filter((item) => item.sourceVisitorId).length} />
       </section>
 
-      <section className="family-chart-grid">
-        <ChartCard title="Prospect Funnel">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={stageData}>
-              <XAxis dataKey="name" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-                {stageData.map((entry, index) => (
-                  <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Stage Mix">
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie data={stageData} dataKey="value" nameKey="name" outerRadius={104}>
-                {stageData.map((entry, index) => (
-                  <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </section>
-
       <section className="surface-card data-card">
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Prospect ID</th>
-                <th>Name</th>
-                <th>Source</th>
-                <th>Current Stage</th>
-                <th>Assigned Evangelist</th>
-                <th>Campaign</th>
-              </tr>
-            </thead>
-            <tbody>
-              {prospects.length ? (
-                prospects.map((prospect) => (
-                  <tr
-                    key={prospect._id || prospect.prospectId}
-                    className="clickable-row"
-                    onClick={() => onOpen(prospect)}
-                  >
-                    <td>{prospect.prospectId}</td>
-                    <td>{prospect.firstName} {prospect.surname}</td>
-                    <td>{prospect.source?.label || "-"}</td>
-                    <td>{prospect.currentStage?.label || "-"}</td>
-                    <td>
-                      {prospect.assignedEvangelistMemberId ||
-                        prospect.assignedEvangelistId?.displayName ||
-                        "Unassigned"}
-                    </td>
-                    <td>{prospect.campaignId?.name || "-"}</td>
-                  </tr>
-                ))
-              ) : (
-                <EmptyTable columns={6} message="No prospects recorded yet." />
-              )}
-            </tbody>
-          </table>
+        <div className="section-headline compact">
+          <h3>Pipeline View</h3>
+          <div className="tab-row">
+            <button type="button" className={`tab-button ${viewMode === "table" ? "active" : ""}`} onClick={() => setViewMode("table")}>
+              Table View
+            </button>
+            <button type="button" className={`tab-button ${viewMode === "board" ? "active" : ""}`} onClick={() => setViewMode("board")}>
+              Board View
+            </button>
+          </div>
         </div>
       </section>
+
+      {viewMode === "table" ? (
+        <>
+          <section className="family-chart-grid">
+            <ChartCard title="Prospect Funnel">
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={stageData}>
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                    {stageData.map((entry, index) => (
+                      <Cell key={`${entry.name}-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="Stage Mix">
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie data={stageData} dataKey="value" nameKey="name" outerRadius={104}>
+                    {stageData.map((entry, index) => (
+                      <Cell key={`${entry.name}-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </section>
+
+          <section className="surface-card data-card">
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Prospect ID</th>
+                    <th>Name</th>
+                    <th>Source</th>
+                    <th>Current Stage</th>
+                    <th>Assigned Evangelist</th>
+                    <th>Campaign</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prospects.length ? (
+                    prospects.map((prospect) => (
+                      <tr
+                        key={prospect._id || prospect.prospectId}
+                        className="clickable-row"
+                        onClick={() => onOpen(prospect)}
+                      >
+                        <td>{prospect.prospectId}</td>
+                        <td>{prospect.firstName} {prospect.surname}</td>
+                        <td>{prospect.source?.label || "-"}</td>
+                        <td>{prospect.currentStage?.label || "-"}</td>
+                        <td>
+                          {prospect.assignedEvangelistMemberId ||
+                            prospect.assignedEvangelistId?.displayName ||
+                            "Unassigned"}
+                        </td>
+                        <td>{prospect.campaignId?.name || "-"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <EmptyTable columns={6} message="No prospects recorded yet." />
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      ) : (
+        <ProspectBoard columns={boardColumns} onOpen={onOpen} onDropItem={onMoveProspect} />
+      )}
     </>
   );
 }
@@ -432,4 +491,56 @@ function isToday(value) {
   }
 
   return new Date(value).toDateString() === new Date().toDateString();
+}
+
+function ProspectBoard({ columns, onOpen, onDropItem }) {
+  const [draggedItem, setDraggedItem] = useState(null);
+
+  return (
+    <section className="pipeline-board-grid">
+      {columns.map((column) => (
+        <article
+          key={column.key}
+          className="pipeline-column"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={() => {
+            if (draggedItem && (draggedItem.currentStage?.label || "Unassigned") !== column.label) {
+              onDropItem(draggedItem, column.label);
+            }
+            setDraggedItem(null);
+          }}
+        >
+          <div className="pipeline-column-head">
+            <div>
+              <h3>{column.label}</h3>
+              <p>{column.items.length} prospects</p>
+            </div>
+            <span className="family-badge-soft">{column.items.length}</span>
+          </div>
+          <div className="pipeline-column-list">
+            {column.items.length ? (
+              column.items.map((item) => (
+                <button
+                  key={item._id || item.prospectId}
+                  type="button"
+                  draggable
+                  className="pipeline-card"
+                  onDragStart={() => setDraggedItem(item)}
+                  onClick={() => onOpen(item)}
+                >
+                  <strong>{item.firstName} {item.surname}</strong>
+                  <p>{item.assignedEvangelistId?.displayName || "Unassigned"}</p>
+                  <span>{item.prospectId}</span>
+                </button>
+              ))
+            ) : columns.some((entry) => entry.items.length) ? (
+              <div className="empty-note">Drop prospects here.</div>
+            ) : (
+              <div className="empty-note">No prospects in this stage yet.</div>
+            )}
+          </div>
+        </article>
+      ))}
+    </section>
+  );
 }

@@ -223,6 +223,32 @@ const memberSchema = new mongoose.Schema(
     dateCaptured: {
       type: Date,
     },
+    qrToken: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    qrCodeImageUrl: {
+      type: String,
+      trim: true,
+    },
+    qrGeneratedAt: {
+      type: Date,
+    },
+    qrRegeneratedAt: {
+      type: Date,
+    },
+    qrRegeneratedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    qrActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,

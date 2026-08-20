@@ -52,6 +52,24 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const family = await Family.findById(req.params.id);
+    if (!family) {
+      return res.status(404).json({ message: "Family not found." });
+    }
+
+    await Member.updateMany(
+      { familyId: family.familyId },
+      { $set: { familyId: "", familyName: "", householdRole: "" } }
+    );
+    await Family.deleteOne({ _id: family._id });
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
 module.exports = router;
 
 async function generateNextFamilyId() {
