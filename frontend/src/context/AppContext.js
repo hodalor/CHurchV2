@@ -1535,8 +1535,25 @@ export function AppProvider({ children }) {
     if (type === "appConfig") {
       try {
         setSettingsState({ loading: true, error: "" });
-        const savedConfig = await churchApi.updateAppConfig(normalizeAppConfigDraft(draft));
-        setBranding((current) => ({ ...current, ...savedConfig }));
+        const payload = normalizeAppConfigDraft(draft);
+        const savedConfig = await churchApi.updateAppConfig(payload);
+        const refreshedConfig = await churchApi.getAppConfig().catch(() => null);
+        const resolvedConfig = {
+          ...payload,
+          ...(savedConfig || {}),
+          ...(refreshedConfig || {}),
+          currencies:
+            Array.isArray(refreshedConfig?.currencies) && refreshedConfig.currencies.length
+              ? refreshedConfig.currencies
+              : Array.isArray(savedConfig?.currencies) && savedConfig.currencies.length
+                ? savedConfig.currencies
+                : payload.currencies,
+          defaultCurrencyCode:
+            refreshedConfig?.defaultCurrencyCode ||
+            savedConfig?.defaultCurrencyCode ||
+            payload.defaultCurrencyCode,
+        };
+        setBranding((current) => ({ ...current, ...resolvedConfig }));
         setSettingsState({ loading: false, error: "" });
         notifySuccess("App configuration saved successfully.");
       } catch (error) {

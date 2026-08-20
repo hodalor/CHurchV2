@@ -1,4 +1,5 @@
 import ModalShell from "./ModalShell";
+import DetailGrid from "./DetailGrid";
 import { useAppContext } from "../../context/AppContext";
 import AttendanceEventActionPanel from "../attendance/AttendanceEventActionPanel";
 import AttendanceEventRecordFields from "../attendance/AttendanceEventRecordFields";
@@ -88,58 +89,73 @@ export default function RecordDetailModal() {
             </div>
           </div>
 
-          <div className="form-grid">
-            {fields.map((field) => (
-              <label key={field.name} className={field.wide ? "full-width" : ""}>
-                {field.label}
-                {field.type === "select" ? (
-                  <select
-                    value={getFieldValue(field, draft)}
-                    disabled={!isEditing}
-                    onChange={(event) =>
-                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
-                  >
-                    {field.options.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                ) : field.type === "textarea" ? (
-                  <textarea
-                    rows="4"
-                    value={getFieldValue(field, draft)}
-                    readOnly={!isEditing}
-                    onChange={(event) =>
-                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
-                  />
-                ) : (
-                  <input
-                    type={field.type || "text"}
-                    value={getFieldValue(field, draft)}
-                    readOnly={!isEditing}
-                    onChange={(event) =>
-                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
-                  />
-                )}
+          {isEditing ? (
+            <div className="form-grid">
+              {fields.map((field) => (
+                <label key={field.name} className={field.wide ? "full-width" : ""}>
+                  {field.label}
+                  {field.type === "select" ? (
+                    <select
+                      value={getFieldValue(field, draft)}
+                      disabled={!isEditing}
+                      onChange={(event) =>
+                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                      }
+                    >
+                      {field.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.type === "textarea" ? (
+                    <textarea
+                      rows="4"
+                      value={getFieldValue(field, draft)}
+                      readOnly={!isEditing}
+                      onChange={(event) =>
+                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                      }
+                    />
+                  ) : (
+                    <input
+                      type={field.type || "text"}
+                      value={getFieldValue(field, draft)}
+                      readOnly={!isEditing}
+                      onChange={(event) =>
+                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                      }
+                    />
+                  )}
+                </label>
+              ))}
+              <label>
+                QR Active
+                <input value={draft.qrActive !== false ? "Yes" : "No"} readOnly />
               </label>
-            ))}
-            <label>
-              QR Active
-              <input value={draft.qrActive !== false ? "Yes" : "No"} readOnly />
-            </label>
-            <label>
-              QR Generated
-              <input value={draft.qrGeneratedAt || ""} readOnly />
-            </label>
-            <label className="full-width">
-              QR Token
-              <input value={draft.qrToken || ""} readOnly />
-            </label>
-          </div>
+              <label>
+                QR Generated
+                <input value={draft.qrGeneratedAt || ""} readOnly />
+              </label>
+              <label className="full-width">
+                QR Token
+                <input value={draft.qrToken || ""} readOnly />
+              </label>
+            </div>
+          ) : (
+            <DetailGrid
+              items={[
+                ...fields.map((field) => ({
+                  label: field.label,
+                  value: getFieldValue(field, draft),
+                  wide: field.wide,
+                })),
+                { label: "QR Active", value: draft.qrActive !== false ? "Yes" : "No" },
+                { label: "QR Generated", value: draft.qrGeneratedAt || "" },
+                { label: "QR Token", value: draft.qrToken || "", wide: true },
+              ]}
+            />
+          )}
 
           <RecordModalActions
             isEditing={isEditing}
@@ -363,46 +379,56 @@ export default function RecordDetailModal() {
         </>
       ) : (
         <div className="modal-form">
-          <div className="form-grid">
-            {fields.map((field) => (
-              <label key={field.name} className={field.wide ? "full-width" : ""}>
-                {field.label}
-                {field.type === "select" ? (
-                  <select
-                    value={getFieldValue(field, draft)}
-                    disabled={!isEditing}
-                    onChange={(event) =>
-                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
-                  >
-                    {field.options.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                ) : field.type === "textarea" ? (
-                  <textarea
-                    rows="4"
-                    value={getFieldValue(field, draft)}
-                    readOnly={!isEditing}
-                    onChange={(event) =>
-                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
-                  />
-                ) : (
-                  <input
-                    type={field.type || "text"}
-                    value={getFieldValue(field, draft)}
-                    readOnly={!isEditing}
-                    onChange={(event) =>
-                      setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
-                  />
-                )}
-              </label>
-            ))}
-          </div>
+          {isEditing ? (
+            <div className="form-grid">
+              {fields.map((field) => (
+                <label key={field.name} className={field.wide ? "full-width" : ""}>
+                  {field.label}
+                  {field.type === "select" ? (
+                    <select
+                      value={getFieldValue(field, draft)}
+                      disabled={!isEditing}
+                      onChange={(event) =>
+                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                      }
+                    >
+                      {field.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.type === "textarea" ? (
+                    <textarea
+                      rows="4"
+                      value={getFieldValue(field, draft)}
+                      readOnly={!isEditing}
+                      onChange={(event) =>
+                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                      }
+                    />
+                  ) : (
+                    <input
+                      type={field.type || "text"}
+                      value={getFieldValue(field, draft)}
+                      readOnly={!isEditing}
+                      onChange={(event) =>
+                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
+                      }
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+          ) : (
+            <DetailGrid
+              items={fields.map((field) => ({
+                label: field.label,
+                value: getFieldValue(field, draft),
+                wide: field.wide,
+              }))}
+            />
+          )}
 
           <RecordModalActions
             isEditing={isEditing}

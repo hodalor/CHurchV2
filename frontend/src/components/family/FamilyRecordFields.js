@@ -1,4 +1,5 @@
 import MemberLookupField from "../common/MemberLookupField";
+import DetailGrid from "../common/DetailGrid";
 
 export default function FamilyRecordFields({
   draft,
@@ -29,111 +30,133 @@ export default function FamilyRecordFields({
 
   return (
     <div className="modal-form">
-      <div className="form-grid">
-        <label>
-          Family/Household ID
-          <input value={draft.familyId || ""} readOnly />
-        </label>
-        <label>
-          Household Name
-          <input
-            value={draft.familyName || ""}
-            readOnly={!isEditing}
-            onChange={(event) => onChange("familyName", event.target.value)}
-          />
-        </label>
-        <label>
-          Primary Contact Member ID
-          <select
-            value={draft.primaryContactMemberId || ""}
-            disabled={!isEditing}
-            onChange={(event) => {
-              const selected = primaryContactOptions.find((item) => item.memberId === event.target.value);
-              onChange("primaryContactMemberId", event.target.value);
-              onChange("primaryContactNumber", selected?.phone || draft.primaryContactNumber || "");
-            }}
-          >
-            <option value="">Select household member</option>
-            {primaryContactOptions.map((item) => (
-              <option key={item.memberId} value={item.memberId}>
-                {item.memberId} - {item.memberName}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Primary Contact Number
-          <input
-            value={draft.primaryContactNumber || ""}
-            readOnly={!isEditing}
-            onChange={(event) => onChange("primaryContactNumber", event.target.value)}
-          />
-        </label>
-        <label>
-          Residential Area
-          <input
-            value={draft.residentialArea || ""}
-            readOnly={!isEditing}
-            onChange={(event) => onChange("residentialArea", event.target.value)}
-          />
-        </label>
-        <label>
-          Fellowship/Zone
-          <select
-            value={draft.fellowshipZone || ""}
-            disabled={!isEditing}
-            onChange={(event) => onChange("fellowshipZone", event.target.value)}
-          >
-            <option value="">Select group</option>
-            {groups.map((group) => (
-              <option key={group._id || group.id} value={group._id || group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Family Contact
-          <input
-            value={draft.familyContact || ""}
-            readOnly={!isEditing}
-            onChange={(event) => onChange("familyContact", event.target.value)}
-          />
-        </label>
-        <label>
-          Date Last Visited
-          <input
-            type="date"
-            value={draft.dateLastVisited || ""}
-            readOnly={!isEditing}
-            onChange={(event) => onChange("dateLastVisited", event.target.value)}
-          />
-        </label>
-        <label className="full-width">
-          Physical Address
-          <input
-            value={draft.physicalAddress || ""}
-            readOnly={!isEditing}
-            onChange={(event) => onChange("physicalAddress", event.target.value)}
-          />
-        </label>
-        <label>
-          Source Record Ref
-          <input
-            value={draft.sourceRecordRef || ""}
-            readOnly={!isEditing}
-            onChange={(event) => onChange("sourceRecordRef", event.target.value)}
-          />
-        </label>
-        <label>
-          Data Entry Clerk
-          <input value={draft.dataEntryClerk || ""} readOnly />
-        </label>
-        <label>
-          Date Captured
-          <input type="date" value={draft.dateCaptured || ""} readOnly />
-        </label>
-      </div>
+      {isEditing ? (
+        <div className="form-grid">
+          <label>
+            Family/Household ID
+            <input value={draft.familyId || ""} readOnly />
+          </label>
+          <label>
+            Household Name
+            <input
+              value={draft.familyName || ""}
+              readOnly={!isEditing}
+              onChange={(event) => onChange("familyName", event.target.value)}
+            />
+          </label>
+          <label>
+            Primary Contact Member ID
+            <select
+              value={draft.primaryContactMemberId || ""}
+              disabled={!isEditing}
+              onChange={(event) => {
+                const selected = primaryContactOptions.find((item) => item.memberId === event.target.value);
+                onChange("primaryContactMemberId", event.target.value);
+                onChange("primaryContactNumber", selected?.phone || draft.primaryContactNumber || "");
+              }}
+            >
+              <option value="">Select household member</option>
+              {primaryContactOptions.map((item) => (
+                <option key={item.memberId} value={item.memberId}>
+                  {item.memberId} - {item.memberName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Primary Contact Number
+            <input
+              value={draft.primaryContactNumber || ""}
+              readOnly={!isEditing}
+              onChange={(event) => onChange("primaryContactNumber", event.target.value)}
+            />
+          </label>
+          <label>
+            Residential Area
+            <input
+              value={draft.residentialArea || ""}
+              readOnly={!isEditing}
+              onChange={(event) => onChange("residentialArea", event.target.value)}
+            />
+          </label>
+          <label>
+            Fellowship/Zone
+            <select
+              value={draft.fellowshipZone || ""}
+              disabled={!isEditing}
+              onChange={(event) => onChange("fellowshipZone", event.target.value)}
+            >
+              <option value="">Select group</option>
+              {groups.map((group) => (
+                <option key={group._id || group.id} value={group._id || group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Family Contact
+            <input
+              value={draft.familyContact || ""}
+              readOnly={!isEditing}
+              onChange={(event) => onChange("familyContact", event.target.value)}
+            />
+          </label>
+          <label>
+            Date Last Visited
+            <input
+              type="date"
+              value={draft.dateLastVisited || ""}
+              readOnly={!isEditing}
+              onChange={(event) => onChange("dateLastVisited", event.target.value)}
+            />
+          </label>
+          <label className="full-width">
+            Physical Address
+            <input
+              value={draft.physicalAddress || ""}
+              readOnly={!isEditing}
+              onChange={(event) => onChange("physicalAddress", event.target.value)}
+            />
+          </label>
+          <label>
+            Source Record Ref
+            <input
+              value={draft.sourceRecordRef || ""}
+              readOnly={!isEditing}
+              onChange={(event) => onChange("sourceRecordRef", event.target.value)}
+            />
+          </label>
+          <label>
+            Data Entry Clerk
+            <input value={draft.dataEntryClerk || ""} readOnly />
+          </label>
+          <label>
+            Date Captured
+            <input type="date" value={draft.dateCaptured || ""} readOnly />
+          </label>
+        </div>
+      ) : (
+        <DetailGrid
+          items={[
+            { label: "Family/Household ID", value: draft.familyId || "" },
+            { label: "Household Name", value: draft.familyName || "" },
+            { label: "Primary Contact Member ID", value: draft.primaryContactMemberId || "" },
+            { label: "Primary Contact Number", value: draft.primaryContactNumber || "" },
+            { label: "Residential Area", value: draft.residentialArea || "" },
+            {
+              label: "Fellowship/Zone",
+              value: groups.find((group) => (group._id || group.id) === draft.fellowshipZone)?.name || draft.fellowshipZone || "",
+            },
+            { label: "Family Contact", value: draft.familyContact || "" },
+            { label: "Date Last Visited", value: draft.dateLastVisited || "" },
+            { label: "Physical Address", value: draft.physicalAddress || "", wide: true },
+            { label: "Source Record Ref", value: draft.sourceRecordRef || "" },
+            { label: "Data Entry Clerk", value: draft.dataEntryClerk || "" },
+            { label: "Date Captured", value: draft.dateCaptured || "" },
+          ]}
+        />
+      )}
 
       <div className="subsection-card">
         <div className="section-headline">
@@ -214,15 +237,26 @@ export default function FamilyRecordFields({
         </div>
       </div>
 
-      <label className="full-width">
-        Family Visitation History
-        <textarea
-          rows="5"
-          value={draft.visitationHistory || ""}
-          readOnly={!isEditing}
-          onChange={(event) => onChange("visitationHistory", event.target.value)}
-        />
-      </label>
+      {isEditing ? (
+        <label className="full-width">
+          Family Visitation History
+          <textarea
+            rows="5"
+            value={draft.visitationHistory || ""}
+            readOnly={!isEditing}
+            onChange={(event) => onChange("visitationHistory", event.target.value)}
+          />
+        </label>
+      ) : (
+        <div className="subsection-card">
+          <div className="section-headline">
+            <div>
+              <h3>Family Visitation History</h3>
+            </div>
+          </div>
+          <p className="detail-text-block">{draft.visitationHistory || "-"}</p>
+        </div>
+      )}
 
       {householdSelections.length ? (
         <div className="subsection-card">

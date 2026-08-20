@@ -169,13 +169,30 @@ export default function SettingsPage() {
                   }
 
                   setSavingCurrencies(true);
-                  const savedConfig = await churchApi.updateAppConfig({
+                  const payload = {
                     appName: branding.appName,
                     appLogoUrl: branding.appLogoUrl,
                     currencies,
                     defaultCurrencyCode,
-                  });
-                  setBranding((current) => ({ ...current, ...savedConfig }));
+                  };
+                  const savedConfig = await churchApi.updateAppConfig(payload);
+                  const refreshedConfig = await churchApi.getAppConfig().catch(() => null);
+                  const resolvedConfig = {
+                    ...payload,
+                    ...(savedConfig || {}),
+                    ...(refreshedConfig || {}),
+                    currencies:
+                      Array.isArray(refreshedConfig?.currencies) && refreshedConfig.currencies.length
+                        ? refreshedConfig.currencies
+                        : Array.isArray(savedConfig?.currencies) && savedConfig.currencies.length
+                          ? savedConfig.currencies
+                          : payload.currencies,
+                    defaultCurrencyCode:
+                      refreshedConfig?.defaultCurrencyCode ||
+                      savedConfig?.defaultCurrencyCode ||
+                      payload.defaultCurrencyCode,
+                  };
+                  setBranding((current) => ({ ...current, ...resolvedConfig }));
                   notifySuccess("System currencies saved successfully.");
                 } catch (error) {
                   notifyError(error.message || "Unable to save currencies.");
