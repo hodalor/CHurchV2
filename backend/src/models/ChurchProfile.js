@@ -2,6 +2,16 @@ const mongoose = require("mongoose");
 
 const churchProfileSchema = new mongoose.Schema(
   {
+    appName: {
+      type: String,
+      trim: true,
+      default: "ChurchSuite Pro",
+    },
+    appLogoUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     churchName: {
       type: String,
       required: true,

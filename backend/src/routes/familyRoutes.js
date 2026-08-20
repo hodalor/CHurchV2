@@ -1,10 +1,14 @@
 const express = require("express");
 const Family = require("../models/Family");
 const Member = require("../models/Member");
+const authenticate = require("../middleware/authenticate");
+const { authorizePermissions } = require("../middleware/authorize");
+const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
+router.use(authenticate);
 
-router.get("/", async (req, res) => {
+router.get("/", authorizePermissions(PERMISSIONS.VIEW_HOUSEHOLDS), async (req, res) => {
   try {
     const families = await Family.find().sort({ createdAt: -1 });
     res.json(families);
@@ -13,7 +17,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/next-id", async (req, res) => {
+router.get("/next-id", authorizePermissions(PERMISSIONS.VIEW_HOUSEHOLDS), async (req, res) => {
   try {
     const familyId = await generateNextFamilyId();
     res.json({ familyId });
@@ -22,7 +26,7 @@ router.get("/next-id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", authorizePermissions(PERMISSIONS.MANAGE_HOUSEHOLDS), async (req, res) => {
   try {
     const payload = await normalizeFamilyPayload(req.body);
     const family = await Family.create(payload);
@@ -33,7 +37,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", authorizePermissions(PERMISSIONS.MANAGE_HOUSEHOLDS), async (req, res) => {
   try {
     const payload = await normalizeFamilyPayload(req.body);
     const family = await Family.findByIdAndUpdate(req.params.id, payload, {
@@ -52,7 +56,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authorizePermissions(PERMISSIONS.MANAGE_HOUSEHOLDS), async (req, res) => {
   try {
     const family = await Family.findById(req.params.id);
     if (!family) {

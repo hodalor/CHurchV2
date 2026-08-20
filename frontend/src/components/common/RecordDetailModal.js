@@ -10,6 +10,8 @@ import ProspectRecordFields from "../evangelism/ProspectRecordFields";
 import FamilyRecordFields from "../family/FamilyRecordFields";
 import MinistryRecordFields from "../ministries/MinistryRecordFields";
 import GroupRecordFields from "../setup/GroupRecordFields";
+import AppConfigFields from "../setup/AppConfigFields";
+import UserAccountFields from "../users/UserAccountFields";
 import VisitorActionPanel from "../visitors/VisitorActionPanel";
 import VisitorRecordFields from "../visitors/VisitorRecordFields";
 
@@ -25,6 +27,7 @@ export default function RecordDetailModal() {
     members,
     roles,
     users,
+    permissionCatalog,
     visitorHowHeardOptions,
     evangelismSourceOptions,
     evangelismStageOptions,
@@ -316,6 +319,45 @@ export default function RecordDetailModal() {
             setRecordModalMode={setRecordModalMode}
           />
         </>
+      ) : type === "user" ? (
+        <>
+          <UserAccountFields
+            draft={draft}
+            isEditing={isEditing}
+            roles={roles}
+            members={members}
+            permissionCatalog={permissionCatalog}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+          />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={false}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
+      ) : type === "appConfig" ? (
+        <>
+          <AppConfigFields
+            draft={draft}
+            isEditing={isEditing}
+            onChange={(field, value) =>
+              setRecordModalDraft((current) => ({ ...current, [field]: value }))
+            }
+          />
+          <RecordModalActions
+            isEditing={isEditing}
+            closeRecordModal={closeRecordModal}
+            saveRecordModal={saveRecordModal}
+            deleteRecordModal={deleteRecordModal}
+            canDelete={false}
+            setRecordModalMode={setRecordModalMode}
+          />
+        </>
       ) : (
         <div className="modal-form">
           <div className="form-grid">
@@ -411,6 +453,7 @@ function getTitle(type) {
     attendance: "Attendance Details",
     attendanceEvent: "Attendance Event Details",
     user: "User Details",
+    appConfig: "App Configuration",
     ministry: "Ministry Details",
     role: "Role Details",
     group: "Group Details",

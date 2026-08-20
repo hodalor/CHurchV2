@@ -272,6 +272,46 @@ export const churchApi = {
     return request("/users");
   },
 
+  async getRoles() {
+    return request("/users/roles");
+  },
+
+  async createUser(payload) {
+    return request("/users", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateUser(userId, payload) {
+    return request(`/users/${userId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getBranding() {
+    return request("/setup/branding");
+  },
+
+  async updateBranding(payload) {
+    return request("/setup/branding", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAppConfig() {
+    return request("/setup/app-config");
+  },
+
+  async updateAppConfig(payload) {
+    return request("/setup/app-config", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
   async getPendingActions(status) {
     const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
     return request(`/pending-actions${suffix}`);

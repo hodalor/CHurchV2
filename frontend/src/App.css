@@ -66,6 +66,13 @@
   flex-shrink: 0;
   font-size: 19px;
   background: linear-gradient(135deg, #f59e0b, #4f46e5);
+  overflow: hidden;
+}
+
+.brand-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .sidebar-menu-scroll {
@@ -172,6 +179,28 @@
   backdrop-filter: blur(14px);
 }
 
+.topbar-branding {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.topbar-brand-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #f59e0b, #4f46e5);
+  color: #fff;
+  font-weight: 800;
+}
+
 .topbar-label {
   margin: 0 0 4px;
   font-size: 11px;
@@ -184,6 +213,24 @@
 .topbar h1 {
   font-size: 18px;
   color: #7588ad;
+}
+
+.topbar-church-name {
+  font-size: 28px;
+  color: #62779b;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-church-name.medium {
+  font-size: 24px;
+}
+
+.topbar-church-name.compact {
+  font-size: 20px;
 }
 
 .topbar-subtitle {
@@ -221,6 +268,40 @@
   background: linear-gradient(135deg, #0ea5e9, #0284c7);
   color: #fff;
   font-weight: 700;
+}
+
+.profile-menu-wrap {
+  position: relative;
+}
+
+.profile-toggle {
+  border: none;
+  cursor: pointer;
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 220px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
+  z-index: 20;
+}
+
+.profile-dropdown strong,
+.profile-dropdown span {
+  display: block;
+}
+
+.profile-dropdown span {
+  color: #7186a6;
+  font-size: 13px;
 }
 
 .workspace-shell {
@@ -836,6 +917,66 @@
   color: rgba(255, 255, 255, 0.76);
 }
 
+.permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.permission-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fbff;
+  border: 1px solid #dbe4f0;
+}
+
+.permission-card h4 {
+  margin: 0 0 12px;
+  color: #456082;
+}
+
+.permission-list {
+  display: grid;
+  gap: 10px;
+}
+
+.permission-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #425c7e;
+}
+
+.soft-note {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.app-logo-preview {
+  margin-top: 16px;
+  width: 120px;
+  height: 120px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid #dbe4f0;
+  background: #fff;
+}
+
+.app-logo-preview.large {
+  width: 180px;
+  height: 180px;
+}
+
+.app-logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -1096,7 +1237,7 @@
 .toast-viewport {
   position: fixed;
   right: 18px;
-  bottom: 18px;
+  top: 18px;
   z-index: 50;
   display: grid;
   gap: 12px;
@@ -1116,11 +1257,23 @@
 }
 
 .toast-card.success {
-  border-color: #99f6e4;
+  border-color: #86efac;
+  background: #dcfce7;
 }
 
 .toast-card.error {
-  border-color: #fecdd3;
+  border-color: #fca5a5;
+  background: #fee2e2;
+}
+
+.toast-card.warning {
+  border-color: #fcd34d;
+  background: #fef3c7;
+}
+
+.toast-card.info {
+  border-color: #93c5fd;
+  background: #dbeafe;
 }
 
 .toast-card strong,

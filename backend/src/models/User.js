@@ -33,6 +33,16 @@ const userSchema = new mongoose.Schema(
         ref: "Role",
       },
     ],
+    permissions: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    permissionsConfigured: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
       trim: true,

@@ -17,6 +17,7 @@ async function bootstrapApplicationData() {
   await seedMinistries();
   await seedStrategicPlanningData();
   await seedInitialAdminUser();
+  await seedInitialSuperadminUser();
 }
 
 async function seedRoles() {
@@ -318,6 +319,42 @@ async function seedInitialAdminUser() {
     displayName: "System Administrator",
     email: "admin@churchflow.org",
     roles: [adminRole._id],
+    permissions: ROLE_PERMISSION_MAP[ROLES.SYSTEM_ADMINISTRATOR],
+    permissionsConfigured: true,
+    status: "Active",
+  });
+}
+
+async function seedInitialSuperadminUser() {
+  const superadminUsername = "superadmin";
+  const superadminPin = "0902";
+  const superadminRole = await Role.findOne({ name: ROLES.SUPERADMIN });
+
+  if (!superadminRole) {
+    return;
+  }
+
+  const existingUser = await User.findOne({ username: superadminUsername });
+  if (existingUser) {
+    if (!existingUser.roles.some((roleId) => roleId.toString() === superadminRole._id.toString())) {
+      existingUser.roles = [superadminRole._id];
+    }
+    existingUser.permissions = ROLE_PERMISSION_MAP[ROLES.SUPERADMIN];
+    existingUser.permissionsConfigured = true;
+    existingUser.status = "Active";
+    await existingUser.save();
+    return;
+  }
+
+  const pinHash = await hashPin(superadminPin);
+  await User.create({
+    username: superadminUsername,
+    pinHash,
+    displayName: "Superadmin",
+    email: "superadmin@churchflow.org",
+    roles: [superadminRole._id],
+    permissions: ROLE_PERMISSION_MAP[ROLES.SUPERADMIN],
+    permissionsConfigured: true,
     status: "Active",
   });
 }

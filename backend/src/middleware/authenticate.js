@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const { getEffectivePermissions } = require("../services/authService");
 const { verifyAccessToken } = require("../utils/tokenUtils");
 
 async function authenticate(req, res, next) {
@@ -23,7 +24,7 @@ async function authenticate(req, res, next) {
       displayName: user.displayName,
       memberId: user.memberId || "",
       roles: user.roles.map((role) => role.name),
-      permissions: [...new Set(user.roles.flatMap((role) => role.permissions || []))],
+      permissions: getEffectivePermissions(user),
     };
 
     return next();

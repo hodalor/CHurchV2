@@ -18,6 +18,10 @@ export default function UsersPage() {
           <div className="compact-stat-label">Roles</div>
           <div className="compact-stat-value">{roles.length}</div>
         </article>
+        <article className="compact-stat-card orange">
+          <div className="compact-stat-label">Superadmin</div>
+          <div className="compact-stat-value">{users.filter((user) => (user.roles || []).some((role) => role.name === "Superadmin")).length}</div>
+        </article>
       </section>
 
       <section className="surface-card data-card">
@@ -27,17 +31,21 @@ export default function UsersPage() {
             <thead>
               <tr>
                 <th>Full Name</th>
+                <th>Username</th>
                 <th>Email</th>
                 <th>Role</th>
+                <th>Permissions</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id} className="clickable-row" onClick={() => openRecordModal("user", user)}>
-                  <td>{user.fullName}</td>
+                <tr key={user.id || user._id || user.username} className="clickable-row" onClick={() => openRecordModal("user", user)}>
+                  <td>{user.displayName || user.fullName}</td>
+                  <td>{user.username || "-"}</td>
                   <td>{user.email}</td>
-                  <td>{user.role}</td>
+                  <td>{(user.roles || []).map((role) => role.name || role).join(", ") || "-"}</td>
+                  <td>{user.permissions?.length || 0}</td>
                   <td>
                     <span className={`status-pill ${user.status.toLowerCase()}`}>{user.status}</span>
                   </td>

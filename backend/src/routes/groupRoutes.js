@@ -1,9 +1,13 @@
 const express = require("express");
 const Group = require("../models/Group");
+const authenticate = require("../middleware/authenticate");
+const { authorizePermissions } = require("../middleware/authorize");
+const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
+router.use(authenticate);
 
-router.get("/", async (req, res) => {
+router.get("/", authorizePermissions(PERMISSIONS.VIEW_GROUPS), async (req, res) => {
   try {
     const groups = await Group.find().populate("parent", "name code").sort({ createdAt: -1 });
     res.json(groups);
@@ -12,7 +16,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", authorizePermissions(PERMISSIONS.MANAGE_GROUPS), async (req, res) => {
   try {
     const payload = await normalizeGroupPayload(req.body);
     const group = await Group.create(payload);
@@ -23,7 +27,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:groupId", async (req, res) => {
+router.put("/:groupId", authorizePermissions(PERMISSIONS.MANAGE_GROUPS), async (req, res) => {
   try {
     const group = await Group.findById(req.params.groupId);
     if (!group) {
@@ -43,7 +47,7 @@ router.put("/:groupId", async (req, res) => {
   }
 });
 
-router.delete("/:groupId", async (req, res) => {
+router.delete("/:groupId", authorizePermissions(PERMISSIONS.MANAGE_GROUPS), async (req, res) => {
   try {
     const group = await Group.findById(req.params.groupId);
     if (!group) {

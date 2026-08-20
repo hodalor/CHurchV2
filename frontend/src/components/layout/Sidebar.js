@@ -2,25 +2,51 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { FaChevronDown } from "react-icons/fa";
 import { navigationSections } from "../../lib/navigation";
-import { APP_NAME } from "../../data/mockData";
 import { useAppContext } from "../../context/AppContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Sidebar() {
   const location = useLocation();
   const { branding } = useAppContext();
+  const { authUser } = useAuth();
+  const availableSections = useMemo(() => {
+    const permissionSet = new Set(authUser?.permissions || []);
+    return navigationSections.filter((item) => !item.permission || permissionSet.has(item.permission));
+  }, [authUser?.permissions]);
   const defaultOpenState = useMemo(() => {
-    return navigationSections.reduce((accumulator, item) => {
+    return availableSections.reduce((accumulator, item) => {
       if (item.children) {
         accumulator[item.label] = location.pathname.startsWith(`${item.path}/`);
       }
       return accumulator;
     }, {});
-  }, [location.pathname]);
+  }, [availableSections, location.pathname]);
   const [openSections, setOpenSections] = useState(defaultOpenState);
 
   useEffect(() => {
-    setOpenSections((current) => ({ ...defaultOpenState, ...current }));
-  }, [defaultOpenState]);
+    setOpenSections((current) => {
+      const nextState = availableSections.reduce((accumulator, item) => {
+        if (!item.children) {
+          return accumulator;
+        }
+
+        const isActiveSection = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+        accumulator[item.label] = current[item.label] ?? isActiveSection;
+        if (isActiveSection) {
+          accumulator[item.label] = true;
+        }
+        return accumulator;
+      }, {});
+
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(nextState);
+      const hasSameShape =
+        currentKeys.length === nextKeys.length &&
+        nextKeys.every((key) => current[key] === nextState[key]);
+
+      return hasSameShape ? current : nextState;
+    });
+  }, [availableSections, location.pathname]);
 
   const toggleSection = (label) => {
     setOpenSections((current) => ({
@@ -32,16 +58,18 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand-strip">
-        <div className="brand-icon">{branding.churchName.slice(0, 1)}</div>
+        <div className="brand-icon">
+          {branding.appLogoUrl ? <img src={branding.appLogoUrl} alt={branding.appName || "App logo"} className="brand-logo-image" /> : (branding.appName || "C").slice(0, 1)}
+        </div>
         <div className="brand-copy">
-          <p>{APP_NAME}</p>
-          <h2>{branding.churchName}</h2>
+          <p>Application</p>
+          <h2>{branding.appName || "ChurchSuite Pro"}</h2>
         </div>
       </div>
 
       <div className="sidebar-menu-scroll">
         <nav className="sidebar-nav">
-          {navigationSections.map((item) => {
+          {availableSections.map((item) => {
             const Icon = item.icon;
             const isSectionActive =
               location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);

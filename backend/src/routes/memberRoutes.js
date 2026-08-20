@@ -1,15 +1,19 @@
 const express = require("express");
 const Member = require("../models/Member");
+const authenticate = require("../middleware/authenticate");
+const { authorizePermissions } = require("../middleware/authorize");
 const { logAudit } = require("../services/auditService");
 const {
   assignMemberQr,
   migrateMemberQRCodes,
   regenerateMemberQr,
 } = require("../services/memberQrService");
+const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
+router.use(authenticate);
 
-router.get("/next-id", async (req, res) => {
+router.get("/next-id", authorizePermissions(PERMISSIONS.VIEW_MEMBERS), async (req, res) => {
   try {
     const members = await Member.find({}, { memberId: 1 }).lean();
     const nextNumber =
@@ -24,7 +28,7 @@ router.get("/next-id", async (req, res) => {
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", authorizePermissions(PERMISSIONS.VIEW_MEMBERS), async (req, res) => {
   try {
     const members = await populateMembersQuery();
     res.json(members);
@@ -33,7 +37,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/qr/migrate", async (req, res) => {
+router.post("/qr/migrate", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
   try {
     const summary = await migrateMemberQRCodes({
       limit: Number(req.body?.limit) || 0,
@@ -56,7 +60,7 @@ router.post("/qr/migrate", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
   try {
     const member = await Member.create(normalizeMemberPayload(req.body));
     await assignMemberQr(member, req.user || null);
@@ -67,7 +71,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/:memberId/qr", async (req, res) => {
+router.get("/:memberId/qr", authorizePermissions(PERMISSIONS.VIEW_MEMBERS), async (req, res) => {
   try {
     const member = await Member.findById(req.params.memberId).populate("qrRegeneratedBy", "displayName username");
     if (!member) {
@@ -89,7 +93,7 @@ router.get("/:memberId/qr", async (req, res) => {
   }
 });
 
-router.post("/:memberId/qr/regenerate", async (req, res) => {
+router.post("/:memberId/qr/regenerate", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
   try {
     const member = await Member.findById(req.params.memberId);
     if (!member) {
@@ -130,7 +134,7 @@ router.post("/:memberId/qr/regenerate", async (req, res) => {
   }
 });
 
-router.put("/:memberId", async (req, res) => {
+router.put("/:memberId", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
   try {
     const member = await Member.findById(req.params.memberId);
     if (!member) {
@@ -147,7 +151,7 @@ router.put("/:memberId", async (req, res) => {
   }
 });
 
-router.delete("/:memberId", async (req, res) => {
+router.delete("/:memberId", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
   try {
     const member = await Member.findById(req.params.memberId);
     if (!member) {

@@ -18,6 +18,7 @@ import CommunicationPage from "../../pages/CommunicationPage";
 import SpiritualHealthPage from "../../pages/SpiritualHealthPage";
 import LeadershipDevelopmentPage from "../../pages/LeadershipDevelopmentPage";
 import StrategicPlanningPage from "../../pages/StrategicPlanningPage";
+import SettingsPage from "../../pages/SettingsPage";
 import UsersPage from "../../pages/UsersPage";
 import MemberEnrollmentModal from "../members/MemberEnrollmentModal";
 import RecordDetailModal from "../common/RecordDetailModal";
@@ -26,9 +27,9 @@ import { useAppContext } from "../../context/AppContext";
 
 export default function AppLayout() {
   const location = useLocation();
-  const { openMemberEnrollment, openRecordModal, activeSetupTab, branding, toasts, dismissToast } = useAppContext();
+  const { authUser, openMemberEnrollment, openRecordModal, activeSetupTab, branding, toasts, dismissToast } = useAppContext();
   const pageMeta = getPageMeta(location.pathname);
-  const pageAction = getPageAction(pageMeta.action, activeSetupTab, { openMemberEnrollment, openRecordModal, branding }, location.pathname);
+  const pageAction = getPageAction(pageMeta.action, activeSetupTab, { openMemberEnrollment, openRecordModal, branding, authUser }, location.pathname);
 
   return (
     <>
@@ -47,28 +48,34 @@ export default function AppLayout() {
                 <Route path="/setup" element={<SetupPage />} />
                 <Route path="/members" element={<MembersPage />} />
                 <Route path="/ministries" element={<MinistriesPage />} />
+                <Route path="/evangelism" element={<Navigate to="/evangelism/pipeline" replace />} />
                 <Route path="/evangelism/pipeline" element={<EvangelismPage />} />
                 <Route path="/evangelism/contacts" element={<EvangelismPage />} />
                 <Route path="/evangelism/bible-study" element={<EvangelismPage />} />
                 <Route path="/evangelism/campaigns" element={<EvangelismPage />} />
                 <Route path="/evangelism/reports" element={<EvangelismPage />} />
+                <Route path="/discipleship" element={<Navigate to="/discipleship/programmes" replace />} />
                 <Route path="/discipleship/programmes" element={<DiscipleshipPage />} />
                 <Route path="/discipleship/enrollments" element={<DiscipleshipPage />} />
                 <Route path="/discipleship/follow-ups" element={<DiscipleshipPage />} />
                 <Route path="/discipleship/reports" element={<DiscipleshipPage />} />
+                <Route path="/visitors" element={<Navigate to="/visitors/register-list" replace />} />
                 <Route path="/visitors/register-list" element={<VisitorsPage />} />
                 <Route path="/visitors/pipeline" element={<VisitorsPage />} />
                 <Route path="/visitors/follow-ups" element={<VisitorsPage />} />
                 <Route path="/visitors/workflow" element={<VisitorsPage />} />
                 <Route path="/visitors/reports" element={<VisitorsPage />} />
+                <Route path="/family" element={<Navigate to="/family/overview" replace />} />
                 <Route path="/family/overview" element={<FamilyOverviewPage />} />
                 <Route path="/family/households" element={<FamilyHouseholdsPage />} />
+                <Route path="/finance" element={<Navigate to="/finance/overview" replace />} />
                 <Route path="/finance/overview" element={<FinancePage />} />
                 <Route path="/finance/transactions" element={<FinancePage />} />
                 <Route path="/finance/pledges" element={<FinancePage />} />
                 <Route path="/finance/expenses" element={<FinancePage />} />
                 <Route path="/finance/budgets" element={<FinancePage />} />
                 <Route path="/finance/reports" element={<FinancePage />} />
+                <Route path="/attendance" element={<Navigate to="/attendance/services" replace />} />
                 <Route path="/attendance/services" element={<AttendancePage />} />
                 <Route path="/attendance/reports" element={<AttendancePage />} />
                 <Route path="/attendance/absentees" element={<AttendancePage />} />
@@ -89,7 +96,9 @@ export default function AppLayout() {
                 <Route path="/strategic/plans" element={<StrategicPlanningPage />} />
                 <Route path="/strategic/kpis" element={<StrategicPlanningPage />} />
                 <Route path="/strategic/scorecards" element={<StrategicPlanningPage />} />
-                <Route path="/users" element={<UsersPage />} />
+                <Route path="/users" element={authUser?.permissions?.includes("manage_users") ? <UsersPage /> : <Navigate to="/dashboard" replace />} />
+                <Route path="/settings" element={<Navigate to="/settings/app-config" replace />} />
+                <Route path="/settings/app-config" element={authUser?.permissions?.includes("manage_settings") ? <SettingsPage /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
@@ -170,6 +179,14 @@ function getPageMeta(pathname) {
     };
   }
 
+  if (pathname.startsWith("/settings")) {
+    return {
+      title: "Settings",
+      subtitle: "Superadmin controls for application-wide shell and security configuration.",
+      action: "settings",
+    };
+  }
+
   if (pathname.startsWith("/communication")) {
     return {
       title: "Communication",
@@ -225,7 +242,12 @@ function getPageAction(action, activeSetupTab, handlers, pathname) {
     return null;
   }
 
+  const permissionSet = new Set(handlers.authUser?.permissions || []);
+
   if (action === "member") {
+    if (!permissionSet.has("manage_members")) {
+      return null;
+    }
     return (
       <button type="button" className="primary-button large-action" onClick={handlers.openMemberEnrollment}>
         <FaPlus />
@@ -235,6 +257,17 @@ function getPageAction(action, activeSetupTab, handlers, pathname) {
   }
 
   if (action === "setup") {
+    const allowedForTab =
+      activeSetupTab === "groups"
+        ? permissionSet.has("manage_groups")
+        : activeSetupTab === "users"
+          ? permissionSet.has("manage_users")
+          : permissionSet.has("manage_system");
+
+    if (!allowedForTab) {
+      return null;
+    }
+
     const setupType =
       activeSetupTab === "groups"
         ? "group"
@@ -274,9 +307,26 @@ function getPageAction(action, activeSetupTab, handlers, pathname) {
     attendance: "Add Event",
     user: "Add User",
     ministry: "Add Ministry",
+    settings: "Edit App Config",
   };
 
   if (!labels[action]) {
+    return null;
+  }
+
+  const actionPermissionMap = {
+    visitor: "manage_visitors",
+    evangelism: "manage_evangelism",
+    discipleship: "manage_discipleship",
+    family: "manage_households",
+    finance: "manage_finance",
+    attendance: "manage_attendance",
+    user: "manage_users",
+    ministry: "manage_ministries",
+    settings: "manage_settings",
+  };
+
+  if (actionPermissionMap[action] && !permissionSet.has(actionPermissionMap[action])) {
     return null;
   }
 
@@ -298,6 +348,8 @@ function getPageAction(action, activeSetupTab, handlers, pathname) {
                 : "discipleshipEnrollment"
             : action === "attendance"
               ? "attendanceEvent"
+            : action === "settings"
+              ? "appConfig"
             : action,
           null,
           "edit"

@@ -8,7 +8,16 @@ export default function ToastViewport({ toasts = [], onDismiss }) {
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast-card ${toast.type || "info"}`}>
           <div>
-            <strong>{toast.title || (toast.type === "error" ? "Error" : "Success")}</strong>
+            <strong>
+              {toast.title ||
+                (toast.type === "error"
+                  ? "Error"
+                  : toast.type === "warning"
+                    ? "Warning"
+                    : toast.type === "info"
+                      ? "Info"
+                      : "Success")}
+            </strong>
             <p>{toast.message}</p>
           </div>
           <button type="button" className="toast-close" onClick={() => onDismiss(toast.id)}>

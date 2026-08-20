@@ -1,6 +1,8 @@
 export const APP_NAME = "ChurchSuite Pro";
 
 export const initialBranding = {
+  appName: "ChurchSuite Pro",
+  appLogoUrl: "",
   churchName: "ChurchFlow Central",
   address: "123 Church Street, Accra",
   phone: "+233 20 700 8899",
@@ -25,15 +27,22 @@ export const initialMinistries = [
 ];
 
 export const initialRoles = [
-  { id: "r1", name: "Administrator", description: "Full access to setup and records" },
-  { id: "r2", name: "Finance Officer", description: "Can manage finance and reports" },
-  { id: "r3", name: "Ministry Leader", description: "Can oversee ministry teams" },
+  { id: "r1", name: "Superadmin", description: "Highest access with full godmode control" },
+  { id: "r2", name: "System Administrator", description: "Full access to setup, users, and system administration" },
+  { id: "r3", name: "Church Administrator", description: "Operational access to membership, households, visitors, attendance, and ministries" },
+  { id: "r4", name: "Elders", description: "Leadership dashboards, care, strategic, and leadership visibility" },
+  { id: "r5", name: "Deacons", description: "Assigned operational visibility for ministries and reports" },
+  { id: "r6", name: "Finance Manager", description: "Finance oversight and reporting access" },
+  { id: "r7", name: "Church Accountant", description: "Finance processing and accounting access" },
+  { id: "r8", name: "Ministry Leaders", description: "Ministry members, attendance, performance, and reports" },
+  { id: "r9", name: "Evangelism Team", description: "Visitors, prospects, Bible studies, and pipeline follow-up" },
+  { id: "r10", name: "Data Entry Clerks", description: "Controlled data capture without confidential admin access" },
 ];
 
 export const initialUsers = [
-  { id: "u1", fullName: "Paul Admin", email: "admin@churchflow.org", role: "Administrator", status: "Active" },
-  { id: "u2", fullName: "Grace Finance", email: "finance@churchflow.org", role: "Finance Officer", status: "Active" },
-  { id: "u3", fullName: "Martha Kids", email: "kids@churchflow.org", role: "Ministry Leader", status: "Pending" },
+  { id: "u1", displayName: "Paul Admin", username: "admin", email: "admin@churchflow.org", roles: ["System Administrator"], permissions: [], status: "Active" },
+  { id: "u2", displayName: "Grace Finance", username: "grace.finance", email: "finance@churchflow.org", roles: ["Church Administrator"], permissions: [], status: "Active" },
+  { id: "u3", displayName: "Martha Kids", username: "martha.kids", email: "kids@churchflow.org", roles: ["Ministry Leaders"], permissions: [], status: "Pending" },
 ];
 
 export const initialVisitors = [
@@ -224,9 +233,12 @@ export const attendanceFormTemplate = {
 };
 
 export const userFormTemplate = {
-  fullName: "",
+  displayName: "",
+  username: "",
   email: "",
-  role: "Administrator",
+  pin: "",
+  roleIds: [],
+  permissions: [],
   status: "Pending",
 };
 

@@ -6,6 +6,7 @@ import {
   FaChurch,
   FaComments,
   FaCoins,
+  FaCog,
   FaGraduationCap,
   FaHandHoldingHeart,
   FaHeartbeat,
@@ -16,34 +17,34 @@ import {
 } from "react-icons/fa";
 
 export const navigationSections = [
-  { label: "Dashboard", path: "/dashboard", icon: FaBuilding },
-  { label: "Church Setup", path: "/setup", icon: FaChurch },
-  { label: "Members", path: "/members", icon: FaUsers },
+  { label: "Dashboard", path: "/dashboard", icon: FaBuilding, permission: "view_dashboard" },
+  { label: "Church Setup", path: "/setup", icon: FaChurch, permission: "view_setup" },
+  { label: "Members", path: "/members", icon: FaUsers, permission: "view_members" },
   { label: "Visitors", path: "/visitors", icon: FaUsers, children: [
     { label: "RegisterList", path: "/visitors/register-list" },
     { label: "Pipeline", path: "/visitors/pipeline" },
     { label: "Follow-ups", path: "/visitors/follow-ups" },
     { label: "Workflow", path: "/visitors/workflow" },
     { label: "Reports", path: "/visitors/reports" },
-  ] },
+  ], permission: "view_visitors" },
   { label: "Evangelism", path: "/evangelism", icon: FaBullhorn, children: [
     { label: "Pipeline", path: "/evangelism/pipeline" },
     { label: "Contacts", path: "/evangelism/contacts" },
     { label: "Bible Study", path: "/evangelism/bible-study" },
     { label: "Campaigns", path: "/evangelism/campaigns" },
     { label: "Reports", path: "/evangelism/reports" },
-  ] },
+  ], permission: "view_evangelism" },
   { label: "Discipleship", path: "/discipleship", icon: FaGraduationCap, children: [
     { label: "Programmes", path: "/discipleship/programmes" },
     { label: "Enrollments", path: "/discipleship/enrollments" },
     { label: "Follow-ups", path: "/discipleship/follow-ups" },
     { label: "Reports", path: "/discipleship/reports" },
-  ] },
+  ], permission: "view_discipleship" },
   { label: "Family", path: "/family", icon: FaHome, children: [
     { label: "Overview", path: "/family/overview" },
     { label: "Households", path: "/family/households" },
-  ] },
-  { label: "Ministries", path: "/ministries", icon: FaHandHoldingHeart },
+  ], permission: "view_households" },
+  { label: "Ministries", path: "/ministries", icon: FaHandHoldingHeart, permission: "view_ministries" },
   { label: "Finance", path: "/finance", icon: FaCoins, children: [
     { label: "Overview", path: "/finance/overview" },
     { label: "Transactions", path: "/finance/transactions" },
@@ -51,32 +52,35 @@ export const navigationSections = [
     { label: "Expenses", path: "/finance/expenses" },
     { label: "Budgets", path: "/finance/budgets" },
     { label: "Reports", path: "/finance/reports" },
-  ] },
+  ], permission: "view_finance" },
   { label: "Attendance", path: "/attendance", icon: FaCalendarCheck, children: [
     { label: "Services", path: "/attendance/services" },
     { label: "Reports", path: "/attendance/reports" },
     { label: "Absentees", path: "/attendance/absentees" },
-  ] },
+  ], permission: "view_attendance" },
   { label: "Communication", path: "/communication", icon: FaComments, children: [
     { label: "Groups", path: "/communication/groups" },
     { label: "Preferences", path: "/communication/preferences" },
     { label: "Logs", path: "/communication/logs" },
-  ] },
+  ], permission: "view_communication" },
   { label: "Spiritual Health", path: "/spiritual-health", icon: FaHeartbeat, children: [
     { label: "Dashboard", path: "/spiritual-health/dashboard" },
     { label: "Alerts", path: "/spiritual-health/alerts" },
     { label: "Rules", path: "/spiritual-health/rules" },
-  ] },
+  ], permission: "view_spiritual_health" },
   { label: "Leadership", path: "/leadership", icon: FaSitemap, children: [
     { label: "Roles", path: "/leadership/roles" },
     { label: "Talent", path: "/leadership/talent" },
     { label: "Succession", path: "/leadership/succession" },
     { label: "Reports", path: "/leadership/reports" },
-  ] },
+  ], permission: "view_leadership" },
   { label: "Strategic", path: "/strategic", icon: FaChartLine, children: [
     { label: "Plans", path: "/strategic/plans" },
     { label: "KPIs", path: "/strategic/kpis" },
     { label: "Scorecards", path: "/strategic/scorecards" },
-  ] },
-  { label: "Users", path: "/users", icon: FaUserShield },
+  ], permission: "view_strategic_planning" },
+  { label: "Users", path: "/users", icon: FaUserShield, permission: "manage_users" },
+  { label: "Settings", path: "/settings", icon: FaCog, children: [
+    { label: "App Config", path: "/settings/app-config" },
+  ], permission: "manage_settings" },
 ];

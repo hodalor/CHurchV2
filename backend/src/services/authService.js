@@ -3,6 +3,14 @@ const User = require("../models/User");
 const RefreshTokenSession = require("../models/RefreshTokenSession");
 const { createAccessToken, createRefreshToken, hashToken, verifyRefreshToken } = require("../utils/tokenUtils");
 
+function getEffectivePermissions(user) {
+  const rolePermissions = user.roles.flatMap((role) => role.permissions || []);
+  const configuredPermissions = Array.isArray(user.permissions) ? user.permissions : [];
+  return [
+    ...new Set(user.permissionsConfigured ? configuredPermissions : rolePermissions),
+  ];
+}
+
 async function authenticateWithUsernameAndPin({ username, pin, ipAddress = "", userAgent = "" }) {
   const user = await User.findOne({ username: String(username || "").toLowerCase() }).populate("roles");
 
@@ -70,8 +78,7 @@ async function revokeSession({ refreshToken, ipAddress = "" }) {
 }
 
 async function issueTokensForUser(user, { ipAddress = "", userAgent = "", existingSession = null }) {
-  const permissions = user.roles.flatMap((role) => role.permissions || []);
-  const uniquePermissions = [...new Set(permissions)];
+  const uniquePermissions = getEffectivePermissions(user);
   const roleNames = user.roles.map((role) => role.name);
   const accessToken = createAccessToken({
     sub: user._id.toString(),
@@ -118,6 +125,7 @@ async function hashPin(pin) {
 
 module.exports = {
   authenticateWithUsernameAndPin,
+  getEffectivePermissions,
   hashPin,
   refreshUserSession,
   revokeSession,

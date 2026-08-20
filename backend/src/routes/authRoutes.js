@@ -1,7 +1,7 @@
 const express = require("express");
 const User = require("../models/User");
 const authenticate = require("../middleware/authenticate");
-const { authenticateWithUsernameAndPin, refreshUserSession, revokeSession } = require("../services/authService");
+const { authenticateWithUsernameAndPin, getEffectivePermissions, refreshUserSession, revokeSession } = require("../services/authService");
 
 const router = express.Router();
 
@@ -55,7 +55,7 @@ router.get("/me", authenticate, async (req, res) => {
     displayName: user.displayName,
     memberId: user.memberId || "",
     roles: user.roles.map((role) => role.name),
-    permissions: [...new Set(user.roles.flatMap((role) => role.permissions || []))],
+    permissions: getEffectivePermissions(user),
   });
 });
 

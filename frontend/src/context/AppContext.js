@@ -70,6 +70,7 @@ export function AppProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const [lookupState, setLookupState] = useState({ loading: false, error: "", values: [] });
   const [pendingActionState, setPendingActionState] = useState({ loading: false, error: "", items: [] });
+  const [settingsState, setSettingsState] = useState({ loading: false, error: "" });
   const [memberSearch, setMemberSearch] = useState("");
   const [memberMinistryFilter, setMemberMinistryFilter] = useState("all");
   const [activeSetupTab, setActiveSetupTab] = useState("groups");
@@ -174,6 +175,8 @@ export function AppProvider({ children }) {
     () => lookupState.values.filter((item) => item.type?.key === "attendance_capture_mode"),
     [lookupState.values]
   );
+
+  const permissionCatalog = useMemo(() => buildPermissionCatalog(), []);
 
   const dismissToast = (toastId) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -736,6 +739,8 @@ export function AppProvider({ children }) {
           setAttendanceSessions(initialAttendanceSessions);
           setAttendanceAbsentees([]);
           setUsers(initialUsers);
+          setRoles(initialRoles);
+          setBranding(initialBranding);
           setLookupState({ loading: false, error: "", values: [] });
           setVisitorApiState({ loading: false, error: "", metrics: null });
           setEvangelismApiState({ loading: false, error: "", dashboard: null });
@@ -757,6 +762,7 @@ export function AppProvider({ children }) {
         const [
           lookupsResponse,
           groupsResponse,
+          rolesResponse,
           usersResponse,
           ministriesResponse,
           membersResponse,
@@ -779,6 +785,7 @@ export function AppProvider({ children }) {
           await Promise.allSettled([
             churchApi.getLookups(),
             churchApi.getGroups(),
+            churchApi.getRoles(),
             churchApi.getUsers(),
             churchApi.getMinistries(),
             churchApi.getMembers(),
@@ -819,9 +826,14 @@ export function AppProvider({ children }) {
             ? groupsResponse.value.map(hydrateGroupRecord)
             : initialGroups.map(hydrateGroupRecord)
         );
+        setRoles(
+          rolesResponse.status === "fulfilled" && Array.isArray(rolesResponse.value)
+            ? rolesResponse.value
+            : initialRoles
+        );
         setUsers(
           usersResponse.status === "fulfilled" && Array.isArray(usersResponse.value)
-            ? usersResponse.value
+            ? usersResponse.value.map(hydrateUserRecord)
             : []
         );
         setMinistries(
@@ -947,6 +959,21 @@ export function AppProvider({ children }) {
             pendingActionsResponse.status === "fulfilled" && Array.isArray(pendingActionsResponse.value)
               ? pendingActionsResponse.value
               : [],
+        });
+
+        const [brandingResponse, appConfigResponse] = await Promise.allSettled([
+          churchApi.getBranding(),
+          churchApi.getAppConfig(),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setBranding({
+          ...initialBranding,
+          ...(brandingResponse.status === "fulfilled" && brandingResponse.value ? brandingResponse.value : {}),
+          ...(appConfigResponse.status === "fulfilled" && appConfigResponse.value ? appConfigResponse.value : {}),
         });
       } catch (error) {
         if (!active) {
@@ -1366,11 +1393,24 @@ export function AppProvider({ children }) {
     }
 
     if (type === "user") {
-      setUsers((current) =>
-        updateOrInsert(current, draft, record?.id, {
-          id: draft.id || `u${Date.now()}`,
-        })
-      );
+      try {
+        const payload = normalizeUserDraft(draft);
+        const savedUser = record?._id
+          ? await churchApi.updateUser(record._id, payload)
+          : await churchApi.createUser(payload);
+
+        setUsers((current) =>
+          updateOrInsert(current, hydrateUserRecord(savedUser), getRecordIdentity(record), {
+            id: savedUser.id || savedUser._id || `u${Date.now()}`,
+            _id: savedUser._id,
+          })
+        );
+        closeRecordModal();
+        notifySuccess("User account saved successfully.");
+      } catch (error) {
+        notifyError(error.message || "Unable to save user account.");
+      }
+      return;
     }
 
     if (type === "ministry") {
@@ -1428,7 +1468,28 @@ export function AppProvider({ children }) {
     }
 
     if (type === "branding") {
-      setBranding(draft);
+      try {
+        const savedBranding = await churchApi.updateBranding(normalizeBrandingDraft(draft));
+        setBranding((current) => ({ ...current, ...savedBranding }));
+        notifySuccess("Church branding saved successfully.");
+      } catch (error) {
+        notifyError(error.message || "Unable to save church branding.");
+        return;
+      }
+    }
+
+    if (type === "appConfig") {
+      try {
+        setSettingsState({ loading: true, error: "" });
+        const savedConfig = await churchApi.updateAppConfig(normalizeAppConfigDraft(draft));
+        setBranding((current) => ({ ...current, ...savedConfig }));
+        setSettingsState({ loading: false, error: "" });
+        notifySuccess("App configuration saved successfully.");
+      } catch (error) {
+        setSettingsState({ loading: false, error: error.message || "Unable to save app configuration." });
+        notifyError(error.message || "Unable to save app configuration.");
+        return;
+      }
     }
 
     closeRecordModal();
@@ -1465,7 +1526,9 @@ export function AppProvider({ children }) {
     attendanceApiState,
     lookupState,
     pendingActionState,
+    settingsState,
     mediaUploadState,
+    permissionCatalog,
     visitorHowHeardOptions,
     visitorStatusOptions,
     evangelismSourceOptions,
@@ -2194,9 +2257,12 @@ function buildNewRecord(type, { families, members, ministries, roles, users, aut
 
   if (type === "user") {
     return {
-      fullName: "",
+        displayName: "",
+        username: "",
       email: "",
-      role: roles[0]?.name || "Administrator",
+        pin: "",
+        roleIds: roles[0] ? [roles[0]._id || roles[0].id || roles[0].name] : [],
+        permissions: roles[0]?.permissions || [],
       status: "Pending",
     };
   }
@@ -2284,11 +2350,20 @@ function buildNewRecord(type, { families, members, ministries, roles, users, aut
 
   if (type === "branding") {
     return {
+      appName: "ChurchSuite Pro",
+      appLogoUrl: "",
       churchName: "",
       address: "",
       phone: "",
       email: "",
       website: "",
+    };
+  }
+
+  if (type === "appConfig") {
+    return {
+      appName: "ChurchSuite Pro",
+      appLogoUrl: "",
     };
   }
 
@@ -2333,6 +2408,134 @@ function hydrateMemberRecord(member) {
     idFrontPhoto: normalizeMediaField(member.idFrontPhoto),
     idBackPhoto: normalizeMediaField(member.idBackPhoto),
   };
+}
+
+function hydrateUserRecord(user) {
+  if (!user) {
+    return user;
+  }
+
+  const normalizedRoles = Array.isArray(user.roles)
+    ? user.roles.map((role) => (typeof role === "string" ? { name: role, permissions: [] } : role))
+    : [];
+  const rolePermissions = [...new Set(normalizedRoles.flatMap((role) => role.permissions || []))];
+  const explicitPermissions = Array.isArray(user.permissions) ? user.permissions : [];
+  const effectivePermissions =
+    explicitPermissions.length || user.permissionsConfigured ? explicitPermissions : rolePermissions;
+
+  return {
+    ...user,
+    displayName: user.displayName || user.fullName || "",
+    fullName: user.displayName || user.fullName || "",
+    username: user.username || "",
+    roles: normalizedRoles,
+    permissions: effectivePermissions,
+    roleIds: normalizedRoles.map((role) => role._id || role.id || role.name).filter(Boolean),
+  };
+}
+
+function normalizeUserDraft(draft) {
+  return {
+    displayName: draft.displayName || draft.fullName || "",
+    username: String(draft.username || "").trim().toLowerCase(),
+    email: draft.email || "",
+    pin: draft.pin || "",
+    memberId: draft.memberId || "",
+    roleIds: Array.isArray(draft.roleIds) ? draft.roleIds : [],
+    permissions: Array.isArray(draft.permissions) ? draft.permissions : [],
+    status: draft.status || "Pending",
+  };
+}
+
+function normalizeBrandingDraft(draft) {
+  return {
+    churchName: draft.churchName || "",
+    address: draft.address || "",
+    phone: draft.phone || "",
+    email: draft.email || "",
+    website: draft.website || "",
+  };
+}
+
+function normalizeAppConfigDraft(draft) {
+  return {
+    appName: draft.appName || "ChurchSuite Pro",
+    appLogoUrl: draft.appLogoUrl || "",
+  };
+}
+
+function buildPermissionCatalog() {
+  return [
+    {
+      key: "core",
+      title: "Core Access",
+      permissions: [
+        { key: "view_dashboard", label: "Dashboard" },
+        { key: "view_setup", label: "Church Setup" },
+        { key: "manage_system", label: "System Configuration" },
+        { key: "manage_settings", label: "Superadmin Settings" },
+        { key: "manage_lookups", label: "Lookup Tables" },
+        { key: "manage_users", label: "User Administration" },
+        { key: "view_audit_logs", label: "Audit Administration" },
+      ],
+    },
+    {
+      key: "membership",
+      title: "Membership And Households",
+      permissions: [
+        { key: "view_members", label: "Members" },
+        { key: "manage_members", label: "Manage Members" },
+        { key: "view_households", label: "Households" },
+        { key: "manage_households", label: "Manage Households" },
+        { key: "view_groups", label: "Groups" },
+        { key: "manage_groups", label: "Manage Groups" },
+      ],
+    },
+    {
+      key: "visitors",
+      title: "Visitors And Evangelism",
+      permissions: [
+        { key: "view_visitors", label: "Visitors" },
+        { key: "manage_visitors", label: "Manage Visitors" },
+        { key: "assign_visitor_followup", label: "Assign Visitor Follow-Up" },
+        { key: "convert_visitor", label: "Convert Visitor" },
+        { key: "view_evangelism", label: "Evangelism" },
+        { key: "manage_evangelism", label: "Manage Evangelism" },
+        { key: "convert_prospect", label: "Convert Prospect" },
+      ],
+    },
+    {
+      key: "ministry_flow",
+      title: "Discipleship, Attendance, Ministries",
+      permissions: [
+        { key: "view_discipleship", label: "Discipleship" },
+        { key: "manage_discipleship", label: "Manage Discipleship" },
+        { key: "view_attendance", label: "Attendance" },
+        { key: "manage_attendance", label: "Manage Attendance" },
+        { key: "view_ministries", label: "Ministries" },
+        { key: "manage_ministries", label: "Manage Ministries" },
+        { key: "view_finance", label: "Finance" },
+        { key: "manage_finance", label: "Manage Finance" },
+      ],
+    },
+    {
+      key: "care_admin",
+      title: "Communication, Care, Leadership",
+      permissions: [
+        { key: "view_pending_actions", label: "Follow-Up Lists" },
+        { key: "view_communication", label: "Communication" },
+        { key: "manage_communication", label: "Manage Communication" },
+        { key: "export_contacts", label: "Export Contacts" },
+        { key: "view_spiritual_health", label: "Spiritual Health" },
+        { key: "manage_spiritual_health", label: "Manage Spiritual Health" },
+        { key: "view_leadership", label: "Leadership" },
+        { key: "manage_leadership", label: "Manage Leadership" },
+        { key: "view_succession_sensitive", label: "Succession Sensitive Records" },
+        { key: "view_strategic_planning", label: "Strategic Planning" },
+        { key: "manage_strategic_planning", label: "Manage Strategic Planning" },
+      ],
+    },
+  ];
 }
 
 function normalizeMemberDraft(draft, authUser = null) {
