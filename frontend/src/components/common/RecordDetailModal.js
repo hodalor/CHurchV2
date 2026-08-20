@@ -23,6 +23,7 @@ export default function RecordDetailModal() {
     deleteRecordModal,
     setRecordModalDraft,
     setRecordModalMode,
+    openMemberEnrollment,
     groups,
     members,
     roles,
@@ -147,6 +148,8 @@ export default function RecordDetailModal() {
             deleteRecordModal={deleteRecordModal}
             canDelete={Boolean(draft._id)}
             setRecordModalMode={setRecordModalMode}
+            onEdit={() => openMemberEnrollment(draft)}
+            editLabel="Edit In Steps"
           />
         </div>
       ) : type === "family" ? (
@@ -415,7 +418,16 @@ export default function RecordDetailModal() {
   );
 }
 
-function RecordModalActions({ isEditing, closeRecordModal, saveRecordModal, deleteRecordModal, canDelete, setRecordModalMode }) {
+function RecordModalActions({
+  isEditing,
+  closeRecordModal,
+  saveRecordModal,
+  deleteRecordModal,
+  canDelete,
+  setRecordModalMode,
+  onEdit = null,
+  editLabel = "Edit",
+}) {
   return (
     <div className="modal-actions">
       <button type="button" className="ghost-button" onClick={closeRecordModal}>
@@ -426,16 +438,28 @@ function RecordModalActions({ isEditing, closeRecordModal, saveRecordModal, dele
           Delete
         </button>
       ) : null}
-      <button
-        type="button"
-        className="ghost-button"
-        onClick={() => setRecordModalMode(isEditing ? "view" : "edit")}
-      >
-        {isEditing ? "Cancel Edit" : "Edit"}
-      </button>
-      <button type="button" className="primary-button" onClick={isEditing ? saveRecordModal : () => setRecordModalMode("edit")}>
-        {isEditing ? "Save" : "Edit"}
-      </button>
+      {isEditing ? (
+        <>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setRecordModalMode("view")}
+          >
+            Cancel Edit
+          </button>
+          <button type="button" className="primary-button" onClick={saveRecordModal}>
+            Save
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="primary-button"
+          onClick={onEdit || (() => setRecordModalMode("edit"))}
+        >
+          {editLabel}
+        </button>
+      )}
     </div>
   );
 }

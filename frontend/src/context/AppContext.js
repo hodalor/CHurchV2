@@ -5,16 +5,7 @@ import {
   financeFormTemplate,
   familyFormTemplate,
   groupFormTemplate,
-  initialAttendanceSessions,
   initialBranding,
-  initialFamilies,
-  initialFinanceRecords,
-  initialGroups,
-  initialMembers,
-  initialMinistries,
-  initialRoles,
-  initialUsers,
-  initialVisitors,
   memberFormTemplate,
   ministryFormTemplate,
   roleFormTemplate,
@@ -27,7 +18,6 @@ import {
   enrichFamilyLinks,
   generateNextFamilyId,
   generateNextMemberId,
-  getReciprocalRelationship,
 } from "../utils/memberUtils";
 
 const AppContext = createContext(null);
@@ -35,12 +25,12 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const { authUser } = useAuth();
   const [branding, setBranding] = useState(initialBranding);
-  const [groups, setGroups] = useState(initialGroups.map(hydrateGroupRecord));
-  const [ministries, setMinistries] = useState(initialMinistries.map(hydrateMinistryRecord));
-  const [members, setMembers] = useState(initialMembers);
-  const [roles, setRoles] = useState(initialRoles);
-  const [users, setUsers] = useState(initialUsers);
-  const [visitors, setVisitors] = useState(initialVisitors);
+  const [groups, setGroups] = useState([]);
+  const [ministries, setMinistries] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [visitors, setVisitors] = useState([]);
   const [prospects, setProspects] = useState([]);
   const [evangelismContacts, setEvangelismContacts] = useState([]);
   const [bibleStudies, setBibleStudies] = useState([]);
@@ -48,9 +38,9 @@ export function AppProvider({ children }) {
   const [discipleshipProgrammes, setDiscipleshipProgrammes] = useState([]);
   const [discipleshipEnrollments, setDiscipleshipEnrollments] = useState([]);
   const [discipleshipOverdue, setDiscipleshipOverdue] = useState([]);
-  const [families, setFamilies] = useState(initialFamilies);
-  const [financeRecords, setFinanceRecords] = useState(initialFinanceRecords);
-  const [attendanceSessions, setAttendanceSessions] = useState(initialAttendanceSessions);
+  const [families, setFamilies] = useState([]);
+  const [financeRecords, setFinanceRecords] = useState([]);
+  const [attendanceSessions, setAttendanceSessions] = useState([]);
   const [attendanceAbsentees, setAttendanceAbsentees] = useState([]);
   const [familyApiState, setFamilyApiState] = useState({ loading: false, error: "" });
   const [visitorApiState, setVisitorApiState] = useState({ loading: false, error: "", metrics: null });
@@ -198,6 +188,10 @@ export function AppProvider({ children }) {
     pushToast("error", message, title);
   };
 
+  const notifyWarning = (message, title = "Warning") => {
+    pushToast("warning", message, title);
+  };
+
   const openModal = (name) => setActiveModal(name);
   const closeModal = () => setActiveModal(null);
 
@@ -270,6 +264,15 @@ export function AppProvider({ children }) {
         sourceRecord.bibleStudyId = payload.bibleStudyId || sourceRecord.bibleStudyId;
       } catch (error) {
         // Fall back to local generated ID if the next-id request fails.
+      }
+    }
+
+    if (!record && type === "finance" && authUser) {
+      try {
+        const payload = await churchApi.getNextFinanceRecordNo();
+        sourceRecord.recordNo = payload.recordNo || sourceRecord.recordNo;
+      } catch (error) {
+        // Keep fallback finance record number when the next-record request fails.
       }
     }
 
@@ -355,6 +358,9 @@ export function AppProvider({ children }) {
       } else if (type === "attendanceEvent" && identity._id) {
         await churchApi.deleteAttendanceEvent(identity._id);
         setAttendanceSessions((current) => current.filter((item) => item._id !== identity._id));
+      } else if (type === "finance" && identity._id) {
+        await churchApi.deleteFinanceRecord(identity._id);
+        setFinanceRecords((current) => current.filter((item) => (item._id || item.id) !== identity._id));
       } else if (type === "ministry" && identity._id) {
         await churchApi.deleteMinistry(identity._id);
         setMinistries((current) => current.filter((item) => (item._id || item.id) !== identity._id));
@@ -372,22 +378,33 @@ export function AppProvider({ children }) {
     }
   };
 
-  const openMemberEnrollment = () => {
+  const openMemberEnrollment = (memberRecord = null) => {
     const fallbackId = generateNextMemberId(members);
     const today = new Date().toISOString().slice(0, 10);
+    const preparedMemberForm = memberRecord
+      ? buildMemberEnrollmentDraft(memberRecord, groups, authUser)
+      : {
+          ...memberFormTemplate,
+          memberId: fallbackId,
+          membershipDate: today,
+          dateJoined: today,
+          dateCaptured: today,
+          dataEntryClerk: authUser?.displayName || authUser?.username || "",
+        };
 
-    setMemberForm({
-      ...memberFormTemplate,
-      memberId: fallbackId,
-      membershipDate: today,
-      dateJoined: today,
-      dateCaptured: today,
-      dataEntryClerk: authUser?.displayName || authUser?.username || "",
+    setRecordModal({
+      open: false,
+      type: null,
+      mode: "view",
+      record: null,
+      draft: null,
     });
+    setMediaUploadState({ loading: false, error: "", fieldName: "" });
+    setMemberForm(preparedMemberForm);
     setEnrolmentStep(0);
     setActiveModal("member-enrolment");
 
-    if (authUser) {
+    if (!memberRecord && authUser) {
       churchApi
         .getNextMemberId()
         .then((payload) => {
@@ -693,10 +710,42 @@ export function AppProvider({ children }) {
     };
   };
 
+  const refreshMembers = async () => {
+    const remoteMembers = await churchApi.getMembers();
+    setMembers(Array.isArray(remoteMembers) ? remoteMembers.map(hydrateMemberRecord) : []);
+    return remoteMembers;
+  };
+
+  const refreshFamilies = async () => {
+    const remoteFamilies = await churchApi.getFamilies();
+    setFamilies(Array.isArray(remoteFamilies) ? remoteFamilies.map(hydrateFamilyRecord) : []);
+    return remoteFamilies;
+  };
+
+  const refreshMinistries = async () => {
+    const remoteMinistries = await churchApi.getMinistries();
+    setMinistries(Array.isArray(remoteMinistries) ? remoteMinistries.map(hydrateMinistryRecord) : []);
+    return remoteMinistries;
+  };
+
+  const refreshFinanceRecords = async () => {
+    const remoteFinanceRecords = await churchApi.getFinanceRecords();
+    setFinanceRecords(Array.isArray(remoteFinanceRecords) ? remoteFinanceRecords : []);
+    return remoteFinanceRecords;
+  };
+
   useEffect(() => {
     let active = true;
 
     async function loadFamilies() {
+      if (!authUser) {
+        if (active) {
+          setFamilies([]);
+          setFamilyApiState({ loading: false, error: "" });
+        }
+        return;
+      }
+
       setFamilyApiState({ loading: true, error: "" });
 
       try {
@@ -717,7 +766,7 @@ export function AppProvider({ children }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [authUser]);
 
   useEffect(() => {
     let active = true;
@@ -725,10 +774,10 @@ export function AppProvider({ children }) {
     async function loadProtectedData() {
       if (!authUser) {
         if (active) {
-          setGroups(initialGroups.map(hydrateGroupRecord));
-          setMinistries(initialMinistries.map(hydrateMinistryRecord));
-          setVisitors(initialVisitors);
-          setMembers(initialMembers);
+          setGroups([]);
+          setMinistries([]);
+          setVisitors([]);
+          setMembers([]);
           setProspects([]);
           setEvangelismContacts([]);
           setBibleStudies([]);
@@ -736,10 +785,12 @@ export function AppProvider({ children }) {
           setDiscipleshipProgrammes([]);
           setDiscipleshipEnrollments([]);
           setDiscipleshipOverdue([]);
-          setAttendanceSessions(initialAttendanceSessions);
+          setAttendanceSessions([]);
           setAttendanceAbsentees([]);
-          setUsers(initialUsers);
-          setRoles(initialRoles);
+          setUsers([]);
+          setRoles([]);
+          setFamilies([]);
+          setFinanceRecords([]);
           setBranding(initialBranding);
           setLookupState({ loading: false, error: "", values: [] });
           setVisitorApiState({ loading: false, error: "", metrics: null });
@@ -766,6 +817,7 @@ export function AppProvider({ children }) {
           usersResponse,
           ministriesResponse,
           membersResponse,
+          financeRecordsResponse,
           visitorsResponse,
           retentionMetrics,
           pendingActionsResponse,
@@ -789,6 +841,7 @@ export function AppProvider({ children }) {
             churchApi.getUsers(),
             churchApi.getMinistries(),
             churchApi.getMembers(),
+            churchApi.getFinanceRecords(),
             churchApi.getVisitors(),
             churchApi.getVisitorRetentionMetrics(30),
             churchApi.getPendingActions(),
@@ -824,12 +877,12 @@ export function AppProvider({ children }) {
         setGroups(
           groupsResponse.status === "fulfilled" && Array.isArray(groupsResponse.value)
             ? groupsResponse.value.map(hydrateGroupRecord)
-            : initialGroups.map(hydrateGroupRecord)
+            : []
         );
         setRoles(
           rolesResponse.status === "fulfilled" && Array.isArray(rolesResponse.value)
             ? rolesResponse.value
-            : initialRoles
+            : []
         );
         setUsers(
           usersResponse.status === "fulfilled" && Array.isArray(usersResponse.value)
@@ -844,6 +897,11 @@ export function AppProvider({ children }) {
         setMembers(
           membersResponse.status === "fulfilled" && Array.isArray(membersResponse.value)
             ? membersResponse.value.map(hydrateMemberRecord)
+            : []
+        );
+        setFinanceRecords(
+          financeRecordsResponse.status === "fulfilled" && Array.isArray(financeRecordsResponse.value)
+            ? financeRecordsResponse.value
             : []
         );
         setVisitors(
@@ -1060,69 +1118,15 @@ export function AppProvider({ children }) {
 
     try {
       const payload = normalizeMemberDraft(newMember, authUser);
-      const savedMember = await churchApi.createMember(payload);
+      const savedMember = memberForm._id
+        ? await churchApi.updateMember(memberForm._id, payload)
+        : await churchApi.createMember(payload);
       const hydratedMember = hydrateMemberRecord(savedMember);
       setMediaUploadState({ loading: false, error: "", fieldName: "" });
-
-      setMembers((current) => {
-        const nextMembers = [hydratedMember, ...current];
-
-        resolvedLinks.forEach((link) => {
-          const reciprocalRelationship = getReciprocalRelationship(link.relationship, hydratedMember);
-          const linkedMember = nextMembers.find((item) => item.memberId === link.memberId);
-
-          if (linkedMember) {
-            const alreadyExists = (linkedMember.familyLinks || []).some(
-              (item) => item.memberId === hydratedMember.memberId && item.relationship === reciprocalRelationship
-            );
-
-            if (!alreadyExists) {
-              linkedMember.familyLinks = [
-                ...(linkedMember.familyLinks || []),
-                {
-                  memberId: hydratedMember.memberId,
-                  memberName: `${hydratedMember.firstName} ${hydratedMember.lastName}`,
-                  relationship: reciprocalRelationship,
-                },
-              ];
-            }
-          }
-        });
-
-        return [...nextMembers];
-      });
-
-      if (effectiveFamilyId) {
-        setFamilies((current) =>
-          current.map((family) => {
-            if (family.familyId !== effectiveFamilyId) {
-              return family;
-            }
-
-            const exists = (family.householdMembers || []).some((item) => item.memberId === hydratedMember.memberId);
-            const nextHouseholdMembers = exists
-              ? family.householdMembers
-              : [
-                  ...(family.householdMembers || []),
-                  {
-                    memberId: hydratedMember.memberId,
-                    memberName: `${hydratedMember.firstName} ${hydratedMember.lastName}`,
-                    relationshipToHead: hydratedMember.householdRole || "Other",
-                    status: hydratedMember.membershipStatus,
-                  },
-                ];
-
-            return {
-              ...family,
-              householdMembers: nextHouseholdMembers,
-              familyContact: family.familyContact || hydratedMember.phone,
-            };
-          })
-        );
-      }
+      await Promise.all([refreshMembers(), refreshFamilies()]);
 
       closeModal();
-      notifySuccess(`Member ${hydratedMember.memberId || ""} created successfully.`);
+      notifySuccess(`Member ${hydratedMember.memberId || ""} ${memberForm._id ? "updated" : "created"} successfully.`);
     } catch (error) {
       setMediaUploadState((current) => ({
         ...current,
@@ -1362,11 +1366,31 @@ export function AppProvider({ children }) {
     }
 
     if (type === "finance") {
-      setFinanceRecords((current) =>
-        updateOrInsert(current, { ...draft, amount: Number(draft.amount || 0) }, record?.id, {
-          id: draft.id || `f${Date.now()}`,
-        })
-      );
+      try {
+        const payload = {
+          recordNo: draft.recordNo || "",
+          category: draft.category || "",
+          description: draft.description || "",
+          amount: Number(draft.amount || 0),
+          date: draft.date || new Date().toISOString().slice(0, 10),
+          status: draft.status || "Pending",
+        };
+        const savedRecord = record?._id
+          ? await churchApi.updateFinanceRecord(record._id, payload)
+          : await churchApi.createFinanceRecord(payload);
+
+        setFinanceRecords((current) =>
+          updateOrInsert(current, savedRecord, getRecordIdentity(record), {
+            id: savedRecord.id || savedRecord._id || `f${Date.now()}`,
+            _id: savedRecord._id,
+          })
+        );
+        closeRecordModal();
+        notifySuccess("Finance record saved successfully.");
+      } catch (error) {
+        notifyError(error.message || "Unable to save finance record.");
+      }
+      return;
     }
 
     if (type === "attendanceEvent") {
@@ -1438,11 +1462,28 @@ export function AppProvider({ children }) {
     }
 
     if (type === "role") {
-      setRoles((current) =>
-        updateOrInsert(current, draft, record?.id, {
-          id: draft.id || `r${Date.now()}`,
-        })
-      );
+      try {
+        const payload = {
+          name: draft.name || "",
+          description: draft.description || "",
+          permissions: Array.isArray(draft.permissions) ? draft.permissions : [],
+        };
+        const savedRole = record?._id
+          ? await churchApi.updateRole(record._id, payload)
+          : await churchApi.createRole(payload);
+
+        setRoles((current) =>
+          updateOrInsert(current, savedRole, getRecordIdentity(record), {
+            id: savedRole.id || savedRole._id || `r${Date.now()}`,
+            _id: savedRole._id,
+          })
+        );
+        closeRecordModal();
+        notifySuccess("Role saved successfully.");
+      } catch (error) {
+        notifyError(error.message || "Unable to save role.");
+      }
+      return;
     }
 
     if (type === "group") {
@@ -1560,7 +1601,12 @@ export function AppProvider({ children }) {
     dismissToast,
     notifySuccess,
     notifyError,
+    notifyWarning,
     refreshPendingActions,
+    refreshMembers,
+    refreshFamilies,
+    refreshMinistries,
+    refreshFinanceRecords,
     syncVisitorState,
     syncProspectState,
     refreshEvangelismCollections,
@@ -2407,6 +2453,28 @@ function hydrateMemberRecord(member) {
     personalPhoto: normalizeMediaField(member.personalPhoto),
     idFrontPhoto: normalizeMediaField(member.idFrontPhoto),
     idBackPhoto: normalizeMediaField(member.idBackPhoto),
+  };
+}
+
+function buildMemberEnrollmentDraft(member, groups, authUser = null) {
+  const hydratedMember = hydrateMemberRecord(member);
+  const groupChain = Array.isArray(hydratedMember.groups)
+    ? hydratedMember.groups
+        .map((group) => group.groupId || group._id || group.id || "")
+        .filter((groupId) => groups.some((item) => (item._id || item.id) === groupId))
+    : [];
+
+  return {
+    ...memberFormTemplate,
+    ...hydratedMember,
+    dateOfBirth: formatDateInputValue(hydratedMember.dateOfBirth),
+    membershipDate: formatDateInputValue(hydratedMember.membershipDate || hydratedMember.dateJoined),
+    dateJoined: formatDateInputValue(hydratedMember.dateJoined || hydratedMember.membershipDate),
+    baptismDate: formatDateInputValue(hydratedMember.baptismDate),
+    dateCaptured: formatDateInputValue(hydratedMember.dateCaptured || hydratedMember.createdAt),
+    dataEntryClerk: hydratedMember.dataEntryClerk || authUser?.displayName || authUser?.username || "",
+    groupChain,
+    familyLinks: Array.isArray(hydratedMember.familyLinks) ? hydratedMember.familyLinks : [],
   };
 }
 

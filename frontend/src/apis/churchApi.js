@@ -268,12 +268,54 @@ export const churchApi = {
     return request("/lookups");
   },
 
+  async getFinanceRecords() {
+    return request("/finance");
+  },
+
+  async getNextFinanceRecordNo() {
+    return request("/finance/next-record-no");
+  },
+
+  async createFinanceRecord(payload) {
+    return request("/finance", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateFinanceRecord(recordId, payload) {
+    return request(`/finance/${recordId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteFinanceRecord(recordId) {
+    return request(`/finance/${recordId}`, {
+      method: "DELETE",
+    });
+  },
+
   async getUsers() {
     return request("/users");
   },
 
   async getRoles() {
     return request("/users/roles");
+  },
+
+  async createRole(payload) {
+    return request("/users/roles", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateRole(roleId, payload) {
+    return request(`/users/roles/${roleId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
   },
 
   async createUser(payload) {
@@ -308,6 +350,67 @@ export const churchApi = {
   async updateAppConfig(payload) {
     return request("/setup/app-config", {
       method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async previewImport(entity, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request(`/imports/preview/${entity}`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  async commitImport(entity, rows) {
+    return request(`/imports/commit/${entity}`, {
+      method: "POST",
+      body: JSON.stringify({ rows }),
+    });
+  },
+
+  async downloadImportTemplate(entity) {
+    const session = getStoredSession();
+    const response = await fetch(`${API_BASE_URL}/imports/template/${entity}`, {
+      headers: session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {},
+    });
+
+    if (!response.ok) {
+      const payload = await safeJson(response);
+      throw new Error(payload.message || "Unable to download template.");
+    }
+
+    return response.text();
+  },
+
+  async getDuplicateCandidates(status = "") {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request(`/ai-assist/duplicates${suffix}`);
+  },
+
+  async reviewDuplicateCandidate(candidateId, payload) {
+    return request(`/ai-assist/duplicates/${candidateId}/review`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAiSuggestions(status = "") {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request(`/ai-assist/suggestions${suffix}`);
+  },
+
+  async generateAiSuggestions(moduleKey, payload = {}) {
+    return request(`/ai-assist/suggestions/generate/${moduleKey}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async reviewAiSuggestion(suggestionId, payload) {
+    return request(`/ai-assist/suggestions/${suggestionId}/review`, {
+      method: "POST",
       body: JSON.stringify(payload),
     });
   },

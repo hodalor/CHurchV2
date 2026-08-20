@@ -8,6 +8,11 @@ const {
   migrateMemberQRCodes,
   regenerateMemberQr,
 } = require("../services/memberQrService");
+const {
+  evaluateDuplicateCandidatesForRecord,
+  upsertDuplicateCandidates,
+} = require("../services/duplicateDetectionService");
+const { generateDuplicateExplanation } = require("../services/aiService");
 const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
@@ -62,8 +67,40 @@ router.post("/qr/migrate", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), asy
 
 router.post("/", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
   try {
+    const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("member", req.body, {
+      minimumScore: 55,
+    });
     const member = await Member.create(normalizeMemberPayload(req.body));
     await assignMemberQr(member, req.user || null);
+    if (duplicateCandidates.length) {
+      const enrichedCandidates = await Promise.all(
+        duplicateCandidates.slice(0, 5).map(async (candidate) => {
+          const explanation = await generateDuplicateExplanation({
+            recordType: "member",
+            incomingLabel: `${member.firstName || ""} ${member.lastName || ""}`.trim(),
+            candidateLabel: candidate.recordLabel,
+            reasons: candidate.matchReasons,
+          });
+          return {
+            ...candidate,
+            aiExplanation: explanation.text,
+          };
+        })
+      );
+
+      await upsertDuplicateCandidates({
+        recordType: "member",
+        baseRecordId: member.memberId,
+        baseRecordLabel: `${member.firstName || ""} ${member.lastName || ""}`.trim(),
+        candidates: enrichedCandidates,
+        sourceModule: "Membership",
+        metadata: {
+          trigger: "create",
+        },
+        user: req.user,
+        ipAddress: req.ip,
+      });
+    }
     const populatedMember = await populateMemberById(member._id);
     res.status(201).json(populatedMember);
   } catch (error) {
@@ -143,6 +180,46 @@ router.put("/:memberId", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async
 
     Object.assign(member, normalizeMemberPayload(req.body));
     await member.save();
+    const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("member", {
+      ...member.toObject(),
+      familyId: member.familyId,
+    }, {
+      minimumScore: 55,
+    });
+    if (duplicateCandidates.length) {
+      const enrichedCandidates = await Promise.all(
+        duplicateCandidates
+          .filter((candidate) => candidate.recordId !== member.memberId)
+          .slice(0, 5)
+          .map(async (candidate) => {
+            const explanation = await generateDuplicateExplanation({
+              recordType: "member",
+              incomingLabel: `${member.firstName || ""} ${member.lastName || ""}`.trim(),
+              candidateLabel: candidate.recordLabel,
+              reasons: candidate.matchReasons,
+            });
+            return {
+              ...candidate,
+              aiExplanation: explanation.text,
+            };
+          })
+      );
+
+      if (enrichedCandidates.length) {
+        await upsertDuplicateCandidates({
+          recordType: "member",
+          baseRecordId: member.memberId,
+          baseRecordLabel: `${member.firstName || ""} ${member.lastName || ""}`.trim(),
+          candidates: enrichedCandidates,
+          sourceModule: "Membership",
+          metadata: {
+            trigger: "update",
+          },
+          user: req.user,
+          ipAddress: req.ip,
+        });
+      }
+    }
     const populatedMember = await populateMemberById(member._id);
 
     return res.json(populatedMember);

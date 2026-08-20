@@ -98,7 +98,7 @@ export default function SetupPage() {
         <section className="surface-card">
           <div className="simple-list">
             {roles.map((role) => (
-              <div className="simple-list-item clickable-card" key={role.id} onClick={() => openRecordModal("role", role)}>
+              <div className="simple-list-item clickable-card" key={role._id || role.id || role.name} onClick={() => openRecordModal("role", role)}>
                 <div>
                   <strong>{role.name}</strong>
                   <p>{role.description}</p>

@@ -7,6 +7,7 @@ import {
   FaComments,
   FaCoins,
   FaCog,
+  FaRobot,
   FaGraduationCap,
   FaHandHoldingHeart,
   FaHeartbeat,
@@ -79,6 +80,10 @@ export const navigationSections = [
     { label: "KPIs", path: "/strategic/kpis" },
     { label: "Scorecards", path: "/strategic/scorecards" },
   ], permission: "view_strategic_planning" },
+  { label: "AI Assist", path: "/ai-assist", icon: FaRobot, children: [
+    { label: "Duplicates", path: "/ai-assist/duplicates" },
+    { label: "Suggestions", path: "/ai-assist/suggestions" },
+  ], permission: "view_ai_assist" },
   { label: "Users", path: "/users", icon: FaUserShield, permission: "manage_users" },
   { label: "Settings", path: "/settings", icon: FaCog, children: [
     { label: "App Config", path: "/settings/app-config" },

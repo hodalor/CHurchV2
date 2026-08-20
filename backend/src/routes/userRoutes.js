@@ -21,6 +21,63 @@ router.get("/roles", authorizePermissions(PERMISSIONS.MANAGE_USERS), async (req,
   res.json(roles);
 });
 
+router.post("/roles", authorizePermissions(PERMISSIONS.MANAGE_USERS), async (req, res) => {
+  try {
+    const role = await Role.create({
+      name: req.body.name,
+      description: req.body.description || "",
+      permissions: Array.isArray(req.body.permissions) ? req.body.permissions : [],
+      isSystem: false,
+    });
+
+    await logAudit({
+      action: "create",
+      module: "System",
+      recordType: "Role",
+      recordId: role._id.toString(),
+      newValue: role.toObject(),
+      user: req.user,
+      ipAddress: req.ip,
+    });
+
+    res.status(201).json(role);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.put("/roles/:roleId", authorizePermissions(PERMISSIONS.MANAGE_USERS), async (req, res) => {
+  try {
+    const role = await Role.findById(req.params.roleId);
+    if (!role) {
+      return res.status(404).json({ message: "Role not found." });
+    }
+
+    const previousValue = role.toObject();
+    role.name = req.body.name || role.name;
+    role.description = req.body.description || "";
+    if (Array.isArray(req.body.permissions)) {
+      role.permissions = req.body.permissions;
+    }
+    await role.save();
+
+    await logAudit({
+      action: "update",
+      module: "System",
+      recordType: "Role",
+      recordId: role._id.toString(),
+      previousValue,
+      newValue: role.toObject(),
+      user: req.user,
+      ipAddress: req.ip,
+    });
+
+    return res.json(role);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
 router.post("/", authorizePermissions(PERMISSIONS.MANAGE_USERS), async (req, res) => {
   try {
     const roleIds = Array.isArray(req.body.roleIds) ? req.body.roleIds : [];

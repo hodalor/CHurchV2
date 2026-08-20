@@ -54,6 +54,10 @@ export default function MemberEnrollmentModal() {
     setEnrolmentStep((current) => Math.max(current - 1, 0));
   };
 
+  const handleStepSelect = (stepIndex) => {
+    setEnrolmentStep(stepIndex);
+  };
+
   const handleMediaUpload = async (fieldName, event) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -74,13 +78,29 @@ export default function MemberEnrollmentModal() {
 
   return (
     <ModalShell
-      title="Membership Enrolment"
-      subtitle="Capture the member in guided sections so the user is not overwhelmed."
+      title={memberForm._id ? "Edit Member" : "Membership Enrolment"}
+      subtitle={
+        memberForm._id
+          ? "Move through the guided steps and complete any missing information before saving."
+          : "Capture the member in guided sections so the user is not overwhelmed."
+      }
       onClose={closeModal}
     >
       <div className="wizard-steps">
         {steps.map((step, index) => (
-          <div key={step} className={index === enrolmentStep ? "wizard-step active" : "wizard-step"}>
+          <div
+            key={step}
+            className={index === enrolmentStep ? "wizard-step active" : "wizard-step"}
+            role="button"
+            tabIndex={0}
+            onClick={() => handleStepSelect(index)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleStepSelect(index);
+              }
+            }}
+          >
             <span>{index + 1}</span>
             <strong>{step}</strong>
           </div>
@@ -481,7 +501,7 @@ export default function MemberEnrollmentModal() {
           Back
         </button>
         <button type="button" className="primary-button" onClick={handleNext} disabled={mediaUploadState.loading}>
-          {enrolmentStep === steps.length - 1 ? "Save Member" : "Next"}
+          {enrolmentStep === steps.length - 1 ? (memberForm._id ? "Update Member" : "Save Member") : "Next"}
         </button>
       </div>
     </ModalShell>

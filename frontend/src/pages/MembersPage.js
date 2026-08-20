@@ -1,7 +1,10 @@
 import { FaSearch } from "react-icons/fa";
+import { useState } from "react";
+import BulkImportModal from "../components/common/BulkImportModal";
 import { useAppContext } from "../context/AppContext";
 
 export default function MembersPage() {
+  const [showImportModal, setShowImportModal] = useState(false);
   const {
     filteredMembers,
     ministries,
@@ -45,6 +48,11 @@ export default function MembersPage() {
               </option>
             ))}
           </select>
+          <div className="toolbar-actions">
+            <button type="button" className="ghost-button" onClick={() => setShowImportModal(true)}>
+              Bulk Upload
+            </button>
+          </div>
         </div>
 
         <div className="table-accent-bar" />
@@ -139,6 +147,8 @@ export default function MembersPage() {
           </table>
         </div>
       </section>
+
+      {showImportModal ? <BulkImportModal entity="members" onClose={() => setShowImportModal(false)} /> : null}
     </div>
   );
 }

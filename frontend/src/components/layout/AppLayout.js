@@ -15,6 +15,7 @@ import FamilyHouseholdsPage from "../../pages/FamilyHouseholdsPage";
 import FinancePage from "../../pages/FinancePage";
 import AttendancePage from "../../pages/AttendancePage";
 import CommunicationPage from "../../pages/CommunicationPage";
+import AiAssistPage from "../../pages/AiAssistPage";
 import SpiritualHealthPage from "../../pages/SpiritualHealthPage";
 import LeadershipDevelopmentPage from "../../pages/LeadershipDevelopmentPage";
 import StrategicPlanningPage from "../../pages/StrategicPlanningPage";
@@ -96,6 +97,9 @@ export default function AppLayout() {
                 <Route path="/strategic/plans" element={<StrategicPlanningPage />} />
                 <Route path="/strategic/kpis" element={<StrategicPlanningPage />} />
                 <Route path="/strategic/scorecards" element={<StrategicPlanningPage />} />
+                <Route path="/ai-assist" element={<Navigate to="/ai-assist/duplicates" replace />} />
+                <Route path="/ai-assist/duplicates" element={authUser?.permissions?.includes("view_ai_assist") ? <AiAssistPage /> : <Navigate to="/dashboard" replace />} />
+                <Route path="/ai-assist/suggestions" element={authUser?.permissions?.includes("view_ai_assist") ? <AiAssistPage /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/users" element={authUser?.permissions?.includes("manage_users") ? <UsersPage /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/settings" element={<Navigate to="/settings/app-config" replace />} />
                 <Route path="/settings/app-config" element={authUser?.permissions?.includes("manage_settings") ? <SettingsPage /> : <Navigate to="/dashboard" replace />} />
@@ -176,6 +180,14 @@ function getPageMeta(pathname) {
       title: "Users",
       subtitle: "User accounts and roles stay separate from church membership records.",
       action: "user",
+    };
+  }
+
+  if (pathname.startsWith("/ai-assist")) {
+    return {
+      title: "AI Assist",
+      subtitle: "Review duplicate candidates and advisory drafts before any human action is taken.",
+      action: null,
     };
   }
 

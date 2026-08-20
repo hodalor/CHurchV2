@@ -15,6 +15,11 @@ const {
   getRetentionMetrics,
   populateVisitorQuery,
 } = require("../services/visitorService");
+const {
+  evaluateDuplicateCandidatesForRecord,
+  upsertDuplicateCandidates,
+} = require("../services/duplicateDetectionService");
+const { generateDuplicateExplanation } = require("../services/aiService");
 const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
@@ -49,8 +54,12 @@ router.get("/retention-metrics", authorizePermissions(PERMISSIONS.VIEW_VISITORS)
 
 router.post("/", authorizePermissions(PERMISSIONS.MANAGE_VISITORS), async (req, res) => {
   try {
+    const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("visitor", req.body, {
+      minimumScore: 55,
+    });
     const visitor = await createVisitor(req.body);
     const populatedVisitor = await getPopulatedVisitor(visitor.visitorId);
+    await createVisitorDuplicateCandidates(visitor, duplicateCandidates, req.user, req.ip);
     await logAudit({
       action: "create",
       module: "Visitor Management",
@@ -85,6 +94,10 @@ router.put("/:visitorId", authorizePermissions(PERMISSIONS.MANAGE_VISITORS), asy
   visitor.assignedFollowUpUserId = req.body.assignedFollowUpUserId || visitor.assignedFollowUpUserId;
   visitor.assignedFollowUpMemberId = req.body.assignedFollowUpMemberId || visitor.assignedFollowUpMemberId;
   await visitor.save();
+  const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("visitor", visitor.toObject(), {
+    minimumScore: 55,
+  });
+  await createVisitorDuplicateCandidates(visitor, duplicateCandidates.filter((candidate) => candidate.recordId !== visitor.visitorId), req.user, req.ip);
   const populatedVisitor = await getPopulatedVisitor(visitor.visitorId);
 
   await logAudit({
@@ -258,3 +271,38 @@ router.post("/:visitorId/convert-to-member", authorizePermissions(PERMISSIONS.CO
 });
 
 module.exports = router;
+
+async function createVisitorDuplicateCandidates(visitor, duplicateCandidates = [], user = null, ipAddress = "") {
+  const filteredCandidates = duplicateCandidates.filter((candidate) => candidate.recordId !== visitor.visitorId).slice(0, 5);
+  if (!filteredCandidates.length) {
+    return;
+  }
+
+  const enrichedCandidates = await Promise.all(
+    filteredCandidates.map(async (candidate) => {
+      const explanation = await generateDuplicateExplanation({
+        recordType: "visitor",
+        incomingLabel: `${visitor.firstName || ""} ${visitor.surname || ""}`.trim(),
+        candidateLabel: candidate.recordLabel,
+        reasons: candidate.matchReasons,
+      });
+      return {
+        ...candidate,
+        aiExplanation: explanation.text,
+      };
+    })
+  );
+
+  await upsertDuplicateCandidates({
+    recordType: "visitor",
+    baseRecordId: visitor.visitorId,
+    baseRecordLabel: `${visitor.firstName || ""} ${visitor.surname || ""}`.trim(),
+    candidates: enrichedCandidates,
+    sourceModule: "Visitor Management",
+    metadata: {
+      trigger: "save",
+    },
+    user,
+    ipAddress,
+  });
+}

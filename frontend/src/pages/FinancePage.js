@@ -43,8 +43,8 @@ export default function FinancePage() {
               </tr>
             </thead>
             <tbody>
-              {financeRecords.map((record) => (
-                <tr key={record.id} className="clickable-row" onClick={() => openRecordModal("finance", record)}>
+              {financeRecords.length ? financeRecords.map((record) => (
+                <tr key={record._id || record.id || record.recordNo} className="clickable-row" onClick={() => openRecordModal("finance", record)}>
                   <td>{record.recordNo}</td>
                   <td>{record.category}</td>
                   <td>{record.description}</td>
@@ -54,7 +54,13 @@ export default function FinancePage() {
                     <span className={`status-pill ${record.status.toLowerCase()}`}>{record.status}</span>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={6} className="empty-table">
+                    No finance records have been posted yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

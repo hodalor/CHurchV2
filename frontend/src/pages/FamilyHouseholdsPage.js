@@ -1,3 +1,5 @@
+import { useState } from "react";
+import BulkImportModal from "../components/common/BulkImportModal";
 import { useAppContext } from "../context/AppContext";
 
 function getName(value) {
@@ -9,6 +11,7 @@ function getName(value) {
 }
 
 export default function FamilyHouseholdsPage() {
+  const [showImportModal, setShowImportModal] = useState(false);
   const { families, groups, openRecordModal, familyApiState } = useAppContext();
 
   if (familyApiState.loading) {
@@ -22,6 +25,17 @@ export default function FamilyHouseholdsPage() {
   return (
     <div className="page-grid">
       <section className="surface-card data-card">
+        <div className="section-headline compact">
+          <div>
+            <h3>Households</h3>
+            <p>Open any row to view or edit a household, or import many households from a template.</p>
+          </div>
+          <div className="toolbar-actions">
+            <button type="button" className="ghost-button" onClick={() => setShowImportModal(true)}>
+              Bulk Upload
+            </button>
+          </div>
+        </div>
         <div className="table-accent-bar" />
         <div className="table-wrap">
           <table className="data-table">
@@ -64,6 +78,8 @@ export default function FamilyHouseholdsPage() {
           </table>
         </div>
       </section>
+
+      {showImportModal ? <BulkImportModal entity="households" onClose={() => setShowImportModal(false)} /> : null}
     </div>
   );
 }

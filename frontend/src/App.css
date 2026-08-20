@@ -1307,6 +1307,13 @@
   gap: 18px;
 }
 
+.toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
 .wizard-steps {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1440,6 +1447,19 @@
 
 .upload-actions .upload-input {
   display: none;
+}
+
+.import-file-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.import-file-button .upload-input {
+  display: none;
+}
+
+.align-end {
+  justify-content: flex-end;
 }
 
 .upload-preview a {

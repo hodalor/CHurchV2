@@ -3,6 +3,11 @@ const Family = require("../models/Family");
 const Member = require("../models/Member");
 const authenticate = require("../middleware/authenticate");
 const { authorizePermissions } = require("../middleware/authorize");
+const {
+  evaluateDuplicateCandidatesForRecord,
+  upsertDuplicateCandidates,
+} = require("../services/duplicateDetectionService");
+const { generateDuplicateExplanation } = require("../services/aiService");
 const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
@@ -31,6 +36,7 @@ router.post("/", authorizePermissions(PERMISSIONS.MANAGE_HOUSEHOLDS), async (req
     const payload = await normalizeFamilyPayload(req.body);
     const family = await Family.create(payload);
     await syncMembersToFamily(payload);
+    await createHouseholdDuplicateCandidates(family, req.user, req.ip);
     res.status(201).json(family);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -50,6 +56,7 @@ router.put("/:id", authorizePermissions(PERMISSIONS.MANAGE_HOUSEHOLDS), async (r
     }
 
     await syncMembersToFamily(payload);
+    await createHouseholdDuplicateCandidates(family, req.user, req.ip);
     return res.json(family);
   } catch (error) {
     return res.status(400).json({ message: error.message });
@@ -172,4 +179,42 @@ async function syncMembersToFamily(family) {
       )
     )
   );
+}
+
+async function createHouseholdDuplicateCandidates(family, user = null, ipAddress = "") {
+  const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("household", family.toObject(), {
+    minimumScore: 55,
+  });
+  const filteredCandidates = duplicateCandidates.filter((candidate) => candidate.recordId !== family.familyId).slice(0, 5);
+  if (!filteredCandidates.length) {
+    return;
+  }
+
+  const enrichedCandidates = await Promise.all(
+    filteredCandidates.map(async (candidate) => {
+      const explanation = await generateDuplicateExplanation({
+        recordType: "household",
+        incomingLabel: family.familyName || family.familyId,
+        candidateLabel: candidate.recordLabel,
+        reasons: candidate.matchReasons,
+      });
+      return {
+        ...candidate,
+        aiExplanation: explanation.text,
+      };
+    })
+  );
+
+  await upsertDuplicateCandidates({
+    recordType: "household",
+    baseRecordId: family.familyId,
+    baseRecordLabel: family.familyName || family.familyId,
+    candidates: enrichedCandidates,
+    sourceModule: "Family",
+    metadata: {
+      trigger: "save",
+    },
+    user,
+    ipAddress,
+  });
 }
