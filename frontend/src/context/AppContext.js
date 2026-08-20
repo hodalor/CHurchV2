@@ -136,6 +136,49 @@ export function AppProvider({ children }) {
     ];
   }, [members]);
 
+  const memberGenderBreakdown = useMemo(() => {
+    const maleCount = members.filter((member) => member.gender === "Male").length;
+    const femaleCount = members.filter((member) => member.gender === "Female").length;
+
+    return [
+      { name: "Male", value: maleCount, color: "#3b82f6" },
+      { name: "Female", value: femaleCount, color: "#ec4899" },
+    ];
+  }, [members]);
+
+  const dashboardAudienceBreakdown = useMemo(() => {
+    const childrenCount = members.filter((member) => member.memberType === "Child").length;
+    const youthCount = members.filter((member) => {
+      const age = getPersonAge(member.dateOfBirth);
+      return age !== null && age >= 13 && age <= 35;
+    }).length;
+
+    return [
+      { name: "Male", value: members.filter((member) => member.gender === "Male").length, color: "#3b82f6" },
+      { name: "Female", value: members.filter((member) => member.gender === "Female").length, color: "#ec4899" },
+      { name: "Children", value: childrenCount, color: "#f59e0b" },
+      { name: "Youth", value: youthCount, color: "#10b981" },
+      { name: "Visitors", value: visitors.length, color: "#8b5cf6" },
+      { name: "Prospects", value: prospects.length, color: "#14b8a6" },
+    ];
+  }, [members, prospects.length, visitors.length]);
+
+  const memberStatusBreakdown = useMemo(() => {
+    const statusMap = members.reduce((accumulator, member) => {
+      const key = member.membershipStatus || "Unknown";
+      accumulator[key] = (accumulator[key] || 0) + 1;
+      return accumulator;
+    }, {});
+
+    return Object.entries(statusMap)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        color: ["#7c5cff", "#22c55e", "#f59e0b", "#ef4444", "#0ea5e9", "#ec4899"][index % 6],
+      }))
+      .sort((left, right) => right.value - left.value);
+  }, [members]);
+
   const visitorHowHeardOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "visitor_how_heard"),
     [lookupState.values]
@@ -1613,6 +1656,9 @@ export function AppProvider({ children }) {
     attendanceTrend,
     dashboardStats,
     memberDistribution,
+    memberGenderBreakdown,
+    dashboardAudienceBreakdown,
+    memberStatusBreakdown,
     memberSearch,
     setMemberSearch,
     memberMinistryFilter,
@@ -2595,6 +2641,27 @@ function formatCurrencyValue(value, currency) {
     const symbol = currency?.symbol || currencyCode;
     return `${symbol}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   }
+}
+
+function getPersonAge(value) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - parsed.getFullYear();
+  const monthDifference = today.getMonth() - parsed.getMonth();
+
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < parsed.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
 }
 
 function buildPermissionCatalog() {

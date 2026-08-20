@@ -1,8 +1,11 @@
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -13,7 +16,17 @@ import {
 import { useAppContext } from "../context/AppContext";
 
 export default function DashboardPage() {
-  const { dashboardStats, attendanceTrend, memberDistribution, members, financeRecords, formatCurrency } = useAppContext();
+  const {
+    dashboardStats,
+    attendanceTrend,
+    memberDistribution,
+    memberGenderBreakdown,
+    dashboardAudienceBreakdown,
+    memberStatusBreakdown,
+    members,
+    financeRecords,
+    formatCurrency,
+  } = useAppContext();
 
   return (
     <div className="page-grid">
@@ -82,6 +95,107 @@ export default function DashboardPage() {
                 <i style={{ background: entry.color }} />
                 {entry.name}: {entry.value}
               </span>
+            ))}
+          </div>
+        </article>
+      </section>
+
+      <section className="content-layout">
+        <article className="surface-card">
+          <div className="section-headline">
+            <div>
+              <h3>People Overview</h3>
+              <p>Male, female, children, youth, visitors, and prospects at a glance.</p>
+            </div>
+          </div>
+
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={dashboardAudienceBreakdown} barSize={34}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} />
+              <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                {dashboardAudienceBreakdown.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </article>
+
+        <article className="surface-card side-panel">
+          <div className="section-headline">
+            <div>
+              <h3>Gender Split</h3>
+              <p>Current male and female member counts.</p>
+            </div>
+          </div>
+
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie data={memberGenderBreakdown} dataKey="value" nameKey="name" innerRadius={50} outerRadius={82}>
+                {memberGenderBreakdown.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+
+          <div className="legend-row">
+            {memberGenderBreakdown.map((entry) => (
+              <span key={entry.name}>
+                <i style={{ background: entry.color }} />
+                {entry.name}: {entry.value}
+              </span>
+            ))}
+          </div>
+        </article>
+      </section>
+
+      <section className="content-layout">
+        <article className="surface-card">
+          <div className="section-headline">
+            <div>
+              <h3>Membership Status</h3>
+              <p>See how the church body is currently distributed by status.</p>
+            </div>
+          </div>
+
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={memberStatusBreakdown} layout="vertical" margin={{ left: 12, right: 12 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+              <XAxis type="number" tickLine={false} axisLine={false} allowDecimals={false} />
+              <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={120} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="value" name="Members" radius={[0, 10, 10, 0]}>
+                {memberStatusBreakdown.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </article>
+
+        <article className="surface-card side-panel">
+          <div className="section-headline">
+            <div>
+              <h3>Quick Ratios</h3>
+              <p>Helpful summary of the current people mix.</p>
+            </div>
+          </div>
+
+          <div className="simple-list">
+            {dashboardAudienceBreakdown.map((entry) => (
+              <div className="simple-list-item" key={entry.name}>
+                <div>
+                  <strong>{entry.name}</strong>
+                  <p>Current recorded count</p>
+                </div>
+                <span className="status-pill info">{entry.value}</span>
+              </div>
             ))}
           </div>
         </article>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { FaChevronDown } from "react-icons/fa";
 import { navigationSections } from "../../lib/navigation";
 import { useAppContext } from "../../context/AppContext";
@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { branding } = useAppContext();
   const { authUser } = useAuth();
   const availableSections = useMemo(() => {
@@ -48,10 +49,26 @@ export default function Sidebar() {
     });
   }, [availableSections, location.pathname]);
 
-  const toggleSection = (label) => {
+  const handleSectionClick = (item) => {
+    const isSectionActive =
+      location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+
+    if (!item.children?.length) {
+      return;
+    }
+
+    if (!isSectionActive) {
+      setOpenSections((current) => ({
+        ...current,
+        [item.label]: true,
+      }));
+      navigate(item.children[0].path);
+      return;
+    }
+
     setOpenSections((current) => ({
       ...current,
-      [label]: !current[label],
+      [item.label]: !current[item.label],
     }));
   };
 
@@ -80,7 +97,7 @@ export default function Sidebar() {
                   <button
                     type="button"
                     className={isSectionActive || openSections[item.label] ? "nav-item active nav-toggle" : "nav-item nav-toggle"}
-                    onClick={() => toggleSection(item.label)}
+                    onClick={() => handleSectionClick(item)}
                   >
                     <span className="nav-item-main">
                       <Icon />
