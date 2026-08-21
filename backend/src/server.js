@@ -32,7 +32,19 @@ const visitorRoutes = require("./routes/visitorRoutes");
 const app = express();
 const PORT = process.env.PORT || 5100;
 
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      const allowedOrigins = getAllowedOrigins();
+
+      if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("CORS origin not allowed."));
+    },
+  })
+);
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/api/health", (req, res) => {
@@ -85,4 +97,11 @@ async function startServer() {
     console.error("Unable to start backend:", error.message);
     process.exit(1);
   }
+}
+
+function getAllowedOrigins() {
+  return String(process.env.CORS_ORIGIN || process.env.FRONTEND_URL || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
