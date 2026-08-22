@@ -76,6 +76,15 @@ const transactionSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
     notes: {
       type: String,
       trim: true,

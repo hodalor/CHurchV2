@@ -1,9 +1,12 @@
 const express = require("express");
 const authenticate = require("../middleware/authenticate");
 const { authorizePermissions } = require("../middleware/authorize");
+const { listDepositAccounts } = require("../services/churchProfileService");
 const { listLookupValuesByType } = require("../services/lookupService");
 const {
   approveExpense,
+  approveReconciliation,
+  createReconciliation,
   createBudget,
   createExpense,
   createPledge,
@@ -16,6 +19,7 @@ const {
   listExpenses,
   listFunds,
   listPledges,
+  listReconciliations,
   listTransactions,
   payExpense,
   recordPledgePayment,
@@ -64,18 +68,22 @@ router.get("/next-record-no", authorizePermissions(PERMISSIONS.VIEW_FINANCE), as
 
 router.get("/options", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
-    const [funds, transactionMethods, transactionTypes, expenseCategories] = await Promise.all([
+    const [funds, transactionMethods, expensePaymentMethods, transactionTypes, expenseCategories, depositAccounts] = await Promise.all([
       listFunds(),
       listLookupValuesByType("finance_transaction_method"),
+      listLookupValuesByType("finance_expense_payment_method"),
       listLookupValuesByType("finance_transaction_type"),
       listLookupValuesByType("finance_expense_category"),
+      listDepositAccounts(),
     ]);
 
     res.json({
       funds,
       transactionMethods,
+      expensePaymentMethods,
       transactionTypes,
       expenseCategories,
+      depositAccounts,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -198,6 +206,37 @@ router.get("/expenses", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (r
     res.json(await listExpenses({ filters: req.query }));
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/reconciliations", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
+  try {
+    res.json(await listReconciliations({ filters: req.query }));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/reconciliations", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    res.status(201).json(await createReconciliation({ payload: req.body, user: req.user, ipAddress: req.ip }));
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/reconciliations/:reconciliationId/approve", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    res.json(
+      await approveReconciliation({
+        reconciliationId: req.params.reconciliationId,
+        approvalNotes: req.body.approvalNotes || "",
+        user: req.user,
+        ipAddress: req.ip,
+      })
+    );
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 });
 

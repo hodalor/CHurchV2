@@ -35,6 +35,10 @@ const expenseSchema = new mongoose.Schema(
       ref: "Budget",
       default: null,
     },
+    sourceAccountId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
     ministryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Ministry",

@@ -2,6 +2,7 @@ const express = require("express");
 const ChurchProfile = require("../models/ChurchProfile");
 const authenticate = require("../middleware/authenticate");
 const { authorizePermissions } = require("../middleware/authorize");
+const { listDepositAccounts, saveDepositAccount } = require("../services/churchProfileService");
 const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
@@ -45,6 +46,7 @@ router.get("/app-config", authenticate, async (req, res) => {
         profile?.defaultCurrencyCode ||
         normalizeCurrencies(profile?.currencies)[0]?.code ||
         DEFAULT_CURRENCIES[0].code,
+      depositAccounts: Array.isArray(profile?.depositAccounts) ? profile.depositAccounts : [],
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -86,6 +88,7 @@ router.put("/app-config", authenticate, authorizePermissions(PERMISSIONS.MANAGE_
       currencies,
       defaultCurrencyCode:
         currencies.find((item) => item.code === requestedDefault)?.code || currencies[0]?.code || DEFAULT_CURRENCIES[0].code,
+      depositAccounts: Array.isArray(req.body.depositAccounts) ? req.body.depositAccounts : existingProfile?.depositAccounts || [],
     };
 
     if (!existingProfile) {
@@ -101,6 +104,37 @@ router.put("/app-config", authenticate, authorizePermissions(PERMISSIONS.MANAGE_
     return res.json(existingProfile);
   } catch (error) {
     return res.status(400).json({ message: error.message });
+  }
+});
+
+router.get("/deposit-accounts", authenticate, authorizePermissions(PERMISSIONS.VIEW_SETUP), async (req, res) => {
+  try {
+    res.json(await listDepositAccounts());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/deposit-accounts", authenticate, authorizePermissions(PERMISSIONS.MANAGE_SETTINGS), async (req, res) => {
+  try {
+    const accounts = await saveDepositAccount({ payload: req.body, user: req.user, ipAddress: req.ip });
+    res.status(201).json(accounts);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.put("/deposit-accounts/:accountId", authenticate, authorizePermissions(PERMISSIONS.MANAGE_SETTINGS), async (req, res) => {
+  try {
+    const accounts = await saveDepositAccount({
+      accountId: req.params.accountId,
+      payload: req.body,
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    res.json(accounts);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 });
 

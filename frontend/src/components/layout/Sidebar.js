@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { FaChevronDown } from "react-icons/fa";
 import { navigationSections } from "../../lib/navigation";
 import { useAppContext } from "../../context/AppContext";
@@ -7,7 +7,6 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function Sidebar() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { branding } = useAppContext();
   const { authUser } = useAuth();
   const availableSections = useMemo(() => {
@@ -25,51 +24,31 @@ export default function Sidebar() {
   const [openSections, setOpenSections] = useState(defaultOpenState);
 
   useEffect(() => {
-    setOpenSections((current) => {
-      const nextState = availableSections.reduce((accumulator, item) => {
-        if (!item.children) {
-          return accumulator;
-        }
+    const nextState = availableSections.reduce((accumulator, item) => {
+      if (item.children) {
+        accumulator[item.label] = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+      }
+      return accumulator;
+    }, {});
 
-        const isActiveSection = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-        accumulator[item.label] = current[item.label] ?? isActiveSection;
-        if (isActiveSection) {
-          accumulator[item.label] = true;
-        }
-        return accumulator;
-      }, {});
-
-      const currentKeys = Object.keys(current);
-      const nextKeys = Object.keys(nextState);
-      const hasSameShape =
-        currentKeys.length === nextKeys.length &&
-        nextKeys.every((key) => current[key] === nextState[key]);
-
-      return hasSameShape ? current : nextState;
-    });
+    setOpenSections(nextState);
   }, [availableSections, location.pathname]);
 
   const handleSectionClick = (item) => {
-    const isSectionActive =
-      location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-
     if (!item.children?.length) {
       return;
     }
 
-    if (!isSectionActive) {
-      setOpenSections((current) => ({
-        ...current,
-        [item.label]: true,
-      }));
-      navigate(item.children[0].path);
-      return;
-    }
+    setOpenSections((current) =>
+      availableSections.reduce((accumulator, section) => {
+        if (!section.children?.length) {
+          return accumulator;
+        }
 
-    setOpenSections((current) => ({
-      ...current,
-      [item.label]: !current[item.label],
-    }));
+        accumulator[section.label] = section.label === item.label ? !current[item.label] : false;
+        return accumulator;
+      }, {})
+    );
   };
 
   return (
@@ -96,7 +75,7 @@ export default function Sidebar() {
                 {item.children ? (
                   <button
                     type="button"
-                    className={isSectionActive || openSections[item.label] ? "nav-item active nav-toggle" : "nav-item nav-toggle"}
+                    className={isSectionActive ? "nav-item active nav-toggle" : "nav-item nav-toggle"}
                     onClick={() => handleSectionClick(item)}
                   >
                     <span className="nav-item-main">

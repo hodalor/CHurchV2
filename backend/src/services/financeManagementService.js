@@ -1,9 +1,9 @@
+const mongoose = require("mongoose");
 const Budget = require("../models/Budget");
+const ChurchProfile = require("../models/ChurchProfile");
 const Expense = require("../models/Expense");
+const FinanceReconciliation = require("../models/FinanceReconciliation");
 const Fund = require("../models/Fund");
-const Member = require("../models/Member");
-const Family = require("../models/Family");
-const LookupValue = require("../models/LookupValue");
 const Pledge = require("../models/Pledge");
 const Transaction = require("../models/Transaction");
 const { logAudit } = require("./auditService");
@@ -17,6 +17,7 @@ const {
 } = require("./financePolicyService");
 const { voidWithReversal } = require("./financialCorrectionService");
 const { computeVariance } = require("./varianceService");
+const { listDepositAccounts } = require("./churchProfileService");
 
 async function listFunds() {
   return Fund.find().sort({ active: -1, name: 1 });
@@ -79,6 +80,7 @@ async function listTransactions({ user, filters = {} } = {}) {
     .populate("method", "label key")
     .populate("transactionType", "label key")
     .populate("recordedBy", "displayName username")
+    .populate("approvedBy", "displayName username")
     .populate("linkedPledgeId", "pledgedAmount status")
     .sort({ date: -1, createdAt: -1 });
 
@@ -159,6 +161,8 @@ async function voidTransaction({ transactionId, reason, user, ipAddress = "" }) 
       referenceNumber: transaction.referenceNumber,
       receiptNumber: await getNextReceiptNumber(),
       recordedBy: user?._id,
+      approvedBy: user?._id,
+      approvedAt: new Date(),
       notes: `Reversal for receipt ${transaction.receiptNumber}. ${String(reason || "").trim()}`.trim(),
       linkedPledgeId: transaction.linkedPledgeId || null,
       status: "posted",
@@ -250,7 +254,7 @@ async function listExpenses({ filters = {} } = {}) {
     query.ministryId = filters.ministryId;
   }
 
-  return Expense.find(query)
+  const expenses = await Expense.find(query)
     .populate("category", "label key")
     .populate("paymentMethod", "label key")
     .populate("budgetLineId", "period")
@@ -258,6 +262,8 @@ async function listExpenses({ filters = {} } = {}) {
     .populate("requestedBy", "displayName username")
     .populate("approvedBy", "displayName username")
     .sort({ date: -1, createdAt: -1 });
+
+  return decorateExpensesWithAccounts(expenses);
 }
 
 async function createExpense({ payload, user, ipAddress = "" }) {
@@ -277,6 +283,89 @@ async function createExpense({ payload, user, ipAddress = "" }) {
   return expense;
 }
 
+async function listReconciliations({ filters = {} } = {}) {
+  const query = {};
+  if (filters.status) {
+    query.status = filters.status;
+  }
+  const rows = await FinanceReconciliation.find(query)
+    .populate("method", "label key")
+    .populate("sourceTransactionIds", "receiptNumber amount")
+    .populate("initiatedBy", "displayName username")
+    .populate("approvedBy", "displayName username")
+    .sort({ reconciliationDate: -1, createdAt: -1 });
+
+  return decorateReconciliations(rows);
+}
+
+async function createReconciliation({ payload, user, ipAddress = "" }) {
+  if (!payload.reconciliationDate) {
+    throw new Error("Reconciliation date is required.");
+  }
+  if (!payload.method) {
+    throw new Error("Collection method is required.");
+  }
+  if (!payload.depositAccountId) {
+    throw new Error("Deposit account is required.");
+  }
+  if (!Number.isFinite(Number(payload.amount || 0)) || Number(payload.amount || 0) <= 0) {
+    throw new Error("Deposit amount is required.");
+  }
+
+  const reconciliation = await FinanceReconciliation.create({
+    reconciliationDate: new Date(payload.reconciliationDate),
+    serviceEventRef: String(payload.serviceEventRef || "").trim(),
+    method: payload.method,
+    sourceTransactionIds: Array.isArray(payload.sourceTransactionIds) ? payload.sourceTransactionIds.filter(Boolean) : [],
+    depositAccountId: payload.depositAccountId,
+    amount: Number(payload.amount || 0),
+    initiatedBy: user?._id,
+    notes: String(payload.notes || "").trim(),
+  });
+
+  await logAudit({
+    action: "create",
+    module: "Finance",
+    recordType: "FinanceReconciliation",
+    recordId: String(reconciliation._id),
+    newValue: reconciliation.toObject(),
+    user,
+    ipAddress,
+  });
+
+  return reconciliation;
+}
+
+async function approveReconciliation({ reconciliationId, user, ipAddress = "", approvalNotes = "" }) {
+  const reconciliation = await FinanceReconciliation.findById(reconciliationId);
+  if (!reconciliation) {
+    throw new Error("Reconciliation not found.");
+  }
+  if (!canApproveExpense(user, reconciliation.amount)) {
+    throw new Error("You are not allowed to approve this reconciliation.");
+  }
+
+  const previousValue = reconciliation.toObject();
+  reconciliation.status = "approved";
+  reconciliation.approvedBy = user?._id || null;
+  reconciliation.approvedAt = new Date();
+  reconciliation.approvalNotes = String(approvalNotes || "").trim();
+  await reconciliation.save();
+
+  await logAudit({
+    action: "status-change",
+    module: "Finance",
+    recordType: "FinanceReconciliation",
+    recordId: String(reconciliation._id),
+    previousValue,
+    newValue: reconciliation.toObject(),
+    user,
+    ipAddress,
+  });
+
+  return reconciliation;
+}
+
 async function approveExpense({ expenseId, user, ipAddress = "" }) {
   const expense = await Expense.findById(expenseId);
   if (!expense) {
@@ -284,6 +373,9 @@ async function approveExpense({ expenseId, user, ipAddress = "" }) {
   }
   if (!canApproveExpense(user, expense.amount)) {
     throw new Error("You are not allowed to approve this expense.");
+  }
+  if (expense.amount > (await computeAvailableAccountBalance(expense.sourceAccountId, { excludeExpenseId: expense._id }))) {
+    throw new Error("This expense is above the available account balance.");
   }
 
   const previousValue = expense.toObject();
@@ -341,6 +433,9 @@ async function payExpense({ expenseId, paymentMethod, paymentDate, user, ipAddre
   if (!expense) {
     throw new Error("Expense not found.");
   }
+  if (expense.amount > (await computeAvailableAccountBalance(expense.sourceAccountId, { excludeExpenseId: expense._id }))) {
+    throw new Error("This expense is above the available account balance.");
+  }
 
   const previousValue = expense.toObject();
   expense.status = "paid";
@@ -387,6 +482,7 @@ async function voidExpense({ expenseId, reason, user, ipAddress = "" }) {
       paymentMethod: expense.paymentMethod || null,
       receiptImageUrl: expense.receiptImageUrl || "",
       budgetLineId: expense.budgetLineId || null,
+      sourceAccountId: expense.sourceAccountId || null,
       ministryId: expense.ministryId || null,
       status: "paid",
       requestedBy: user?._id,
@@ -447,11 +543,13 @@ async function createBudget({ payload, user, ipAddress = "" }) {
 }
 
 async function getFinanceOverview({ user }) {
-  const [transactions, expenses, pledges, budgets] = await Promise.all([
+  const [transactions, expenses, pledges, budgets, reconciliations, depositAccounts] = await Promise.all([
     listTransactions({ user }),
     listExpenses({}),
     listPledges({ user }),
     listBudgets({}),
+    listReconciliations({}),
+    listDepositAccounts(),
   ]);
 
   const currentIncome = transactions
@@ -481,8 +579,16 @@ async function getFinanceOverview({ user }) {
       overBudgetLines,
       nearBudgetLines: budgets.filter((item) => Number(item.variancePercent || 0) >= -10 && Number(item.variancePercent || 0) < 0).length,
     },
+    accountSnapshot: await Promise.all(
+      depositAccounts.map(async (account) => ({
+        _id: account._id,
+        name: account.name,
+        balance: await computeAvailableAccountBalance(account._id),
+      }))
+    ),
     recentTransactions: transactions.slice(0, 8),
     recentExpenses: expenses.slice(0, 8),
+    recentReconciliations: reconciliations.slice(0, 8),
     approvalThreshold: getExpenseApprovalThreshold(),
   };
 }
@@ -619,6 +725,8 @@ async function normalizeTransactionPayload(payload = {}, user) {
     referenceNumber: String(payload.referenceNumber || "").trim(),
     receiptNumber: payload.receiptNumber || (await getNextReceiptNumber()),
     recordedBy: user?._id,
+    approvedBy: user?._id,
+    approvedAt: new Date(),
     notes: String(payload.notes || "").trim(),
     linkedPledgeId: payload.linkedPledgeId || null,
     status: payload.status || "posted",
@@ -666,11 +774,18 @@ async function normalizeExpensePayload(payload = {}, user) {
   if (!String(payload.payee || "").trim()) {
     throw new Error("Payee is required.");
   }
-  if (!Number(payload.amount || 0)) {
+  if (!Number.isFinite(Number(payload.amount || 0)) || Number(payload.amount || 0) <= 0) {
     throw new Error("Amount is required.");
+  }
+  if (!payload.sourceAccountId) {
+    throw new Error("Select the account to deduct from.");
   }
 
   const amount = Number(payload.amount || 0);
+  const availableBalance = await computeAvailableAccountBalance(payload.sourceAccountId);
+  if (amount > availableBalance) {
+    throw new Error(`Requested amount exceeds available account balance (${availableBalance}).`);
+  }
 
   return {
     date: new Date(payload.date),
@@ -680,6 +795,7 @@ async function normalizeExpensePayload(payload = {}, user) {
     paymentMethod: payload.paymentMethod || null,
     receiptImageUrl: String(payload.receiptImageUrl || "").trim(),
     budgetLineId: payload.budgetLineId || null,
+    sourceAccountId: payload.sourceAccountId,
     ministryId: payload.ministryId || null,
     status: payload.status || "requested",
     requestedBy: user?._id,
@@ -738,6 +854,68 @@ async function computeBudgetActualAmount(budget) {
   return Number(totals[0]?.total || 0);
 }
 
+async function computeAvailableAccountBalance(accountId, { excludeExpenseId = "" } = {}) {
+  const normalizedAccountId = String(accountId || "");
+  if (!normalizedAccountId) {
+    return 0;
+  }
+
+  const expenseMatch = {
+    sourceAccountId: normalizeObjectIdLike(normalizedAccountId),
+    status: { $in: ["requested", "approved", "paid"] },
+  };
+
+  if (excludeExpenseId) {
+    expenseMatch._id = {
+      $ne: normalizeObjectIdLike(excludeExpenseId),
+    };
+  }
+
+  const approvedReconciliations = await FinanceReconciliation.aggregate([
+    { $match: { depositAccountId: normalizeObjectIdLike(normalizedAccountId), status: "approved" } },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+  const committedExpenses = await Expense.aggregate([
+    { $match: expenseMatch },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+
+  return Number(approvedReconciliations[0]?.total || 0) - Number(committedExpenses[0]?.total || 0);
+}
+
+async function decorateExpensesWithAccounts(expenses = []) {
+  const accounts = await listDepositAccounts();
+  const accountMap = new Map(accounts.map((account) => [String(account._id), { ...account.toObject?.() || account }]));
+
+  return expenses.map((expense) => {
+    const plain = expense.toObject();
+    return {
+      ...plain,
+      sourceAccount: accountMap.get(String(plain.sourceAccountId || "")) || null,
+    };
+  });
+}
+
+async function decorateReconciliations(reconciliations = []) {
+  const accounts = await listDepositAccounts();
+  const accountMap = new Map(accounts.map((account) => [String(account._id), { ...account.toObject?.() || account }]));
+
+  return reconciliations.map((row) => {
+    const plain = row.toObject();
+    return {
+      ...plain,
+      depositAccount: accountMap.get(String(plain.depositAccountId || "")) || null,
+    };
+  });
+}
+
+function normalizeObjectIdLike(value) {
+  if (!value) {
+    return value;
+  }
+  return mongoose.Types.ObjectId.isValid(String(value)) ? new mongoose.Types.ObjectId(String(value)) : value;
+}
+
 function buildDateQuery(filters = {}) {
   const query = {};
   if (filters.dateFrom || filters.dateTo) {
@@ -791,6 +969,8 @@ function buildMonthlyTotals(items = [], dateField = "date", amountField = "amoun
 
 module.exports = {
   approveExpense,
+  approveReconciliation,
+  createReconciliation,
   createBudget,
   createExpense,
   createPledge,
@@ -803,6 +983,7 @@ module.exports = {
   listExpenses,
   listFunds,
   listPledges,
+  listReconciliations,
   listTransactions,
   payExpense,
   recordPledgePayment,

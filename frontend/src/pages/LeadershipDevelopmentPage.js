@@ -38,6 +38,8 @@ export default function LeadershipDevelopmentPage() {
     report: null,
   });
   const [activeModal, setActiveModal] = useState("");
+  const [talentTab, setTalentTab] = useState("skills");
+  const [successionTab, setSuccessionTab] = useState("requirements");
   const [roleForm, setRoleForm] = useState({ memberId: "", roleName: "", startDate: new Date().toISOString().slice(0, 10) });
   const [skillForm, setSkillForm] = useState({ memberId: "", skillOrTalent: "", proficiencyNote: "" });
   const [flagForm, setFlagForm] = useState({ memberId: "", notes: "", status: "" });
@@ -64,6 +66,18 @@ export default function LeadershipDevelopmentPage() {
   const permissions = authUser?.permissions || [];
   const canManageLeadership = permissions.includes("manage_leadership");
   const canViewSuccession = permissions.includes("view_succession_sensitive");
+  const talentTabs = [
+    { key: "skills", label: "Skills", modal: "skill", buttonLabel: "Add Skill" },
+    { key: "flags", label: "Flags", modal: "flag", buttonLabel: "Flag Leader" },
+    { key: "mentors", label: "Mentors", modal: "mentor", buttonLabel: "Add Mentor" },
+    { key: "trainings", label: "Training", modal: "training", buttonLabel: "Add Training" },
+  ];
+  const successionTabs = [
+    { key: "requirements", label: "Requirements", modal: "requirement", buttonLabel: "Add Requirement" },
+    { key: "readiness", label: "Readiness", modal: "readiness", buttonLabel: "Add Readiness" },
+  ];
+  const activeTalentTab = talentTabs.find((item) => item.key === talentTab) || talentTabs[0];
+  const activeSuccessionTab = successionTabs.find((item) => item.key === successionTab) || successionTabs[0];
 
   useEffect(() => {
     loadData();
@@ -173,84 +187,95 @@ export default function LeadershipDevelopmentPage() {
             <div className="section-headline compact">
               <div>
                 <h3>Talent Development</h3>
-                <p>Capture skills, emerging leaders, mentors, and training with the same modal-only workflow used elsewhere.</p>
+                <p>Switch between talent registers with tabs instead of stacking every table in one long page.</p>
               </div>
               <div className="toolbar-row">
-                <button type="button" className="ghost-button" onClick={() => setActiveModal("skill")}>
-                  Add Skill
-                </button>
-                <button type="button" className="ghost-button" onClick={() => setActiveModal("flag")}>
-                  Flag Leader
-                </button>
-                <button type="button" className="ghost-button" onClick={() => setActiveModal("mentor")}>
-                  Add Mentor
-                </button>
-                <button type="button" className="primary-button" onClick={() => setActiveModal("training")}>
-                  Add Training
+                <div className="tab-row">
+                  {talentTabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      className={`tab-button ${talentTab === tab.key ? "active" : ""}`}
+                      onClick={() => setTalentTab(tab.key)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="primary-button" onClick={() => setActiveModal(activeTalentTab.modal)}>
+                  {activeTalentTab.buttonLabel}
                 </button>
               </div>
             </div>
           </section>
-          <TableCard
-            title="Skill Register"
-            columns={["Member", "Skill", "Note", "Actions"]}
-            rows={state.skills.map((item) => [
-              `${item.memberId?.memberId || ""} - ${item.memberId?.firstName || ""} ${item.memberId?.lastName || ""}`.trim(),
-              item.skillOrTalent,
-              item.proficiencyNote || "-",
-              <DeleteButton
-                key={`delete-skill-${item._id}`}
-                onClick={() => deleteRecord(item.skillOrTalent || "skill", () => churchApi.deleteLeadershipSkill(item._id), "skills", item._id)}
-              />,
-            ])}
-            emptyMessage="No skill records yet."
-          />
-          <TableCard
-            title="Emerging Leader Flags"
-            columns={["Member", "Status", "Flagged Date", "Notes", "Actions"]}
-            rows={state.flags.map((item) => [
-              `${item.memberId?.memberId || ""} - ${item.memberId?.firstName || ""} ${item.memberId?.lastName || ""}`.trim(),
-              item.status?.label || "-",
-              formatDate(item.flaggedDate),
-              item.notes || "-",
-              <DeleteButton
-                key={`delete-flag-${item._id}`}
-                onClick={() => deleteRecord("emerging leader flag", () => churchApi.deleteEmergingLeaderFlag(item._id), "flags", item._id)}
-              />,
-            ])}
-            emptyMessage="No emerging leader flags yet."
-          />
-          <TableCard
-            title="Mentor Assignments"
-            columns={["Mentee", "Mentor", "Status", "Focus Area", "Actions"]}
-            rows={state.mentors.map((item) => [
-              `${item.menteeId?.memberId || ""} - ${item.menteeId?.firstName || ""} ${item.menteeId?.lastName || ""}`.trim(),
-              `${item.mentorId?.memberId || ""} - ${item.mentorId?.firstName || ""} ${item.mentorId?.lastName || ""}`.trim(),
-              item.status?.label || "-",
-              item.focusArea || "-",
-              <DeleteButton
-                key={`delete-mentor-${item._id}`}
-                onClick={() => deleteRecord("mentor assignment", () => churchApi.deleteMentorAssignment(item._id), "mentors", item._id)}
-              />,
-            ])}
-            emptyMessage="No mentor assignments yet."
-          />
-          <TableCard
-            title="Leadership Training Records"
-            columns={["Member", "Training", "Date", "Provider", "Status", "Actions"]}
-            rows={state.trainings.map((item) => [
-              `${item.memberId?.memberId || ""} - ${item.memberId?.firstName || ""} ${item.memberId?.lastName || ""}`.trim(),
-              item.trainingName || "-",
-              formatDate(item.date),
-              item.provider || "-",
-              item.completionStatus || "-",
-              <DeleteButton
-                key={`delete-training-${item._id}`}
-                onClick={() => deleteRecord(item.trainingName || "training record", () => churchApi.deleteLeadershipTrainingRecord(item._id), "trainings", item._id)}
-              />,
-            ])}
-            emptyMessage="No training records yet."
-          />
+          {talentTab === "skills" ? (
+            <TableCard
+              title="Skill Register"
+              columns={["Member", "Skill", "Note", "Actions"]}
+              rows={state.skills.map((item) => [
+                `${item.memberId?.memberId || ""} - ${item.memberId?.firstName || ""} ${item.memberId?.lastName || ""}`.trim(),
+                item.skillOrTalent,
+                item.proficiencyNote || "-",
+                <DeleteButton
+                  key={`delete-skill-${item._id}`}
+                  onClick={() => deleteRecord(item.skillOrTalent || "skill", () => churchApi.deleteLeadershipSkill(item._id), "skills", item._id)}
+                />,
+              ])}
+              emptyMessage="No skill records yet."
+            />
+          ) : null}
+          {talentTab === "flags" ? (
+            <TableCard
+              title="Emerging Leader Flags"
+              columns={["Member", "Status", "Flagged Date", "Notes", "Actions"]}
+              rows={state.flags.map((item) => [
+                `${item.memberId?.memberId || ""} - ${item.memberId?.firstName || ""} ${item.memberId?.lastName || ""}`.trim(),
+                item.status?.label || "-",
+                formatDate(item.flaggedDate),
+                item.notes || "-",
+                <DeleteButton
+                  key={`delete-flag-${item._id}`}
+                  onClick={() => deleteRecord("emerging leader flag", () => churchApi.deleteEmergingLeaderFlag(item._id), "flags", item._id)}
+                />,
+              ])}
+              emptyMessage="No emerging leader flags yet."
+            />
+          ) : null}
+          {talentTab === "mentors" ? (
+            <TableCard
+              title="Mentor Assignments"
+              columns={["Mentee", "Mentor", "Status", "Focus Area", "Actions"]}
+              rows={state.mentors.map((item) => [
+                `${item.menteeId?.memberId || ""} - ${item.menteeId?.firstName || ""} ${item.menteeId?.lastName || ""}`.trim(),
+                `${item.mentorId?.memberId || ""} - ${item.mentorId?.firstName || ""} ${item.mentorId?.lastName || ""}`.trim(),
+                item.status?.label || "-",
+                item.focusArea || "-",
+                <DeleteButton
+                  key={`delete-mentor-${item._id}`}
+                  onClick={() => deleteRecord("mentor assignment", () => churchApi.deleteMentorAssignment(item._id), "mentors", item._id)}
+                />,
+              ])}
+              emptyMessage="No mentor assignments yet."
+            />
+          ) : null}
+          {talentTab === "trainings" ? (
+            <TableCard
+              title="Leadership Training Records"
+              columns={["Member", "Training", "Date", "Provider", "Status", "Actions"]}
+              rows={state.trainings.map((item) => [
+                `${item.memberId?.memberId || ""} - ${item.memberId?.firstName || ""} ${item.memberId?.lastName || ""}`.trim(),
+                item.trainingName || "-",
+                formatDate(item.date),
+                item.provider || "-",
+                item.completionStatus || "-",
+                <DeleteButton
+                  key={`delete-training-${item._id}`}
+                  onClick={() => deleteRecord(item.trainingName || "training record", () => churchApi.deleteLeadershipTrainingRecord(item._id), "trainings", item._id)}
+                />,
+              ])}
+              emptyMessage="No training records yet."
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -261,51 +286,64 @@ export default function LeadershipDevelopmentPage() {
             <div className="section-headline compact">
               <div>
                 <h3>Succession Planning</h3>
-                <p>Keep readiness and requirement records restricted and off the page until needed.</p>
+                <p>Keep succession records in focused tabs so the page stays easy to scan.</p>
               </div>
               <div className="toolbar-row">
-                <button type="button" className="ghost-button" onClick={() => setActiveModal("requirement")} disabled={!canManageLeadership}>
-                  Add Requirement
-                </button>
-                <button type="button" className="primary-button" onClick={() => setActiveModal("readiness")} disabled={!canManageLeadership}>
-                  Add Readiness
+                <div className="tab-row">
+                  {successionTabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      className={`tab-button ${successionTab === tab.key ? "active" : ""}`}
+                      onClick={() => setSuccessionTab(tab.key)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="primary-button" onClick={() => setActiveModal(activeSuccessionTab.modal)} disabled={!canManageLeadership}>
+                  {activeSuccessionTab.buttonLabel}
                 </button>
               </div>
             </div>
           </section>
-          <TableCard
-            title="Succession Requirements"
-            columns={["Role", "Key Role", "Requirements", "Actions"]}
-            rows={state.requirements.map((item) => [
-              item.roleName?.label || "-",
-              item.keyRole ? "Yes" : "No",
-              item.requirements || "-",
-              <DeleteButton
-                key={`delete-requirement-${item._id}`}
-                onClick={() =>
-                  deleteRecord(item.roleName?.label || "succession requirement", () => churchApi.deleteSuccessionRequirement(item._id), "requirements", item._id)
-                }
-              />,
-            ])}
-            emptyMessage="No succession requirements yet."
-          />
-          <TableCard
-            title="Succession Readiness Register"
-            columns={["Member", "Target Role", "Readiness", "Assessed Date", "Actions"]}
-            rows={state.readiness.map((item) => [
-              `${item.memberId?.memberId || ""} - ${item.memberId?.firstName || ""} ${item.memberId?.lastName || ""}`.trim(),
-              item.targetRoleName?.label || "-",
-              item.readinessCategory?.label || "-",
-              formatDate(item.assessedDate),
-              <DeleteButton
-                key={`delete-readiness-${item._id}`}
-                onClick={() =>
-                  deleteRecord(item.targetRoleName?.label || "succession readiness", () => churchApi.deleteSuccessionReadiness(item._id), "readiness", item._id)
-                }
-              />,
-            ])}
-            emptyMessage="No succession readiness records yet."
-          />
+          {successionTab === "requirements" ? (
+            <TableCard
+              title="Succession Requirements"
+              columns={["Role", "Key Role", "Requirements", "Actions"]}
+              rows={state.requirements.map((item) => [
+                item.roleName?.label || "-",
+                item.keyRole ? "Yes" : "No",
+                item.requirements || "-",
+                <DeleteButton
+                  key={`delete-requirement-${item._id}`}
+                  onClick={() =>
+                    deleteRecord(item.roleName?.label || "succession requirement", () => churchApi.deleteSuccessionRequirement(item._id), "requirements", item._id)
+                  }
+                />,
+              ])}
+              emptyMessage="No succession requirements yet."
+            />
+          ) : null}
+          {successionTab === "readiness" ? (
+            <TableCard
+              title="Succession Readiness Register"
+              columns={["Member", "Target Role", "Readiness", "Assessed Date", "Actions"]}
+              rows={state.readiness.map((item) => [
+                `${item.memberId?.memberId || ""} - ${item.memberId?.firstName || ""} ${item.memberId?.lastName || ""}`.trim(),
+                item.targetRoleName?.label || "-",
+                item.readinessCategory?.label || "-",
+                formatDate(item.assessedDate),
+                <DeleteButton
+                  key={`delete-readiness-${item._id}`}
+                  onClick={() =>
+                    deleteRecord(item.targetRoleName?.label || "succession readiness", () => churchApi.deleteSuccessionReadiness(item._id), "readiness", item._id)
+                  }
+                />,
+              ])}
+              emptyMessage="No succession readiness records yet."
+            />
+          ) : null}
         </>
         ) : (
           <section className="surface-card data-card">

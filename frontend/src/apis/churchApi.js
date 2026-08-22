@@ -328,6 +328,25 @@ export const churchApi = {
     });
   },
 
+  async getReconciliations(params = {}) {
+    const search = new URLSearchParams(params).toString();
+    return request(`/finance/reconciliations${search ? `?${search}` : ""}`);
+  },
+
+  async createReconciliation(payload) {
+    return request("/finance/reconciliations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async approveReconciliation(reconciliationId, approvalNotes = "") {
+    return request(`/finance/reconciliations/${reconciliationId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ approvalNotes }),
+    });
+  },
+
   async getPledges(params = {}) {
     const search = new URLSearchParams(params).toString();
     return request(`/finance/pledges${search ? `?${search}` : ""}`);
@@ -521,6 +540,24 @@ export const churchApi = {
 
   async getAppConfig() {
     return request("/setup/app-config");
+  },
+
+  async getDepositAccounts() {
+    return request("/setup/deposit-accounts");
+  },
+
+  async createDepositAccount(payload) {
+    return request("/setup/deposit-accounts", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateDepositAccount(accountId, payload) {
+    return request(`/setup/deposit-accounts/${accountId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
   },
 
   async updateAppConfig(payload) {

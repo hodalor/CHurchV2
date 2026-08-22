@@ -109,7 +109,15 @@ async function seedLookupData() {
       key: "finance_transaction_method",
       label: "Finance Transaction Method",
       module: "finance",
-      values: ["Cash", "Mobile Money", "Bank Transfer", "Cheque", "Other"],
+      values: ["Collection Box", "Pouched", "Mobile Money", "Bank Account", "Cash"],
+      strictSync: true,
+    },
+    {
+      key: "finance_expense_payment_method",
+      label: "Finance Expense Payment Method",
+      module: "finance",
+      values: ["Cash", "Mobile Money", "Bank Account", "Other"],
+      strictSync: true,
     },
     {
       key: "finance_transaction_type",
@@ -205,8 +213,11 @@ async function seedLookupData() {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
+    const seededKeys = [];
+
     for (const [index, label] of seed.values.entries()) {
       const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      seededKeys.push(key);
       await LookupValue.findOneAndUpdate(
         { type: lookupType._id, key },
         {
@@ -217,6 +228,20 @@ async function seedLookupData() {
           },
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+
+    if (seed.strictSync) {
+      await LookupValue.updateMany(
+        {
+          type: lookupType._id,
+          key: { $nin: seededKeys },
+        },
+        {
+          $set: {
+            isActive: false,
+          },
+        }
       );
     }
   }

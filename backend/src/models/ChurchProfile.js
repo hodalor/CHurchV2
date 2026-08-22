@@ -1,5 +1,35 @@
 const mongoose = require("mongoose");
 
+const depositAccountSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+      required: true,
+    },
+    accountNumber: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    provider: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    type: {
+      type: String,
+      enum: ["bank", "mobile_money", "cash", "other"],
+      default: "bank",
+    },
+    active: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  { _id: true }
+);
+
 const churchProfileSchema = new mongoose.Schema(
   {
     appName: {
@@ -65,6 +95,10 @@ const churchProfileSchema = new mongoose.Schema(
     website: {
       type: String,
       trim: true,
+    },
+    depositAccounts: {
+      type: [depositAccountSchema],
+      default: [],
     },
   },
   {

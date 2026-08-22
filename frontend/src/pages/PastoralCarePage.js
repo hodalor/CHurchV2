@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { FaPlus } from "react-icons/fa";
+import ModalShell from "../components/common/ModalShell";
 import { churchApi } from "../apis/churchApi";
 import { useAppContext } from "../context/AppContext";
 
@@ -54,6 +56,7 @@ export default function PastoralCarePage() {
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [counselingForm, setCounselingForm] = useState(emptyCounselingForm);
   const [visitationForm, setVisitationForm] = useState(emptyVisitationForm);
+  const [activeModal, setActiveModal] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -108,6 +111,7 @@ export default function PastoralCarePage() {
     try {
       await churchApi.createCareCase(normalizeBlankObject(caseForm));
       setCaseForm(emptyCaseForm);
+      setActiveModal("");
       await refreshCareState();
       notifySuccess("Care case saved.");
     } catch (error) {
@@ -120,6 +124,7 @@ export default function PastoralCarePage() {
     try {
       await churchApi.createCareNote(normalizeBlankObject(noteForm));
       setNoteForm(emptyNoteForm);
+      setActiveModal("");
       await refreshCareState();
       notifySuccess("Care note saved.");
     } catch (error) {
@@ -135,6 +140,7 @@ export default function PastoralCarePage() {
         attendees: counselingForm.attendees.split(",").map((item) => item.trim()).filter(Boolean),
       });
       setCounselingForm(emptyCounselingForm);
+      setActiveModal("");
       await refreshCareState();
       notifySuccess("Counseling session saved.");
     } catch (error) {
@@ -147,6 +153,7 @@ export default function PastoralCarePage() {
     try {
       await churchApi.createVisitationRecord(normalizeBlankObject(visitationForm));
       setVisitationForm(emptyVisitationForm);
+      setActiveModal("");
       await refreshCareState();
       notifySuccess("Visitation record saved.");
     } catch (error) {
@@ -193,11 +200,119 @@ export default function PastoralCarePage() {
         </article>
       </section>
 
-      {activeSection === "cases" && (
-        <>
-          <section className="surface-card data-card">
-            <div className="toolbar-row"><h3>Formal Care Case</h3></div>
-            <form className="form-grid" onSubmit={handleCreateCase}>
+      {activeSection === "cases" ? (
+        <DataTable
+          title="Care Cases"
+          action={(
+            <button type="button" className="primary-button" onClick={() => setActiveModal("case")}>
+              <FaPlus />
+              Add Care Case
+            </button>
+          )}
+          columns={["Title", "Category", "Subject", "Tier", "Status"]}
+          rows={cases.map((item) => [
+            item.title || "-",
+            item.category || "-",
+            item.memberId ? `${item.memberId.firstName} ${item.memberId.lastName}` : item.householdId?.familyName || "-",
+            item.confidentialityTier,
+            item.status,
+          ])}
+        />
+      ) : null}
+
+      {activeSection === "notes" ? (
+        <section className="surface-card data-card">
+          <div className="toolbar-row">
+            <h3>Care Notes</h3>
+            <button type="button" className="primary-button" onClick={() => setActiveModal("note")}>
+              <FaPlus />
+              Add Quick Note
+            </button>
+          </div>
+          <div className="table-accent-bar" />
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Subject</th>
+                  <th>Tier</th>
+                  <th>Preview</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notes.map((item) => (
+                  <tr key={item._id}>
+                    <td>{formatDateTime(item.dateTime)}</td>
+                    <td>{item.noteType?.label || "-"}</td>
+                    <td>{item.memberId ? `${item.memberId.firstName} ${item.memberId.lastName}` : item.householdId?.familyName || "-"}</td>
+                    <td>{item.confidentialityTier}</td>
+                    <td>{String(item.content || "").slice(0, 80)}</td>
+                    <td>
+                      {!item.careCaseId ? (
+                        <button type="button" className="ghost-button small" onClick={() => handlePromoteNote(item._id)}>Promote</button>
+                      ) : (
+                        <span className="detail-label">Attached</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {activeSection === "counseling" ? (
+        <DataTable
+          title="Counseling Sessions"
+          action={(
+            <button type="button" className="primary-button" onClick={() => setActiveModal("counseling")}>
+              <FaPlus />
+              Add Counseling
+            </button>
+          )}
+          columns={["Date", "Type", "Subject", "Tier", "Preview"]}
+          rows={notes
+            .filter((item) => item.metadata?.structuredType === "counseling-session")
+            .map((item) => [
+              formatDateTime(item.dateTime),
+              item.noteType?.label || "-",
+              item.memberId ? `${item.memberId.firstName} ${item.memberId.lastName}` : item.householdId?.familyName || "-",
+              item.confidentialityTier,
+              String(item.content || "").slice(0, 80),
+            ])}
+        />
+      ) : null}
+
+      {activeSection === "visitations" ? (
+        <DataTable
+          title="Visitations"
+          action={(
+            <button type="button" className="primary-button" onClick={() => setActiveModal("visitation")}>
+              <FaPlus />
+              Add Visitation
+            </button>
+          )}
+          columns={["Date", "Type", "Subject", "Tier", "Preview"]}
+          rows={notes
+            .filter((item) => item.metadata?.structuredType === "visitation-record")
+            .map((item) => [
+              formatDateTime(item.dateTime),
+              item.noteType?.label || "-",
+              item.memberId ? `${item.memberId.firstName} ${item.memberId.lastName}` : item.householdId?.familyName || "-",
+              item.confidentialityTier,
+              String(item.content || "").slice(0, 80),
+            ])}
+        />
+      ) : null}
+
+      {activeModal === "case" ? (
+        <ModalShell title="Formal Care Case" subtitle="Open a pastoral care case in a focused modal." onClose={() => setActiveModal("")}>
+          <form className="modal-form" onSubmit={handleCreateCase}>
+            <div className="form-grid">
               <MemberAndHouseholdFields members={members} families={families} form={caseForm} setForm={setCaseForm} />
               <label>
                 Category
@@ -211,9 +326,7 @@ export default function PastoralCarePage() {
                 Responsible Leader
                 <select value={caseForm.responsibleLeaderId} onChange={(event) => setCaseForm((current) => ({ ...current, responsibleLeaderId: event.target.value }))}>
                   <option value="">Unassigned</option>
-                  {users.map((user) => (
-                    <option key={user._id} value={user._id}>{user.displayName || user.username}</option>
-                  ))}
+                  {users.map((user) => <option key={user._id} value={user._id}>{user.displayName || user.username}</option>)}
                 </select>
               </label>
               <ConfidentialityField form={caseForm} setForm={setCaseForm} />
@@ -221,38 +334,24 @@ export default function PastoralCarePage() {
                 Summary
                 <textarea rows={3} value={caseForm.summary} onChange={(event) => setCaseForm((current) => ({ ...current, summary: event.target.value }))} />
               </label>
-              <div className="full-width">
-                <button type="submit" className="primary-button">Save Care Case</button>
-              </div>
-            </form>
-          </section>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="ghost-button" onClick={() => setActiveModal("")}>Cancel</button>
+              <button type="submit" className="primary-button">Save Care Case</button>
+            </div>
+          </form>
+        </ModalShell>
+      ) : null}
 
-          <DataTable
-            title="Care Cases"
-            columns={["Title", "Category", "Subject", "Tier", "Status"]}
-            rows={cases.map((item) => [
-              item.title || "-",
-              item.category || "-",
-              item.memberId ? `${item.memberId.firstName} ${item.memberId.lastName}` : item.householdId?.familyName || "-",
-              item.confidentialityTier,
-              item.status,
-            ])}
-          />
-        </>
-      )}
-
-      {activeSection === "notes" && (
-        <>
-          <section className="surface-card data-card">
-            <div className="toolbar-row"><h3>Quick Note</h3></div>
-            <form className="form-grid" onSubmit={handleCreateNote}>
+      {activeModal === "note" ? (
+        <ModalShell title="Quick Note" subtitle="Capture a brief pastoral touchpoint without leaving the page crowded." onClose={() => setActiveModal("")}>
+          <form className="modal-form" onSubmit={handleCreateNote}>
+            <div className="form-grid">
               <label>
                 Care Case
                 <select value={noteForm.careCaseId} onChange={(event) => setNoteForm((current) => ({ ...current, careCaseId: event.target.value }))}>
                   <option value="">Standalone note</option>
-                  {cases.map((item) => (
-                    <option key={item._id} value={item._id}>{item.title || item.category || item._id}</option>
-                  ))}
+                  {cases.map((item) => <option key={item._id} value={item._id}>{item.title || item.category || item._id}</option>)}
                 </select>
               </label>
               <MemberAndHouseholdFields members={members} families={families} form={noteForm} setForm={setNoteForm} />
@@ -263,10 +362,7 @@ export default function PastoralCarePage() {
               <label>
                 Note Type
                 <select value={noteForm.noteType} onChange={(event) => setNoteForm((current) => ({ ...current, noteType: event.target.value }))}>
-                  <option value="">Select note type</option>
-                  {options.noteTypes.map((item) => (
-                    <option key={item._id} value={item._id}>{item.label}</option>
-                  ))}
+                  {options.noteTypes.map((item) => <option key={item._id} value={item._id}>{item.label}</option>)}
                 </select>
               </label>
               <ConfidentialityField form={noteForm} setForm={setNoteForm} />
@@ -274,143 +370,121 @@ export default function PastoralCarePage() {
                 Content
                 <textarea rows={4} value={noteForm.content} onChange={(event) => setNoteForm((current) => ({ ...current, content: event.target.value }))} />
               </label>
-              <div className="full-width">
-                <button type="submit" className="primary-button">Save Quick Note</button>
-              </div>
-            </form>
-          </section>
-
-          <section className="surface-card data-card">
-            <div className="toolbar-row"><h3>Care Notes</h3></div>
-            <div className="table-accent-bar" />
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Subject</th>
-                    <th>Tier</th>
-                    <th>Preview</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {notes.map((item) => (
-                    <tr key={item._id}>
-                      <td>{formatDateTime(item.dateTime)}</td>
-                      <td>{item.noteType?.label || "-"}</td>
-                      <td>{item.memberId ? `${item.memberId.firstName} ${item.memberId.lastName}` : item.householdId?.familyName || "-"}</td>
-                      <td>{item.confidentialityTier}</td>
-                      <td>{String(item.content || "").slice(0, 80)}</td>
-                      <td>
-                        {!item.careCaseId ? (
-                          <button type="button" className="ghost-button small" onClick={() => handlePromoteNote(item._id)}>
-                            Promote
-                          </button>
-                        ) : (
-                          <span className="detail-label">Attached</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
-          </section>
-        </>
-      )}
-
-      {activeSection === "counseling" && (
-        <section className="surface-card data-card">
-          <div className="toolbar-row"><h3>Counseling Session</h3></div>
-          <form className="form-grid" onSubmit={handleCreateCounseling}>
-            <label>
-              Care Case
-              <select value={counselingForm.careCaseId} onChange={(event) => setCounselingForm((current) => ({ ...current, careCaseId: event.target.value }))}>
-                <option value="">Optional</option>
-                {cases.map((item) => (
-                  <option key={item._id} value={item._id}>{item.title || item.category || item._id}</option>
-                ))}
-              </select>
-            </label>
-            <MemberAndHouseholdFields members={members} families={families} form={counselingForm} setForm={setCounselingForm} />
-            <label>
-              Session Number
-              <input value={counselingForm.sessionNumber} onChange={(event) => setCounselingForm((current) => ({ ...current, sessionNumber: event.target.value }))} />
-            </label>
-            <label>
-              Topic
-              <input value={counselingForm.topic} onChange={(event) => setCounselingForm((current) => ({ ...current, topic: event.target.value }))} />
-            </label>
-            <label>
-              Attendees
-              <input value={counselingForm.attendees} onChange={(event) => setCounselingForm((current) => ({ ...current, attendees: event.target.value }))} placeholder="Comma separated names" />
-            </label>
-            <ConfidentialityField form={counselingForm} setForm={setCounselingForm} />
-            <label className="full-width">
-              Content
-              <textarea rows={4} value={counselingForm.content} onChange={(event) => setCounselingForm((current) => ({ ...current, content: event.target.value }))} />
-            </label>
-            <label className="full-width">
-              Follow-up Plan
-              <textarea rows={3} value={counselingForm.followUpPlan} onChange={(event) => setCounselingForm((current) => ({ ...current, followUpPlan: event.target.value }))} />
-            </label>
-            <div className="full-width">
-              <button type="submit" className="primary-button">Save Counseling Session</button>
+            <div className="modal-actions">
+              <button type="button" className="ghost-button" onClick={() => setActiveModal("")}>Cancel</button>
+              <button type="submit" className="primary-button">Save Note</button>
             </div>
           </form>
-        </section>
-      )}
+        </ModalShell>
+      ) : null}
 
-      {activeSection === "visitations" && (
-        <section className="surface-card data-card">
-          <div className="toolbar-row"><h3>Visitation Record</h3></div>
-          <form className="form-grid" onSubmit={handleCreateVisitation}>
-            <label>
-              Care Case
-              <select value={visitationForm.careCaseId} onChange={(event) => setVisitationForm((current) => ({ ...current, careCaseId: event.target.value }))}>
-                <option value="">Optional</option>
-                {cases.map((item) => (
-                  <option key={item._id} value={item._id}>{item.title || item.category || item._id}</option>
-                ))}
-              </select>
-            </label>
-            <MemberAndHouseholdFields members={members} families={families} form={visitationForm} setForm={setVisitationForm} />
-            <label>
-              Location
-              <select value={visitationForm.location} onChange={(event) => setVisitationForm((current) => ({ ...current, location: event.target.value }))}>
-                <option value="home">Home</option>
-                <option value="hospital">Hospital</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
-            <ConfidentialityField form={visitationForm} setForm={setVisitationForm} />
-            <label className="full-width">
-              Purpose
-              <textarea rows={3} value={visitationForm.purpose} onChange={(event) => setVisitationForm((current) => ({ ...current, purpose: event.target.value }))} />
-            </label>
-            <label className="full-width">
-              Outcome
-              <textarea rows={3} value={visitationForm.outcome} onChange={(event) => setVisitationForm((current) => ({ ...current, outcome: event.target.value }))} />
-            </label>
-            <label>
-              Follow-up Needed
-              <select value={visitationForm.followUpNeeded ? "yes" : "no"} onChange={(event) => setVisitationForm((current) => ({ ...current, followUpNeeded: event.target.value === "yes" }))}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
-            </label>
-            <label>
-              Follow-up Date
-              <input type="date" value={visitationForm.followUpDate} onChange={(event) => setVisitationForm((current) => ({ ...current, followUpDate: event.target.value }))} />
-            </label>
-            <div className="full-width">
+      {activeModal === "counseling" ? (
+        <ModalShell title="Counseling Session" subtitle="Log a structured counseling session from a modal form." onClose={() => setActiveModal("")}>
+          <form className="modal-form" onSubmit={handleCreateCounseling}>
+            <div className="form-grid">
+              <label>
+                Care Case
+                <select value={counselingForm.careCaseId} onChange={(event) => setCounselingForm((current) => ({ ...current, careCaseId: event.target.value }))}>
+                  <option value="">Optional</option>
+                  {cases.map((item) => <option key={item._id} value={item._id}>{item.title || item.category || item._id}</option>)}
+                </select>
+              </label>
+              <MemberAndHouseholdFields members={members} families={families} form={counselingForm} setForm={setCounselingForm} />
+              <label>
+                Session Number
+                <input value={counselingForm.sessionNumber} onChange={(event) => setCounselingForm((current) => ({ ...current, sessionNumber: event.target.value }))} />
+              </label>
+              <label>
+                Topic
+                <input value={counselingForm.topic} onChange={(event) => setCounselingForm((current) => ({ ...current, topic: event.target.value }))} />
+              </label>
+              <label>
+                Attendees
+                <input value={counselingForm.attendees} onChange={(event) => setCounselingForm((current) => ({ ...current, attendees: event.target.value }))} placeholder="Comma separated names" />
+              </label>
+              <label>
+                Note Type
+                <select value={counselingForm.noteType} onChange={(event) => setCounselingForm((current) => ({ ...current, noteType: event.target.value }))}>
+                  {options.noteTypes.map((item) => <option key={item._id} value={item._id}>{item.label}</option>)}
+                </select>
+              </label>
+              <ConfidentialityField form={counselingForm} setForm={setCounselingForm} />
+              <label className="full-width">
+                Content
+                <textarea rows={4} value={counselingForm.content} onChange={(event) => setCounselingForm((current) => ({ ...current, content: event.target.value }))} />
+              </label>
+              <label className="full-width">
+                Follow-up Plan
+                <textarea rows={3} value={counselingForm.followUpPlan} onChange={(event) => setCounselingForm((current) => ({ ...current, followUpPlan: event.target.value }))} />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="ghost-button" onClick={() => setActiveModal("")}>Cancel</button>
+              <button type="submit" className="primary-button">Save Counseling</button>
+            </div>
+          </form>
+        </ModalShell>
+      ) : null}
+
+      {activeModal === "visitation" ? (
+        <ModalShell title="Visitation Record" subtitle="Capture the visit and any follow-up from a modal form." onClose={() => setActiveModal("")}>
+          <form className="modal-form" onSubmit={handleCreateVisitation}>
+            <div className="form-grid">
+              <label>
+                Care Case
+                <select value={visitationForm.careCaseId} onChange={(event) => setVisitationForm((current) => ({ ...current, careCaseId: event.target.value }))}>
+                  <option value="">Optional</option>
+                  {cases.map((item) => <option key={item._id} value={item._id}>{item.title || item.category || item._id}</option>)}
+                </select>
+              </label>
+              <MemberAndHouseholdFields members={members} families={families} form={visitationForm} setForm={setVisitationForm} />
+              <label>
+                Note Type
+                <select value={visitationForm.noteType} onChange={(event) => setVisitationForm((current) => ({ ...current, noteType: event.target.value }))}>
+                  {options.noteTypes.map((item) => <option key={item._id} value={item._id}>{item.label}</option>)}
+                </select>
+              </label>
+              <label>
+                Location
+                <select value={visitationForm.location} onChange={(event) => setVisitationForm((current) => ({ ...current, location: event.target.value }))}>
+                  <option value="home">Home</option>
+                  <option value="hospital">Hospital</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <ConfidentialityField form={visitationForm} setForm={setVisitationForm} />
+              <label className="full-width">
+                Content
+                <textarea rows={3} value={visitationForm.content} onChange={(event) => setVisitationForm((current) => ({ ...current, content: event.target.value }))} />
+              </label>
+              <label className="full-width">
+                Purpose
+                <textarea rows={3} value={visitationForm.purpose} onChange={(event) => setVisitationForm((current) => ({ ...current, purpose: event.target.value }))} />
+              </label>
+              <label className="full-width">
+                Outcome
+                <textarea rows={3} value={visitationForm.outcome} onChange={(event) => setVisitationForm((current) => ({ ...current, outcome: event.target.value }))} />
+              </label>
+              <label>
+                Follow-up Needed
+                <select value={visitationForm.followUpNeeded ? "yes" : "no"} onChange={(event) => setVisitationForm((current) => ({ ...current, followUpNeeded: event.target.value === "yes" }))}>
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </label>
+              <label>
+                Follow-up Date
+                <input type="date" value={visitationForm.followUpDate} onChange={(event) => setVisitationForm((current) => ({ ...current, followUpDate: event.target.value }))} />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="ghost-button" onClick={() => setActiveModal("")}>Cancel</button>
               <button type="submit" className="primary-button">Save Visitation</button>
             </div>
           </form>
-        </section>
-      )}
+        </ModalShell>
+      ) : null}
     </div>
   );
 }
@@ -422,18 +496,14 @@ function MemberAndHouseholdFields({ members, families, form, setForm }) {
         Member
         <select value={form.memberId || ""} onChange={(event) => setForm((current) => ({ ...current, memberId: event.target.value }))}>
           <option value="">None</option>
-          {members.map((member) => (
-            <option key={member._id} value={member._id}>{member.memberId} - {member.firstName} {member.lastName}</option>
-          ))}
+          {members.map((member) => <option key={member._id} value={member._id}>{member.memberId} - {member.firstName} {member.lastName}</option>)}
         </select>
       </label>
       <label>
         Household
         <select value={form.householdId || ""} onChange={(event) => setForm((current) => ({ ...current, householdId: event.target.value }))}>
           <option value="">None</option>
-          {families.map((family) => (
-            <option key={family._id} value={family._id}>{family.familyName}</option>
-          ))}
+          {families.map((family) => <option key={family._id} value={family._id}>{family.familyName}</option>)}
         </select>
       </label>
     </>
@@ -453,10 +523,13 @@ function ConfidentialityField({ form, setForm }) {
   );
 }
 
-function DataTable({ title, columns, rows }) {
+function DataTable({ title, action, columns, rows }) {
   return (
     <section className="surface-card data-card">
-      <div className="toolbar-row"><h3>{title}</h3></div>
+      <div className="toolbar-row">
+        <h3>{title}</h3>
+        {action}
+      </div>
       <div className="table-accent-bar" />
       <div className="table-wrap">
         <table className="data-table">

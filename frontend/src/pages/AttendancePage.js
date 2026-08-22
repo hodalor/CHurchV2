@@ -74,7 +74,6 @@ export default function AttendancePage() {
 
 function ServicesView({ events, members, onOpen }) {
   const { upcomingEvents, pastEvents } = splitAttendanceEvents(events);
-  const latestRate = events[0]?.attendanceRate ? `${events[0].attendanceRate}%` : "0%";
   const openCheckInCount = events.filter((event) => event.isCheckInOpen !== false).length;
   const [serviceTab, setServiceTab] = useState("upcoming");
   const [search, setSearch] = useState("");
@@ -107,6 +106,7 @@ function ServicesView({ events, members, onOpen }) {
     },
   ];
   const activeTab = serviceTabs.find((item) => item.key === serviceTab) || serviceTabs[0];
+  const activeTabAverageRate = getAverageAttendanceRate(activeTab.events);
   const ministryOptions = useMemo(
     () =>
       [...new Map(
@@ -156,21 +156,14 @@ function ServicesView({ events, members, onOpen }) {
   return (
     <>
       <section className="compact-stats-grid">
-        <StatCard color="purple" label="Events" value={events.length} />
-        <StatCard color="blue" label="Upcoming" value={upcomingEvents.length} />
-        <StatCard color="pink" label="Open Check-In" value={openCheckInCount} />
-        <StatCard color="orange" label="Expected Pool" value={members.length} />
-      </section>
-
-      <section className="compact-stats-grid">
-        <StatCard color="purple" label="Past Events" value={pastEvents.length} />
-        <StatCard color="blue" label="Latest Rate" value={latestRate} />
-        <StatCard color="orange" label="Present Count" value={events.reduce((sum, item) => sum + (item.presentCount || 0), 0)} />
+        <StatCard color="purple" label="Incoming" value={upcomingEvents.length} />
+        <StatCard color="blue" label="Past Events" value={pastEvents.length} />
         <StatCard
           color="pink"
-          label="Expected Pool"
-          value={members.length}
+          label={activeTab.key === "past" ? "Average Rate" : "Open Check-In"}
+          value={activeTab.key === "past" ? `${activeTabAverageRate}%` : openCheckInCount}
         />
+        <StatCard color="orange" label="Expected Pool" value={members.length} />
       </section>
 
       <section className="surface-card data-card">
@@ -564,6 +557,15 @@ function splitAttendanceEvents(events = []) {
       pastEvents: [],
     }
   );
+}
+
+function getAverageAttendanceRate(events = []) {
+  if (!events.length) {
+    return 0;
+  }
+
+  const total = events.reduce((sum, item) => sum + Number(item.attendanceRate || 0), 0);
+  return Math.round(total / events.length);
 }
 
 function isUpcomingEvent(event) {

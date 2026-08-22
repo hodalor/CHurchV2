@@ -1,3 +1,7 @@
+import { useEffect, useState } from "react";
+import { FaPlus } from "react-icons/fa";
+import ModalShell from "../components/common/ModalShell";
+import { churchApi } from "../apis/churchApi";
 import { useAppContext } from "../context/AppContext";
 
 function InfoTile({ label, value, wide }) {
@@ -24,20 +28,56 @@ function GroupNode({ group, groupsByParent, depth }) {
   );
 }
 
+const emptyAccountForm = {
+  name: "",
+  accountNumber: "",
+  provider: "",
+  type: "bank",
+  active: true,
+};
+
 export default function SetupPage() {
-  const { activeSetupTab, setActiveSetupTab, groups, groupsByParent, branding, roles, openRecordModal } = useAppContext();
+  const { activeSetupTab, setActiveSetupTab, groups, groupsByParent, branding, roles, openRecordModal, notifyError, notifySuccess, setBranding, authUser } =
+    useAppContext();
+  const [activeModal, setActiveModal] = useState("");
+  const [accountForm, setAccountForm] = useState(emptyAccountForm);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const depositAccounts = Array.isArray(branding.depositAccounts) ? branding.depositAccounts : [];
+  const canManageSettings = authUser?.permissions?.includes("manage_settings");
+
+  useEffect(() => {
+    if (!["groups", "branding", "users", "accounts"].includes(activeSetupTab)) {
+      setActiveSetupTab("groups");
+    }
+  }, [activeSetupTab, setActiveSetupTab]);
+
+  async function handleSaveAccount(event) {
+    event.preventDefault();
+    try {
+      setSavingAccount(true);
+      const nextAccounts = await churchApi.createDepositAccount(accountForm);
+      setBranding((current) => ({ ...current, depositAccounts: nextAccounts }));
+      setAccountForm(emptyAccountForm);
+      setActiveModal("");
+      notifySuccess("Deposit account saved.");
+    } catch (error) {
+      notifyError(error.message || "Unable to save deposit account.");
+    } finally {
+      setSavingAccount(false);
+    }
+  }
 
   return (
     <div className="page-grid">
       <div className="tab-row">
-        {["groups", "branding", "users"].map((tab) => (
+        {["groups", "branding", "users", "accounts"].map((tab) => (
           <button
             key={tab}
             type="button"
             className={activeSetupTab === tab ? "tab-button active" : "tab-button"}
             onClick={() => setActiveSetupTab(tab)}
           >
-            {tab === "users" ? "User Roles" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === "users" ? "User Roles" : tab === "accounts" ? "Deposit Accounts" : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
@@ -107,6 +147,95 @@ export default function SetupPage() {
             ))}
           </div>
         </section>
+      ) : null}
+
+      {activeSetupTab === "accounts" ? (
+        <section className="surface-card data-card">
+          <div className="section-headline compact">
+            <div>
+              <h3>Deposit Accounts</h3>
+              <p>Create the church accounts where reconciled collections are deposited and expenses are deducted.</p>
+            </div>
+            {canManageSettings ? (
+              <button type="button" className="primary-button" onClick={() => setActiveModal("account")}>
+                <FaPlus />
+                Add Account
+              </button>
+            ) : null}
+          </div>
+
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Provider</th>
+                  <th>Account No</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {depositAccounts.length ? (
+                  depositAccounts.map((account) => (
+                    <tr key={account._id || account.name}>
+                      <td>{account.name}</td>
+                      <td>{account.type}</td>
+                      <td>{account.provider || "-"}</td>
+                      <td>{account.accountNumber || "-"}</td>
+                      <td>{account.active !== false ? "Active" : "Inactive"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="empty-table">No deposit accounts configured yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {activeModal === "account" ? (
+        <ModalShell
+          title="Deposit Account"
+          subtitle="Create the account that will receive reconciled collections or fund expenses."
+          onClose={() => setActiveModal("")}
+        >
+          <form className="modal-form" onSubmit={handleSaveAccount}>
+            <div className="form-grid">
+              <label>
+                Account Name
+                <input value={accountForm.name} onChange={(event) => setAccountForm((current) => ({ ...current, name: event.target.value }))} />
+              </label>
+              <label>
+                Type
+                <select value={accountForm.type} onChange={(event) => setAccountForm((current) => ({ ...current, type: event.target.value }))}>
+                  <option value="bank">Bank</option>
+                  <option value="mobile_money">Mobile Money</option>
+                  <option value="cash">Cash</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>
+                Provider / Bank
+                <input value={accountForm.provider} onChange={(event) => setAccountForm((current) => ({ ...current, provider: event.target.value }))} />
+              </label>
+              <label>
+                Account Number
+                <input value={accountForm.accountNumber} onChange={(event) => setAccountForm((current) => ({ ...current, accountNumber: event.target.value }))} />
+              </label>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="ghost-button" onClick={() => setActiveModal("")}>Cancel</button>
+              <button type="submit" className="primary-button" disabled={savingAccount}>
+                {savingAccount ? "Saving..." : "Save Account"}
+              </button>
+            </div>
+          </form>
+        </ModalShell>
       ) : null}
     </div>
   );
