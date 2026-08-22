@@ -1841,6 +1841,37 @@ textarea:focus {
   gap: 12px;
 }
 
+.export-selection-card,
+.export-summary-card {
+  padding: 16px;
+}
+
+.export-field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px 18px;
+}
+
+.export-field-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.export-summary-card p {
+  margin: 0 0 10px;
+}
+
+.export-summary-line {
+  margin: 0;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  font-weight: 600;
+  scrollbar-width: thin;
+}
+
 @media (max-width: 1180px) {
   .content-layout,
   .compact-stats-grid,
@@ -1906,5 +1937,9 @@ textarea:focus {
   .toolbar-date-input,
   .large-action {
     width: 100%;
+  }
+
+  .export-field-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { FaCheck, FaMinus, FaSearch } from "react-icons/fa";
 import BulkImportModal from "../components/common/BulkImportModal";
+import ExportOptionsModal from "../components/common/ExportOptionsModal";
 import { useAppContext } from "../context/AppContext";
-import { exportRowsToCsv, exportRowsToPdf } from "../utils/exportUtils";
 
 export default function MembersPage() {
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [memberGenderFilter, setMemberGenderFilter] = useState("all");
   const [memberHouseholdFilter, setMemberHouseholdFilter] = useState("all");
   const [memberStatusFilter, setMemberStatusFilter] = useState("all");
@@ -213,23 +214,6 @@ export default function MembersPage() {
     { key: "baptismStatus", header: "Baptism Status" },
   ];
 
-  const handleExportMembersCsv = () => {
-    exportRowsToCsv({
-      fileName: "members-export.csv",
-      columns: memberExportColumns,
-      rows: memberRows,
-    });
-  };
-
-  const handleExportMembersPdf = () => {
-    exportRowsToPdf({
-      fileName: "members-export.pdf",
-      title: "Members Export",
-      columns: memberExportColumns,
-      rows: memberRows,
-    });
-  };
-
   return (
     <div className="page-grid">
       <section className="compact-stats-grid">
@@ -309,11 +293,8 @@ export default function MembersPage() {
             <option value="name_desc">Sort: Name Z-A</option>
           </select>
           <div className="toolbar-actions">
-            <button type="button" className="ghost-button" onClick={handleExportMembersCsv}>
-              Export CSV
-            </button>
-            <button type="button" className="ghost-button" onClick={handleExportMembersPdf}>
-              Export PDF
+            <button type="button" className="ghost-button" onClick={() => setShowExportModal(true)}>
+              Export
             </button>
             <button type="button" className="ghost-button" onClick={() => setShowImportModal(true)}>
               Bulk Upload
@@ -447,6 +428,51 @@ export default function MembersPage() {
           </table>
         </div>
       </section>
+
+      {showExportModal ? (
+        <ExportOptionsModal
+          open={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          title="Export Members"
+          fileBaseName="members-export"
+          columns={memberExportColumns}
+          rows={memberRows}
+          summaryItems={[
+            { label: "Search", value: memberSearch || "All members" },
+            {
+              label: "Ministry Filter",
+              value:
+                memberMinistryFilter === "all"
+                  ? "All ministries"
+                  : ministries.find((ministry) => (ministry._id || ministry.id) === memberMinistryFilter)?.name || memberMinistryFilter,
+            },
+            { label: "Gender Filter", value: memberGenderFilter === "all" ? "All genders" : memberGenderFilter },
+            {
+              label: "Household Filter",
+              value:
+                memberHouseholdFilter === "all"
+                  ? "All households"
+                  : memberHouseholdFilter === "unassigned"
+                    ? "No household"
+                    : householdOptions.find((item) => item.value === memberHouseholdFilter)?.label || memberHouseholdFilter,
+            },
+            {
+              label: "Group Filter",
+              value:
+                memberGroupFilter === "all"
+                  ? "All groups"
+                  : groupOptions.find(([value]) => value === memberGroupFilter)?.[1] || memberGroupFilter,
+            },
+            { label: "Type Filter", value: memberTypeFilter === "all" ? "All member types" : memberTypeFilter },
+            { label: "Status Filter", value: memberStatusFilter === "all" ? "All statuses" : memberStatusFilter },
+            {
+              label: "Marital Filter",
+              value: memberMaritalStatusFilter === "all" ? "All marital statuses" : memberMaritalStatusFilter,
+            },
+            { label: "Sort", value: memberSort === "name_desc" ? "Name Z-A" : "Name A-Z" },
+          ]}
+        />
+      ) : null}
 
       {showImportModal ? <BulkImportModal entity="members" onClose={() => setShowImportModal(false)} /> : null}
     </div>

@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { FaSearch } from "react-icons/fa";
 import BulkImportModal from "../components/common/BulkImportModal";
+import ExportOptionsModal from "../components/common/ExportOptionsModal";
 import { useAppContext } from "../context/AppContext";
-import { exportRowsToCsv, exportRowsToPdf } from "../utils/exportUtils";
 
 function getName(value) {
   if (!value) {
@@ -33,6 +33,7 @@ function compareText(left, right) {
 
 export default function FamilyHouseholdsPage() {
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [search, setSearch] = useState("");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
@@ -113,23 +114,6 @@ export default function FamilyHouseholdsPage() {
     { key: "visitationHistory", header: "Visit History" },
   ];
 
-  const handleExportHouseholdsCsv = () => {
-    exportRowsToCsv({
-      fileName: "households-export.csv",
-      columns: familyExportColumns,
-      rows: familyExportRows,
-    });
-  };
-
-  const handleExportHouseholdsPdf = () => {
-    exportRowsToPdf({
-      fileName: "households-export.pdf",
-      title: "Households Export",
-      columns: familyExportColumns,
-      rows: familyExportRows,
-    });
-  };
-
   if (familyApiState.loading) {
     return <div className="empty-note">Loading households...</div>;
   }
@@ -147,11 +131,8 @@ export default function FamilyHouseholdsPage() {
             <p>Open any row to view or edit a household, or import many households from a template.</p>
           </div>
           <div className="toolbar-actions">
-            <button type="button" className="ghost-button" onClick={handleExportHouseholdsCsv}>
-              Export CSV
-            </button>
-            <button type="button" className="ghost-button" onClick={handleExportHouseholdsPdf}>
-              Export PDF
+            <button type="button" className="ghost-button" onClick={() => setShowExportModal(true)}>
+              Export
             </button>
             <button type="button" className="ghost-button" onClick={() => setShowImportModal(true)}>
               Bulk Upload
@@ -233,6 +214,31 @@ export default function FamilyHouseholdsPage() {
           </table>
         </div>
       </section>
+
+      {showExportModal ? (
+        <ExportOptionsModal
+          open={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          title="Export Households"
+          fileBaseName="households-export"
+          columns={familyExportColumns}
+          rows={familyExportRows}
+          summaryItems={[
+            { label: "Search", value: search || "All households" },
+            { label: "Zone Filter", value: zoneFilter === "all" ? "All zones" : zoneFilter },
+            { label: "Area Filter", value: areaFilter === "all" ? "All areas" : areaFilter },
+            {
+              label: "Sort",
+              value:
+                sortOrder === "members_desc"
+                  ? "Largest household"
+                  : sortOrder === "zone_asc"
+                    ? "Zone"
+                    : "Name A-Z",
+            },
+          ]}
+        />
+      ) : null}
 
       {showImportModal ? <BulkImportModal entity="households" onClose={() => setShowImportModal(false)} /> : null}
     </div>

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { churchApi } from "../apis/churchApi";
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
+import ExportOptionsModal from "../components/common/ExportOptionsModal";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
-import { exportRowsToCsv, exportRowsToPdf } from "../utils/exportUtils";
 
 function getCachedStrategicState() {
   const plans = churchApi.peekCached("/strategic/plans");
@@ -60,6 +60,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
     ministryScorecard: null,
   });
   const [activeModal, setActiveModal] = useState("");
+  const [showExportModal, setShowExportModal] = useState(false);
   const [planForm, setPlanForm] = useState({
     name: "Church Strategic Plan",
     periodStart: "2026-01-01",
@@ -371,23 +372,6 @@ export default function StrategicPlanningPage({ section = "plans" }) {
     { key: "objectiveMinistry", header: "Responsible Ministry" },
   ];
 
-  const handleExportStrategicCsv = () => {
-    exportRowsToCsv({
-      fileName: `${sanitizeFileName(activePlan?.name || "strategic-plans")}.csv`,
-      columns: strategicExportColumns,
-      rows: strategicExportRows,
-    });
-  };
-
-  const handleExportStrategicPdf = () => {
-    exportRowsToPdf({
-      fileName: `${sanitizeFileName(activePlan?.name || "strategic-plans")}.pdf`,
-      title: activePlan ? `Strategic Plan Export - ${activePlan.name}` : "Strategic Plans Export",
-      columns: strategicExportColumns,
-      rows: strategicExportRows,
-    });
-  };
-
   const deleteRecord = async (label, action, collectionKey, id) => {
     const confirmed = await requestConfirmation({
       title: "Delete Strategic Record",
@@ -438,11 +422,8 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 <p>Open one plan at a time so pillars, objectives, and initiatives stay scoped to the selected plan.</p>
               </div>
               <div className="toolbar-row">
-                <button type="button" className="ghost-button" onClick={handleExportStrategicCsv}>
-                  Export CSV
-                </button>
-                <button type="button" className="ghost-button" onClick={handleExportStrategicPdf}>
-                  Export PDF
+                <button type="button" className="ghost-button" onClick={() => setShowExportModal(true)}>
+                  Export
                 </button>
                 <button type="button" className="ghost-button" onClick={() => setActiveModal("plan")}>
                   Add Plan
@@ -573,6 +554,22 @@ export default function StrategicPlanningPage({ section = "plans" }) {
             </section>
           )}
         </>
+      ) : null}
+
+      {showExportModal ? (
+        <ExportOptionsModal
+          open={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          title={activePlan ? `Export ${activePlan.name}` : "Export Strategic Plans"}
+          fileBaseName={sanitizeFileName(activePlan?.name || "strategic-plans")}
+          columns={strategicExportColumns}
+          rows={strategicExportRows}
+          summaryItems={[
+            { label: "Selected Plan", value: activePlan?.name || "All visible plans" },
+            { label: "Plan Status Filter", value: planStatusFilter === "all" ? "All statuses" : planStatusOptions.find((item) => item._id === planStatusFilter)?.label || planStatusFilter },
+            { label: "Ministry Filter", value: objectiveMinistryFilter === "all" ? "All ministries" : ministries.find((ministry) => (ministry._id || ministry.id) === objectiveMinistryFilter)?.name || objectiveMinistryFilter },
+          ]}
+        />
       ) : null}
 
       {activeSection === "kpis" ? (
