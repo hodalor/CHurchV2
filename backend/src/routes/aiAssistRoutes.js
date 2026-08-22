@@ -9,6 +9,7 @@ const {
   generateCommunicationAudienceSuggestion,
   generateCommunicationDraftSuggestion,
   generateEvangelismSuggestions,
+  generateGivingFollowUpSuggestions,
   generateImportFieldMappingSuggestion,
   generateLeadershipGapSuggestions,
   generateMentorMatchSuggestions,
@@ -16,6 +17,7 @@ const {
   generateStrategicCommentarySuggestions,
   generateVisitorFollowUpSuggestions,
 } = require("../services/aiSuggestionGeneratorService");
+const { canViewIndividualGiving } = require("../services/financePolicyService");
 const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
@@ -138,6 +140,17 @@ router.post("/suggestions/generate/:moduleKey", authorizePermissions(PERMISSIONS
     } else if (moduleKey === "leadership") {
       items = await generateLeadershipGapSuggestions({
         user: req.user,
+        ipAddress: req.ip,
+      });
+    } else if (moduleKey === "finance") {
+      if (!canViewIndividualGiving(req.user)) {
+        return res.status(403).json({ message: "You are not allowed to generate giving intelligence suggestions." });
+      }
+      items = await generateGivingFollowUpSuggestions({
+        user: req.user,
+        limit: Number(req.body.limit || 20),
+        recentWindowDays: Number(req.body.recentWindowDays || 60),
+        lapsedWindowDays: Number(req.body.lapsedWindowDays || 90),
         ipAddress: req.ip,
       });
     } else if (moduleKey === "import-mapping") {

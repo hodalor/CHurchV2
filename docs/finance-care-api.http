@@ -1,0 +1,119 @@
+@baseUrl = http://127.0.0.1:5100/api
+@token = REPLACE_ME
+
+### Finance overview
+GET {{baseUrl}}/finance/overview
+Authorization: Bearer {{token}}
+
+### Create fund
+POST {{baseUrl}}/finance/funds
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Building Fund",
+  "description": "Special projects",
+  "active": true
+}
+
+### Create transaction
+POST {{baseUrl}}/finance/transactions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "date": "2026-08-22",
+  "amount": 500,
+  "fundId": "REPLACE_FUND_ID",
+  "method": "REPLACE_METHOD_LOOKUP_ID",
+  "transactionType": "REPLACE_TYPE_LOOKUP_ID",
+  "memberId": "REPLACE_MEMBER_ID",
+  "notes": "Sunday giving"
+}
+
+### Void transaction
+POST {{baseUrl}}/finance/transactions/REPLACE_TRANSACTION_ID/void
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reason": "Duplicate entry"
+}
+
+### Create pledge
+POST {{baseUrl}}/finance/pledges
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "REPLACE_MEMBER_ID",
+  "fundId": "REPLACE_FUND_ID",
+  "pledgedAmount": 12000,
+  "frequency": "monthly",
+  "startDate": "2026-01-01"
+}
+
+### Create expense request
+POST {{baseUrl}}/finance/expenses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "date": "2026-08-22",
+  "category": "REPLACE_EXPENSE_CATEGORY_ID",
+  "amount": 850,
+  "payee": "Water Utility",
+  "notes": "Monthly bill"
+}
+
+### Create budget line
+POST {{baseUrl}}/finance/budgets
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "period": "2026",
+  "lineType": "expense",
+  "budgetedAmount": 25000,
+  "category": "REPLACE_EXPENSE_CATEGORY_ID"
+}
+
+### Generate giving intelligence suggestions
+POST {{baseUrl}}/ai-assist/suggestions/generate/finance
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### List care notes
+GET {{baseUrl}}/care/notes
+Authorization: Bearer {{token}}
+
+### Create quick care note
+POST {{baseUrl}}/care/notes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "REPLACE_MEMBER_ID",
+  "noteType": "REPLACE_CARE_NOTE_TYPE_ID",
+  "content": "Visited after service and scheduled a follow-up call.",
+  "confidentialityTier": "Standard"
+}
+
+### Create visitation record
+POST {{baseUrl}}/care/visitations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "REPLACE_MEMBER_ID",
+  "noteType": "REPLACE_CARE_NOTE_TYPE_ID",
+  "content": "Hospital visit completed.",
+  "confidentialityTier": "Restricted",
+  "location": "hospital",
+  "purpose": "Pastoral visit",
+  "outcome": "Prayer and family support",
+  "followUpNeeded": true,
+  "followUpDate": "2026-08-29"
+}

@@ -185,7 +185,8 @@ export default function RecordDetailModal() {
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
             deleteRecordModal={deleteRecordModal}
-            canDelete={Boolean(draft._id)}
+            canDelete={type === "finance" ? false : Boolean(draft._id)}
+            canEdit={type === "finance" ? false : true}
             setRecordModalMode={setRecordModalMode}
           />
         </>
@@ -454,6 +455,7 @@ function RecordModalActions({
   saveRecordModal,
   deleteRecordModal,
   canDelete,
+  canEdit = true,
   setRecordModalMode,
   onEdit = null,
   editLabel = "Edit",
@@ -481,7 +483,7 @@ function RecordModalActions({
             Save
           </button>
         </>
-      ) : (
+      ) : canEdit ? (
         <button
           type="button"
           className="primary-button"
@@ -489,7 +491,7 @@ function RecordModalActions({
         >
           {editLabel}
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

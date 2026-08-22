@@ -1,8 +1,29 @@
 const express = require("express");
-const FinanceRecord = require("../models/FinanceRecord");
 const authenticate = require("../middleware/authenticate");
 const { authorizePermissions } = require("../middleware/authorize");
-const { logAudit } = require("../services/auditService");
+const { listLookupValuesByType } = require("../services/lookupService");
+const {
+  approveExpense,
+  createBudget,
+  createExpense,
+  createPledge,
+  createTransaction,
+  createTransactionBatch,
+  getFinanceOverview,
+  getFinanceReports,
+  getNextReceiptNumber,
+  listBudgets,
+  listExpenses,
+  listFunds,
+  listPledges,
+  listTransactions,
+  payExpense,
+  recordPledgePayment,
+  rejectExpense,
+  saveFund,
+  voidExpense,
+  voidTransaction,
+} = require("../services/financeManagementService");
 const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
@@ -10,8 +31,23 @@ router.use(authenticate);
 
 router.get("/", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
-    const records = await FinanceRecord.find().sort({ date: -1, createdAt: -1 });
-    res.json(records);
+    const transactions = await listTransactions({ user: req.user, filters: req.query });
+    res.json(
+      transactions.map((transaction) => ({
+        _id: transaction._id,
+        recordNo: transaction.receiptNumber,
+        category: transaction.fundId?.name || transaction.transactionType?.label || "-",
+        description: transaction.notes || transaction.referenceNumber || "",
+        amount: transaction.amount,
+        date: transaction.date,
+        status: transaction.status === "posted" ? "Posted" : "Voided",
+        memberId: transaction.memberId || null,
+        householdId: transaction.householdId || null,
+        fundId: transaction.fundId || null,
+        method: transaction.method || null,
+        transactionType: transaction.transactionType || null,
+      }))
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -19,117 +55,279 @@ router.get("/", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res)
 
 router.get("/next-record-no", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
-    const recordNo = await generateNextFinanceRecordNo();
+    const recordNo = await getNextReceiptNumber();
     res.json({ recordNo });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-router.post("/", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.get("/options", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
-    const payload = await normalizeFinancePayload(req.body);
-    const record = await FinanceRecord.create(payload);
-    await logAudit({
-      action: "create",
-      module: "Finance",
-      recordType: "FinanceRecord",
-      recordId: record.recordNo,
-      newValue: record.toObject(),
-      user: req.user,
-      ipAddress: req.ip,
+    const [funds, transactionMethods, transactionTypes, expenseCategories] = await Promise.all([
+      listFunds(),
+      listLookupValuesByType("finance_transaction_method"),
+      listLookupValuesByType("finance_transaction_type"),
+      listLookupValuesByType("finance_expense_category"),
+    ]);
+
+    res.json({
+      funds,
+      transactionMethods,
+      transactionTypes,
+      expenseCategories,
     });
-    res.status(201).json(record);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/overview", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
+  try {
+    const overview = await getFinanceOverview({ user: req.user });
+    res.json(overview);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/funds", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
+  try {
+    res.json(await listFunds());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/funds", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    const fund = await saveFund({ payload: req.body, user: req.user, ipAddress: req.ip });
+    res.status(201).json(fund);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
 
-router.put("/:recordId", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.put("/funds/:fundId", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
-    const record = await FinanceRecord.findById(req.params.recordId);
-    if (!record) {
-      return res.status(404).json({ message: "Finance record not found." });
-    }
-
-    const previousValue = record.toObject();
-    const payload = await normalizeFinancePayload(req.body, record);
-    Object.assign(record, payload);
-    await record.save();
-
-    await logAudit({
-      action: "update",
-      module: "Finance",
-      recordType: "FinanceRecord",
-      recordId: record.recordNo,
-      previousValue,
-      newValue: record.toObject(),
+    const fund = await saveFund({
+      payload: req.body,
       user: req.user,
       ipAddress: req.ip,
+      fundId: req.params.fundId,
     });
-
-    return res.json(record);
+    res.json(fund);
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    res.status(400).json({ message: error.message });
   }
 });
 
-router.delete("/:recordId", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.get("/transactions", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
-    const record = await FinanceRecord.findById(req.params.recordId);
-    if (!record) {
-      return res.status(404).json({ message: "Finance record not found." });
-    }
-
-    await FinanceRecord.deleteOne({ _id: record._id });
-    await logAudit({
-      action: "delete",
-      module: "Finance",
-      recordType: "FinanceRecord",
-      recordId: record.recordNo,
-      previousValue: record.toObject(),
-      user: req.user,
-      ipAddress: req.ip,
-    });
-
-    return res.json({ success: true });
+    res.json(await listTransactions({ user: req.user, filters: req.query }));
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 
-async function normalizeFinancePayload(payload = {}, existingRecord = null) {
-  if (!String(payload.category || "").trim()) {
-    throw new Error("Category is required.");
+router.post("/transactions", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    const transaction = await createTransaction({ payload: req.body, user: req.user, ipAddress: req.ip });
+    res.status(201).json(transaction);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/transactions/batch", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    const items = await createTransactionBatch({ payload: req.body, user: req.user, ipAddress: req.ip });
+    res.status(201).json({ createdCount: items.length, items });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/transactions/:transactionId/void", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    const result = await voidTransaction({
+      transactionId: req.params.transactionId,
+      reason: req.body.reason || "",
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.get("/pledges", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
+  try {
+    res.json(await listPledges({ user: req.user, filters: req.query }));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/pledges", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    const pledge = await createPledge({ payload: req.body, user: req.user, ipAddress: req.ip });
+    res.status(201).json(pledge);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/pledges/:pledgeId/payments", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    const transaction = await recordPledgePayment({
+      pledgeId: req.params.pledgeId,
+      payload: req.body,
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    res.status(201).json(transaction);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.get("/expenses", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
+  try {
+    res.json(await listExpenses({ filters: req.query }));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/expenses", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    const expense = await createExpense({ payload: req.body, user: req.user, ipAddress: req.ip });
+    res.status(201).json(expense);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/expenses/:expenseId/approve", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    res.json(await approveExpense({ expenseId: req.params.expenseId, user: req.user, ipAddress: req.ip }));
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/expenses/:expenseId/reject", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    res.json(
+      await rejectExpense({
+        expenseId: req.params.expenseId,
+        reason: req.body.reason || "",
+        user: req.user,
+        ipAddress: req.ip,
+      })
+    );
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/expenses/:expenseId/pay", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    res.json(
+      await payExpense({
+        expenseId: req.params.expenseId,
+        paymentMethod: req.body.paymentMethod || null,
+        paymentDate: req.body.paymentDate || null,
+        user: req.user,
+        ipAddress: req.ip,
+      })
+    );
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.post("/expenses/:expenseId/void", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    res.json(
+      await voidExpense({
+        expenseId: req.params.expenseId,
+        reason: req.body.reason || "",
+        user: req.user,
+        ipAddress: req.ip,
+      })
+    );
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.get("/budgets", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
+  try {
+    res.json(await listBudgets({ filters: req.query }));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/budgets", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+  try {
+    res.status(201).json(await createBudget({ payload: req.body, user: req.user, ipAddress: req.ip }));
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.get("/reports/:reportType", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
+  try {
+    const report = await getFinanceReports({ user: req.user, reportType: req.params.reportType, filters: req.query });
+    if (String(req.query.format || "").toLowerCase() === "csv") {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${req.params.reportType}.csv"`);
+      return res.send(convertReportToCsv(report));
+    }
+    res.json(report);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+function convertReportToCsv(report) {
+  const rows = [];
+
+  if (Array.isArray(report?.rows)) {
+    rows.push(["name", "amount"]);
+    report.rows.forEach((item) => rows.push([item.name || item.label || "", item.amount || item.total || 0]));
+  } else if (Array.isArray(report?.byCategory)) {
+    rows.push(["category", "amount", "count"]);
+    report.byCategory.forEach((item) => rows.push([item.name || "", item.amount || 0, item.count || 0]));
+  } else if (Array.isArray(report?.byFund)) {
+    rows.push(["fund", "pledged", "fulfilled", "count"]);
+    report.byFund.forEach((item) => rows.push([item.name || "", item.amount || 0, item.secondaryAmount || 0, item.count || 0]));
+  } else if (Array.isArray(report?.lines)) {
+    rows.push(["line", "budgetedAmount", "actualAmount", "variance", "variancePercent"]);
+    report.lines.forEach((item) =>
+      rows.push([
+        item.ministryId?.name || item.category?.label || item.fundId?.name || item.lineType || "",
+        item.targetValue || item.budgetedAmount || 0,
+        item.actualValue || 0,
+        item.variance || 0,
+        item.variancePercent || 0,
+      ])
+    );
+  } else {
+    rows.push(["value"], [JSON.stringify(report || {})]);
   }
 
-  if (payload.amount === "" || payload.amount === null || payload.amount === undefined || Number.isNaN(Number(payload.amount))) {
-    throw new Error("Amount is required.");
-  }
-
-  if (!String(payload.date || existingRecord?.date || "").trim()) {
-    throw new Error("Date is required.");
-  }
-
-  return {
-    recordNo: payload.recordNo || existingRecord?.recordNo || (await generateNextFinanceRecordNo()),
-    category: payload.category,
-    description: payload.description || "",
-    amount: Number(payload.amount || 0),
-    date: new Date(payload.date || existingRecord?.date),
-    status: payload.status || existingRecord?.status || "Pending",
-  };
-}
-
-async function generateNextFinanceRecordNo() {
-  const records = await FinanceRecord.find({}, { recordNo: 1 }).lean();
-  const nextNumber =
-    records.reduce((maxValue, item) => {
-      const numericPart = Number(String(item.recordNo || "").replace("FIN-", ""));
-      return Number.isNaN(numericPart) ? maxValue : Math.max(maxValue, numericPart);
-    }, 0) + 1;
-
-  return `FIN-${String(nextNumber).padStart(3, "0")}`;
+  return rows
+    .map((row) =>
+      row
+        .map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`)
+        .join(",")
+    )
+    .join("\n");
 }
 
 module.exports = router;

@@ -276,6 +276,134 @@ export const churchApi = {
     return request("/finance/next-record-no");
   },
 
+  async getFinanceOptions() {
+    return request("/finance/options");
+  },
+
+  async getFinanceOverview() {
+    return request("/finance/overview");
+  },
+
+  async getFunds() {
+    return request("/finance/funds");
+  },
+
+  async createFund(payload) {
+    return request("/finance/funds", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateFund(fundId, payload) {
+    return request(`/finance/funds/${fundId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getTransactions(params = {}) {
+    const search = new URLSearchParams(params).toString();
+    return request(`/finance/transactions${search ? `?${search}` : ""}`);
+  },
+
+  async createTransaction(payload) {
+    return request("/finance/transactions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async createTransactionBatch(payload) {
+    return request("/finance/transactions/batch", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async voidTransaction(transactionId, reason) {
+    return request(`/finance/transactions/${transactionId}/void`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async getPledges(params = {}) {
+    const search = new URLSearchParams(params).toString();
+    return request(`/finance/pledges${search ? `?${search}` : ""}`);
+  },
+
+  async createPledge(payload) {
+    return request("/finance/pledges", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async recordPledgePayment(pledgeId, payload) {
+    return request(`/finance/pledges/${pledgeId}/payments`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getExpenses(params = {}) {
+    const search = new URLSearchParams(params).toString();
+    return request(`/finance/expenses${search ? `?${search}` : ""}`);
+  },
+
+  async createExpense(payload) {
+    return request("/finance/expenses", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async approveExpense(expenseId) {
+    return request(`/finance/expenses/${expenseId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
+  async rejectExpense(expenseId, reason) {
+    return request(`/finance/expenses/${expenseId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async payExpense(expenseId, payload) {
+    return request(`/finance/expenses/${expenseId}/pay`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async voidExpense(expenseId, reason) {
+    return request(`/finance/expenses/${expenseId}/void`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async getBudgets(params = {}) {
+    const search = new URLSearchParams(params).toString();
+    return request(`/finance/budgets${search ? `?${search}` : ""}`);
+  },
+
+  async createBudget(payload) {
+    return request("/finance/budgets", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getFinanceReport(reportType, params = {}) {
+    const search = new URLSearchParams(params).toString();
+    return request(`/finance/reports/${reportType}${search ? `?${search}` : ""}`);
+  },
+
   async createFinanceRecord(payload) {
     return request("/finance", {
       method: "POST",
@@ -293,6 +421,54 @@ export const churchApi = {
   async deleteFinanceRecord(recordId) {
     return request(`/finance/${recordId}`, {
       method: "DELETE",
+    });
+  },
+
+  async getCareOptions() {
+    return request("/care/options");
+  },
+
+  async getCareCases() {
+    return request("/care/cases");
+  },
+
+  async createCareCase(payload) {
+    return request("/care/cases", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getCareNotes(params = {}) {
+    const search = new URLSearchParams(params).toString();
+    return request(`/care/notes${search ? `?${search}` : ""}`);
+  },
+
+  async createCareNote(payload) {
+    return request("/care/notes", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async promoteCareNote(noteId, payload) {
+    return request(`/care/notes/${noteId}/promote`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async createCounselingSession(payload) {
+    return request("/care/counseling-sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async createVisitationRecord(payload) {
+    return request("/care/visitations", {
+      method: "POST",
+      body: JSON.stringify(payload),
     });
   },
 

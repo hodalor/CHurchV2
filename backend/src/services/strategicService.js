@@ -5,6 +5,7 @@ const KPITarget = require("../models/KPITarget");
 const StrategicObjective = require("../models/StrategicObjective");
 const StrategicPillar = require("../models/StrategicPillar");
 const { getLookupValueByTypeAndKey } = require("./lookupService");
+const { computeVariance } = require("./varianceService");
 
 async function computeKpiActualFields(kpiId, period, actualValue) {
   const [kpi, target] = await Promise.all([
@@ -17,7 +18,7 @@ async function computeKpiActualFields(kpiId, period, actualValue) {
   }
 
   const targetValue = Number(target?.targetValue || 0);
-  const variance = Number(actualValue || 0) - targetValue;
+  const { variance } = computeVariance(targetValue, Number(actualValue || 0));
   const ragStatus = await resolveRagStatus(kpi.ragThresholds || {}, targetValue, Number(actualValue || 0));
 
   return {

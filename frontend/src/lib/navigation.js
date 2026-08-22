@@ -54,6 +54,12 @@ export const navigationSections = [
     { label: "Budgets", path: "/finance/budgets" },
     { label: "Reports", path: "/finance/reports" },
   ], permission: "view_finance" },
+  { label: "Pastoral Care", path: "/care", icon: FaHeartbeat, children: [
+    { label: "Notes", path: "/care/notes" },
+    { label: "Cases", path: "/care/cases" },
+    { label: "Counseling", path: "/care/counseling" },
+    { label: "Visitations", path: "/care/visitations" },
+  ], permission: "view_pastoral_care" },
   { label: "Attendance", path: "/attendance", icon: FaCalendarCheck, children: [
     { label: "Services", path: "/attendance/services" },
     { label: "Reports", path: "/attendance/reports" },

@@ -1220,7 +1220,20 @@
   color: #0f766e;
 }
 
+.status-pill.approved,
+.status-pill.paid,
+.status-pill.fulfilled {
+  background: rgba(20, 184, 166, 0.14);
+  color: #0f766e;
+}
+
 .status-pill.pending {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.status-pill.requested,
+.status-pill.rejected {
   background: rgba(245, 158, 11, 0.14);
   color: #b45309;
 }
@@ -1231,6 +1244,13 @@
 }
 
 .status-pill.disabled {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.status-pill.voided,
+.status-pill.cancelled,
+.status-pill.lapsed {
   background: rgba(239, 68, 68, 0.12);
   color: #b91c1c;
 }
@@ -1808,6 +1828,17 @@ select:focus,
 textarea:focus {
   outline: 2px solid rgba(79, 70, 229, 0.16);
   border-color: #7c5cff;
+}
+
+.finance-batch-lines {
+  display: grid;
+  gap: 12px;
+}
+
+.finance-batch-line {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+  gap: 12px;
 }
 
 @media (max-width: 1180px) {

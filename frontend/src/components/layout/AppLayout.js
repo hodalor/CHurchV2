@@ -16,6 +16,7 @@ import FinancePage from "../../pages/FinancePage";
 import AttendancePage from "../../pages/AttendancePage";
 import CommunicationPage from "../../pages/CommunicationPage";
 import AiAssistPage from "../../pages/AiAssistPage";
+import PastoralCarePage from "../../pages/PastoralCarePage";
 import SpiritualHealthPage from "../../pages/SpiritualHealthPage";
 import LeadershipDevelopmentPage from "../../pages/LeadershipDevelopmentPage";
 import StrategicPlanningPage from "../../pages/StrategicPlanningPage";
@@ -76,6 +77,11 @@ export default function AppLayout() {
                 <Route path="/finance/expenses" element={<FinancePage />} />
                 <Route path="/finance/budgets" element={<FinancePage />} />
                 <Route path="/finance/reports" element={<FinancePage />} />
+                <Route path="/care" element={<Navigate to="/care/notes" replace />} />
+                <Route path="/care/notes" element={<PastoralCarePage />} />
+                <Route path="/care/cases" element={<PastoralCarePage />} />
+                <Route path="/care/counseling" element={<PastoralCarePage />} />
+                <Route path="/care/visitations" element={<PastoralCarePage />} />
                 <Route path="/attendance" element={<Navigate to="/attendance/services" replace />} />
                 <Route path="/attendance/services" element={<AttendancePage />} />
                 <Route path="/attendance/reports" element={<AttendancePage />} />
@@ -162,8 +168,16 @@ function getPageMeta(pathname) {
   if (pathname.startsWith("/finance")) {
     return {
       title: "Finance",
-      subtitle: "Finance is structured for gradual rollout with submenus and cleaner screens.",
-      action: "finance",
+      subtitle: "Transactions, pledges, expenses, budgets, reports, and giving intelligence now share one finance workflow.",
+      action: null,
+    };
+  }
+
+  if (pathname.startsWith("/care")) {
+    return {
+      title: "Pastoral Care",
+      subtitle: "Capture care notes, counseling sessions, visitations, and confidential follow-up in one place.",
+      action: null,
     };
   }
 

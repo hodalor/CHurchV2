@@ -8,11 +8,13 @@ const EvangelismProspect = require("../models/EvangelismProspect");
 const KPI = require("../models/KPI");
 const KPIActual = require("../models/KPIActual");
 const KPITarget = require("../models/KPITarget");
+const Pledge = require("../models/Pledge");
 const Member = require("../models/Member");
 const Ministry = require("../models/Ministry");
 const SkillTalent = require("../models/SkillTalent");
 const SuccessionReadiness = require("../models/SuccessionReadiness");
 const SuccessionRequirement = require("../models/SuccessionRequirement");
+const Transaction = require("../models/Transaction");
 const User = require("../models/User");
 const Visitor = require("../models/Visitor");
 const { enforceCommunicationPreferences, resolveCommunicationAudience } = require("./communicationService");
@@ -1184,11 +1186,189 @@ async function generateImportFieldMappingSuggestion({
   });
 }
 
+async function generateGivingFollowUpSuggestions({ user, ipAddress = "", limit = 20, recentWindowDays = 60, lapsedWindowDays = 90 } = {}) {
+  const transactions = await Transaction.find({ status: "posted", isReversal: false, amount: { $gt: 0 } })
+    .populate("memberId", "memberId firstName lastName")
+    .populate("householdId", "familyId familyName")
+    .sort({ date: -1, createdAt: -1 });
+  const pledges = await Pledge.find({ status: "active" })
+    .populate("memberId", "memberId firstName lastName")
+    .populate("householdId", "familyId familyName")
+    .populate("fundId", "name")
+    .sort({ createdAt: -1 });
+
+  const now = new Date();
+  const groupedTransactions = new Map();
+  transactions.forEach((transaction) => {
+    const subjectKey = transaction.memberId ? `member:${transaction.memberId._id}` : transaction.householdId ? `household:${transaction.householdId._id}` : "";
+    if (!subjectKey) {
+      return;
+    }
+
+    const bucket = groupedTransactions.get(subjectKey) || [];
+    bucket.push(transaction);
+    groupedTransactions.set(subjectKey, bucket);
+  });
+
+  const draftsToPersist = [];
+  groupedTransactions.forEach((items, subjectKey) => {
+    const sortedItems = [...items].sort((left, right) => new Date(right.date) - new Date(left.date));
+    const primary = sortedItems[0];
+    const subjectType = primary.memberId ? "Member" : "Household";
+    const subjectId = String(primary.memberId?._id || primary.householdId?._id || subjectKey);
+    const subjectLabel = primary.memberId
+      ? `${primary.memberId.firstName || ""} ${primary.memberId.lastName || ""}`.trim()
+      : primary.householdId?.familyName || "Household";
+    const recentTotal = sortedItems
+      .filter((item) => diffDays(item.date, now) <= recentWindowDays)
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const previousTotal = sortedItems
+      .filter((item) => {
+        const daysOld = diffDays(item.date, now);
+        return daysOld > recentWindowDays && daysOld <= recentWindowDays * 2;
+      })
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const daysSinceLastGift = diffDays(primary.date, now);
+
+    if (sortedItems.length >= 2 && daysSinceLastGift >= lapsedWindowDays) {
+      draftsToPersist.push({
+        subjectType,
+        subjectId,
+        subjectLabel,
+        title: `${subjectLabel} may need a caring giving check-in`,
+        insightKind: "lapsed",
+        fallbackText: `${subjectLabel}'s giving pattern has paused compared with earlier activity. A gentle pastoral check-in may be appropriate if there are wider welfare or discipleship concerns.`,
+        basedOnRefs: sortedItems.slice(0, 3).map((item) => ({
+          recordType: "Transaction",
+          recordId: String(item._id),
+          label: item.receiptNumber,
+        })),
+        facts: {
+          daysSinceLastGift,
+          recentTotal,
+          previousTotal,
+        },
+      });
+      return;
+    }
+
+    if (previousTotal > 0 && recentTotal > 0 && recentTotal < previousTotal * 0.6) {
+      draftsToPersist.push({
+        subjectType,
+        subjectId,
+        subjectLabel,
+        title: `${subjectLabel} shows a notable change in giving pattern`,
+        insightKind: "drop",
+        fallbackText: `${subjectLabel}'s recent giving pattern is lower than their earlier pattern. This may simply reflect changed circumstances, but it could be worth a kind stewardship and care check-in.`,
+        basedOnRefs: sortedItems.slice(0, 4).map((item) => ({
+          recordType: "Transaction",
+          recordId: String(item._id),
+          label: item.receiptNumber,
+        })),
+        facts: {
+          recentTotal,
+          previousTotal,
+          changePercent: previousTotal === 0 ? 0 : ((recentTotal - previousTotal) / previousTotal) * 100,
+        },
+      });
+    }
+  });
+
+  pledges.forEach((pledge) => {
+    const linkedPayments = transactions.filter((item) => String(item.linkedPledgeId || "") === String(pledge._id));
+    const fulfilledAmount = linkedPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const expectedAmount = Number(pledge.pledgedAmount || 0) * computePledgeElapsedRatio(pledge, now);
+    if (fulfilledAmount + 0.01 >= expectedAmount) {
+      return;
+    }
+
+    const subjectType = pledge.memberId ? "Member" : "Household";
+    const subjectId = String(pledge.memberId?._id || pledge.householdId?._id || pledge._id);
+    const subjectLabel = pledge.memberId
+      ? `${pledge.memberId.firstName || ""} ${pledge.memberId.lastName || ""}`.trim()
+      : pledge.householdId?.familyName || "Household";
+
+    draftsToPersist.push({
+      subjectType,
+      subjectId,
+      subjectLabel,
+      title: `${subjectLabel} may need a caring pledge follow-up`,
+      insightKind: "pledge_behind_schedule",
+      fallbackText: `${subjectLabel}'s pledge toward ${pledge.fundId?.name || "this fund"} appears behind the expected schedule. A pastoral conversation can stay supportive and never read like a bill reminder.`,
+      basedOnRefs: [
+        {
+          recordType: "Pledge",
+          recordId: String(pledge._id),
+          label: pledge.fundId?.name || "Pledge",
+        },
+      ],
+      facts: {
+        fulfilledAmount,
+        pledgedAmount: Number(pledge.pledgedAmount || 0),
+        expectedAmount,
+      },
+    });
+  });
+
+  const savedSuggestions = [];
+  for (const draftSeed of draftsToPersist.slice(0, limit)) {
+    const draft = await draftNarrative({
+      systemPrompt:
+        "You draft gentle church stewardship follow-up notes. Keep the tone pastoral, caring, and non-transactional. Never use debt collection or overdue-payment language.",
+      userPrompt: [
+        `Subject: ${draftSeed.subjectLabel}`,
+        `Insight: ${draftSeed.insightKind}`,
+        `Facts: ${JSON.stringify(draftSeed.facts)}`,
+        "Write a short pastoral follow-up suggestion for leaders.",
+      ].join("\n"),
+      fallbackText: draftSeed.fallbackText,
+      maxTokens: 120,
+    });
+
+    const suggestion = await upsertAiSuggestion({
+      suggestionType: "giving_follow_up_suggestion",
+      subjectType: draftSeed.subjectType,
+      subjectId: draftSeed.subjectId,
+      subjectLabel: draftSeed.subjectLabel,
+      sourceModule: "Finance",
+      generatedForUser: user?._id || null,
+      title: draftSeed.title,
+      generatedText: draft.text,
+      basedOnRefs: draftSeed.basedOnRefs,
+      promptContextSummary: "Deterministic giving signals are computed first; any AI phrasing stays advisory-only and pastoral in tone.",
+      metadata: {
+        fingerprint: `finance-giving:${draftSeed.subjectType}:${draftSeed.subjectId}:${draftSeed.insightKind}`,
+        insightKind: draftSeed.insightKind,
+        ...draftSeed.facts,
+        claudeEnabled: draft.enabled,
+      },
+      requestedBy: user,
+      ipAddress,
+    });
+    savedSuggestions.push(suggestion);
+  }
+
+  return savedSuggestions;
+}
+
+function computePledgeElapsedRatio(pledge, now = new Date()) {
+  const startDate = new Date(pledge.startDate || now);
+  const endDate = pledge.endDate ? new Date(pledge.endDate) : null;
+  if (!endDate) {
+    return 1;
+  }
+
+  const duration = endDate.getTime() - startDate.getTime();
+  const elapsed = Math.max(0, Math.min(now.getTime() - startDate.getTime(), duration));
+  return duration <= 0 ? 1 : elapsed / duration;
+}
+
 module.exports = {
   generateAttendanceAnomalySuggestions,
   generateCommunicationAudienceSuggestion,
   generateCommunicationDraftSuggestion,
   generateEvangelismSuggestions,
+  generateGivingFollowUpSuggestions,
   generateImportFieldMappingSuggestion,
   generateLeadershipGapSuggestions,
   generateMentorMatchSuggestions,

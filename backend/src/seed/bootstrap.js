@@ -106,6 +106,30 @@ async function seedLookupData() {
       values: ["Manual", "Bulk", "QR", "Mobile"],
     },
     {
+      key: "finance_transaction_method",
+      label: "Finance Transaction Method",
+      module: "finance",
+      values: ["Cash", "Mobile Money", "Bank Transfer", "Cheque", "Other"],
+    },
+    {
+      key: "finance_transaction_type",
+      label: "Finance Transaction Type",
+      module: "finance",
+      values: ["Tithe", "Offering", "Donation", "Pledge Payment", "Other Income"],
+    },
+    {
+      key: "finance_expense_category",
+      label: "Finance Expense Category",
+      module: "finance",
+      values: ["Utilities", "Salaries", "Maintenance", "Ministry Expense", "Missions", "Administration", "Other"],
+    },
+    {
+      key: "care_note_type",
+      label: "Care Note Type",
+      module: "care",
+      values: ["Visitation", "Hospital Visit", "Phone Call", "Counseling Session", "Crisis Intervention", "Prayer Follow-Up", "General Check-In", "Other"],
+    },
+    {
       key: "communication_channel",
       label: "Communication Channel",
       module: "communication",
