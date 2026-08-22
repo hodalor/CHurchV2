@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { churchApi } from "../../apis/churchApi";
 import { useAppContext } from "../../context/AppContext";
+
+const EMPTY_INITIAL_VALUES = {};
 
 export default function AiAssistGeneratorCard({
   title,
@@ -8,17 +10,19 @@ export default function AiAssistGeneratorCard({
   moduleKey,
   buttonLabel = "Generate",
   fields = [],
-  initialValues = {},
+  initialValues = EMPTY_INITIAL_VALUES,
   buildPayload,
 }) {
   const { notifySuccess, notifyError } = useAppContext();
-  const [formValues, setFormValues] = useState(initialValues);
+  const initialValuesSignature = useMemo(() => JSON.stringify(initialValues || EMPTY_INITIAL_VALUES), [initialValues]);
+  const normalizedInitialValues = useMemo(() => JSON.parse(initialValuesSignature), [initialValuesSignature]);
+  const [formValues, setFormValues] = useState(normalizedInitialValues);
   const [loading, setLoading] = useState(false);
   const [lastResult, setLastResult] = useState("");
 
   useEffect(() => {
-    setFormValues(initialValues);
-  }, [initialValues]);
+    setFormValues(normalizedInitialValues);
+  }, [normalizedInitialValues]);
 
   const handleGenerate = async () => {
     try {

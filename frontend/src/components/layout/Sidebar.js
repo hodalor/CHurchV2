@@ -31,7 +31,15 @@ export default function Sidebar() {
       return accumulator;
     }, {});
 
-    setOpenSections(nextState);
+    setOpenSections((current) => {
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(nextState);
+      const isSameState =
+        currentKeys.length === nextKeys.length &&
+        nextKeys.every((key) => current[key] === nextState[key]);
+
+      return isSameState ? current : nextState;
+    });
   }, [availableSections, location.pathname]);
 
   const handleSectionClick = (item) => {

@@ -89,77 +89,10 @@ export default function RecordDetailModal() {
               ) : null}
             </div>
           </div>
-
-          {isEditing ? (
-            <div className="form-grid">
-              {fields.map((field) => (
-                <label key={field.name} className={field.wide ? "full-width" : ""}>
-                  {field.label}
-                  {field.type === "select" ? (
-                    <select
-                      value={getFieldValue(field, draft)}
-                      disabled={!isEditing}
-                      onChange={(event) =>
-                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                      }
-                    >
-                      {field.options.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  ) : field.type === "textarea" ? (
-                    <textarea
-                      rows="4"
-                      value={getFieldValue(field, draft)}
-                      readOnly={!isEditing}
-                      onChange={(event) =>
-                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                      }
-                    />
-                  ) : (
-                    <input
-                      type={field.type || "text"}
-                      value={getFieldValue(field, draft)}
-                      readOnly={!isEditing}
-                      onChange={(event) =>
-                        setRecordModalDraft((current) => ({ ...current, [field.name]: event.target.value }))
-                      }
-                    />
-                  )}
-                </label>
-              ))}
-              <label>
-                QR Active
-                <input value={draft.qrActive !== false ? "Yes" : "No"} readOnly />
-              </label>
-              <label>
-                QR Generated
-                <input value={draft.qrGeneratedAt || ""} readOnly />
-              </label>
-              <label className="full-width">
-                QR Token
-                <input value={draft.qrToken || ""} readOnly />
-              </label>
-            </div>
-          ) : (
-            <DetailGrid
-              items={[
-                ...fields.map((field) => ({
-                  label: field.label,
-                  value: getFieldValue(field, draft),
-                  wide: field.wide,
-                })),
-                { label: "QR Active", value: draft.qrActive !== false ? "Yes" : "No" },
-                { label: "QR Generated", value: draft.qrGeneratedAt || "" },
-                { label: "QR Token", value: draft.qrToken || "", wide: true },
-              ]}
-            />
-          )}
+          <MemberDetailSections draft={draft} groups={groups} ministries={ministries} />
 
           <RecordModalActions
-            isEditing={isEditing}
+            isEditing={false}
             closeRecordModal={closeRecordModal}
             saveRecordModal={saveRecordModal}
             deleteRecordModal={deleteRecordModal}
@@ -447,6 +380,170 @@ export default function RecordDetailModal() {
       )}
     </ModalShell>
   );
+}
+
+function MemberDetailSections({ draft, groups, ministries }) {
+  const ministryName =
+    draft.ministry?.name ||
+    ministries.find((item) => (item._id || item.id) === (draft.ministryId?._id || draft.ministryId || draft.ministry))?.name ||
+    "";
+  const groupPath = Array.isArray(draft.groupChain)
+    ? draft.groupChain
+        .map((groupId) => groups.find((item) => (item._id || item.id) === groupId)?.name || "")
+        .filter(Boolean)
+    : [];
+  const assignedGroups = Array.isArray(draft.groups)
+    ? draft.groups
+        .map((group) => group.groupName || group.name || groups.find((item) => (item._id || item.id) === (group.groupId || group._id || group.id))?.name || "")
+        .filter(Boolean)
+    : [];
+  const familyLinks = Array.isArray(draft.familyLinks)
+    ? draft.familyLinks
+        .map(
+          (item) =>
+            [item.memberId, item.memberName, item.relationship].filter(Boolean).join(" - ")
+        )
+        .filter(Boolean)
+    : [];
+
+  return (
+    <>
+      <section className="subsection-card">
+        <div className="section-headline compact">
+          <div>
+            <h3>Basic Information</h3>
+          </div>
+        </div>
+        <DetailGrid
+          items={[
+            { label: "Member ID", value: draft.memberId || "" },
+            { label: "First Name", value: draft.firstName || "" },
+            { label: "Other Name", value: draft.otherName || "" },
+            { label: "Preferred Name", value: draft.preferredName || "" },
+            { label: "Surname", value: draft.lastName || "" },
+            { label: "Member Type", value: draft.memberType || "" },
+            { label: "Gender", value: draft.gender || "" },
+            { label: "Marital Status", value: draft.maritalStatus || "" },
+            { label: "Date of Birth", value: formatDisplayDate(draft.dateOfBirth) },
+            { label: "Phone", value: draft.phone || "" },
+            { label: "Email", value: draft.email || "" },
+            { label: "Residential Area", value: draft.residentialArea || "" },
+          ]}
+        />
+      </section>
+
+      <section className="subsection-card">
+        <div className="section-headline compact">
+          <div>
+            <h3>Church Information</h3>
+          </div>
+        </div>
+        <DetailGrid
+          items={[
+            { label: "Membership Status", value: draft.membershipStatus || "" },
+            { label: "Date Joined", value: formatDisplayDate(draft.dateJoined || draft.membershipDate) },
+            { label: "Ministry", value: ministryName },
+            { label: "Baptism Status", value: draft.baptismStatus || "" },
+            { label: "Baptism Date", value: formatDisplayDate(draft.baptismDate) },
+            { label: "Place Baptized", value: draft.placeBaptized || "" },
+            { label: "Baptized By", value: draft.baptizedBy || "" },
+            { label: "Occupation", value: draft.occupation || "" },
+            { label: "Employer or Business", value: draft.employerOrBusiness || "" },
+            { label: "Previous Congregation", value: draft.previousCongregation || "" },
+            { label: "Education or Skills", value: draft.educationOrSkills || "", wide: true },
+            { label: "Transfer Details", value: draft.transferDetails || "", wide: true },
+            { label: "Source Record Ref", value: draft.sourceRecordRef || "" },
+            { label: "Data Entry Clerk", value: draft.dataEntryClerk || "" },
+            { label: "Date Captured", value: formatDisplayDate(draft.dateCaptured || draft.createdAt) },
+          ]}
+        />
+      </section>
+
+      <section className="subsection-card">
+        <div className="section-headline compact">
+          <div>
+            <h3>Groups And Household</h3>
+          </div>
+        </div>
+        <DetailGrid
+          items={[
+            { label: "Household ID", value: draft.familyId || "" },
+            { label: "Household Name", value: draft.familyName || "" },
+            { label: "Role In Household", value: draft.householdRole || "" },
+            { label: "Group Path", value: groupPath.join(" / ") || "" , wide: true},
+            { label: "Assigned Groups", value: assignedGroups.join(", ") || "", wide: true },
+            { label: "Family Links", value: familyLinks.join(", ") || "", wide: true },
+          ]}
+        />
+      </section>
+
+      <section className="subsection-card">
+        <div className="section-headline compact">
+          <div>
+            <h3>Location And Notes</h3>
+          </div>
+        </div>
+        <DetailGrid
+          items={[
+            { label: "Address", value: draft.address || "", wide: true },
+            { label: "City", value: draft.city || "" },
+            { label: "Country", value: draft.country || "" },
+            { label: "GPS Latitude", value: draft.gpsLatitude || "" },
+            { label: "GPS Longitude", value: draft.gpsLongitude || "" },
+            { label: "Notes", value: draft.notes || "", wide: true },
+          ]}
+        />
+      </section>
+
+      <section className="subsection-card">
+        <div className="section-headline compact">
+          <div>
+            <h3>Media And QR</h3>
+          </div>
+        </div>
+        <DetailGrid
+          items={[
+            { label: "Photo File Name", value: draft.photoFileName || draft.personalPhoto?.label || "" },
+            { label: "Personal Photo", value: renderMediaValue(draft.personalPhoto) },
+            { label: "ID Front", value: renderMediaValue(draft.idFrontPhoto) },
+            { label: "ID Back", value: renderMediaValue(draft.idBackPhoto) },
+            { label: "QR Active", value: draft.qrActive !== false ? "Yes" : "No" },
+            { label: "QR Generated", value: formatDisplayDate(draft.qrGeneratedAt) },
+            { label: "QR Regenerated", value: formatDisplayDate(draft.qrRegeneratedAt) },
+            { label: "QR Token", value: draft.qrToken || "", wide: true },
+          ]}
+        />
+      </section>
+    </>
+  );
+}
+
+function renderMediaValue(media) {
+  if (!media) {
+    return "";
+  }
+
+  const mediaUrl = typeof media === "string" ? media : media.url;
+  const mediaLabel = typeof media === "string" ? media : media.label || media.url;
+
+  if (!mediaUrl) {
+    return mediaLabel || "";
+  }
+
+  return (
+    <a className="ghost-button small" href={mediaUrl} target="_blank" rel="noreferrer">
+      {mediaLabel || "View file"}
+    </a>
+  );
+}
+
+function formatDisplayDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const normalized = String(value);
+  return normalized.length >= 10 ? normalized.slice(0, 10) : normalized;
 }
 
 function RecordModalActions({

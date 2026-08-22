@@ -254,28 +254,37 @@ export function AppProvider({ children }) {
   const closeModal = () => setActiveModal(null);
 
   const openRecordModal = async (type, record, mode = "view") => {
+    const resolvedRecord =
+      type === "member" && record
+        ? members.find(
+            (item) =>
+              (record._id && item._id === record._id) ||
+              (record.memberId && item.memberId === record.memberId)
+          ) || record
+        : record;
+
     const sourceRecord = record
       ? type === "member"
-        ? hydrateMemberRecord(record)
+        ? hydrateMemberRecord(resolvedRecord)
         : type === "family"
-        ? hydrateFamilyRecord(record)
+        ? hydrateFamilyRecord(resolvedRecord)
         : type === "group"
-          ? hydrateGroupRecord(record)
+          ? hydrateGroupRecord(resolvedRecord)
         : type === "ministry"
-          ? hydrateMinistryRecord(record)
+          ? hydrateMinistryRecord(resolvedRecord)
         : type === "visitor"
-          ? hydrateVisitorRecord(record)
+          ? hydrateVisitorRecord(resolvedRecord)
           : type === "prospect"
-            ? hydrateProspectRecord(record)
+            ? hydrateProspectRecord(resolvedRecord)
             : type === "bibleStudy"
-              ? hydrateBibleStudyRecord(record)
+              ? hydrateBibleStudyRecord(resolvedRecord)
               : type === "attendanceEvent"
-                ? hydrateAttendanceEventRecord(record)
+                ? hydrateAttendanceEventRecord(resolvedRecord)
               : type === "discipleshipProgramme"
-                ? hydrateDiscipleshipProgrammeRecord(record)
+                ? hydrateDiscipleshipProgrammeRecord(resolvedRecord)
               : type === "discipleshipEnrollment"
-                ? hydrateDiscipleshipEnrollmentRecord(record)
-              : record
+                ? hydrateDiscipleshipEnrollmentRecord(resolvedRecord)
+              : resolvedRecord
       : buildNewRecord(type, {
           families,
           members,
