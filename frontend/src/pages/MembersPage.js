@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FaSearch } from "react-icons/fa";
+import { FaCheck, FaMinus, FaSearch } from "react-icons/fa";
 import BulkImportModal from "../components/common/BulkImportModal";
 import { useAppContext } from "../context/AppContext";
 
@@ -263,13 +263,6 @@ export default function MembersPage() {
           <select className="filter-select" value={memberSort} onChange={(event) => setMemberSort(event.target.value)}>
             <option value="name_asc">Sort: Name A-Z</option>
             <option value="name_desc">Sort: Name Z-A</option>
-            <option value="gender">Sort: Gender</option>
-            <option value="member_type">Sort: Member Type</option>
-            <option value="ministry">Sort: Ministry</option>
-            <option value="status">Sort: Status</option>
-            <option value="group">Sort: Group</option>
-            <option value="household">Sort: Household</option>
-            <option value="member_id">Sort: Member ID</option>
           </select>
           <div className="toolbar-actions">
             <button type="button" className="ghost-button" onClick={() => setShowImportModal(true)}>
@@ -281,16 +274,22 @@ export default function MembersPage() {
         <div className="table-accent-bar" />
 
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table member-directory-table">
             <thead>
               <tr>
                 <th>Member</th>
                 <th>ID</th>
-                <th>Church Info</th>
+                <th>Status</th>
+                <th>Marital Status</th>
+                <th>Ministry</th>
+                <th>Groups</th>
+                <th>Type</th>
+                <th>Gender</th>
+                <th>Phone</th>
                 <th>Family</th>
                 <th>Location</th>
                 <th>QR</th>
-                <th>Photos</th>
+                <th>Images</th>
               </tr>
             </thead>
             <tbody>
@@ -311,8 +310,32 @@ export default function MembersPage() {
                     <td>{member.memberId}</td>
                     <td>
                       <strong>{member.membershipStatus}</strong>
-                      <p>{member.ministryName}</p>
-                      <p>{member.groupLabel}</p>
+                    </td>
+                    <td>
+                      <strong>{member.maritalStatus || "-"}</strong>
+                    </td>
+                    <td>
+                      <strong>{member.ministryName}</strong>
+                      <p>{member.dateJoined || member.membershipDate || "-"}</p>
+                    </td>
+                    <td>
+                      <div className="cell-scroll-row">
+                        {(member.groupNames.length ? member.groupNames : ["No group assigned"]).map((groupName) => (
+                          <span key={`${member.memberId}-${groupName}`} className="cell-pill">
+                            {groupName}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td>
+                      <strong>{member.memberType || "-"}</strong>
+                      <p>{member.householdRole || "-"}</p>
+                    </td>
+                    <td>
+                      <strong>{member.gender || "-"}</strong>
+                    </td>
+                    <td>
+                      <strong>{member.phone || "-"}</strong>
                     </td>
                     <td>
                       <strong>{member.householdLabel}</strong>
@@ -323,22 +346,27 @@ export default function MembersPage() {
                       <p>{member.address || "No address"}</p>
                     </td>
                     <td>
-                      <div className="photo-stack">
+                      <div className="cell-scroll-row">
                         {member.qrCodeImageUrl ? (
                           <a
+                            className="media-indicator available"
                             href={member.qrCodeImageUrl}
                             target="_blank"
                             rel="noreferrer"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            View QR
+                            <FaCheck />
+                            QR
                           </a>
                         ) : (
-                          <span>-</span>
+                          <span className="media-indicator missing">
+                            <FaMinus />
+                            QR
+                          </span>
                         )}
                         <button
                           type="button"
-                          className="ghost-button small"
+                          className="ghost-button small media-action-button"
                           onClick={async (event) => {
                             event.stopPropagation();
                             await regenerateMemberQr(member._id);
@@ -350,7 +378,7 @@ export default function MembersPage() {
                       </div>
                     </td>
                     <td>
-                      <div className="photo-stack">
+                      <div className="cell-scroll-row">
                         <MediaLink value={member.personalPhoto} label="Photo" />
                         <MediaLink value={member.idFrontPhoto} label="ID Front" />
                         <MediaLink value={member.idBackPhoto} label="ID Back" />
@@ -360,7 +388,7 @@ export default function MembersPage() {
                 );
               }) : (
                 <tr>
-                  <td colSpan={7} className="empty-table">
+                  <td colSpan={13} className="empty-table">
                     No members found for the current filter.
                   </td>
                 </tr>
@@ -378,33 +406,34 @@ export default function MembersPage() {
 function MediaLink({ value, label }) {
   if (value?.url) {
     return (
-      <a href={value.url} target="_blank" rel="noreferrer">
+      <a className="media-indicator available" href={value.url} target="_blank" rel="noreferrer">
+        <FaCheck />
         {value.label || label}
       </a>
     );
   }
 
-  return <span>{value || "-"}</span>;
+  if (value) {
+    return (
+      <span className="media-indicator available">
+        <FaCheck />
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <span className="media-indicator missing">
+      <FaMinus />
+      {label}
+    </span>
+  );
 }
 
 function sortMembers(left, right, sortKey) {
   switch (sortKey) {
     case "name_desc":
       return compareText(buildMemberName(right), buildMemberName(left));
-    case "gender":
-      return compareText(left.gender, right.gender) || compareText(buildMemberName(left), buildMemberName(right));
-    case "member_type":
-      return compareText(left.memberType, right.memberType) || compareText(buildMemberName(left), buildMemberName(right));
-    case "ministry":
-      return compareText(left.ministryName, right.ministryName) || compareText(buildMemberName(left), buildMemberName(right));
-    case "status":
-      return compareText(left.membershipStatus, right.membershipStatus) || compareText(buildMemberName(left), buildMemberName(right));
-    case "group":
-      return compareText(left.groupLabel, right.groupLabel) || compareText(buildMemberName(left), buildMemberName(right));
-    case "household":
-      return compareText(left.householdName, right.householdName) || compareText(buildMemberName(left), buildMemberName(right));
-    case "member_id":
-      return compareText(left.memberId, right.memberId);
     case "name_asc":
     default:
       return compareText(buildMemberName(left), buildMemberName(right));

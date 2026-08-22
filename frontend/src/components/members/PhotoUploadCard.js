@@ -1,4 +1,4 @@
-import { FaCamera, FaIdCard, FaImage } from "react-icons/fa";
+import { FaCamera, FaCheck, FaIdCard, FaImage, FaMinus } from "react-icons/fa";
 
 export default function PhotoUploadCard({
   title,
@@ -14,6 +14,7 @@ export default function PhotoUploadCard({
   const Icon = type === "id" ? FaIdCard : FaImage;
   const resolvedValue = typeof value === "object" && value?.url ? value : null;
   const previewLabel = resolvedValue?.label || (typeof value === "string" ? value : "");
+  const hasValue = Boolean(resolvedValue?.url || previewLabel);
 
   return (
     <div className="upload-card">
@@ -30,6 +31,13 @@ export default function PhotoUploadCard({
         ) : (
           previewLabel || placeholder
         )}
+      </div>
+
+      <div className="upload-status-row">
+        <span className={hasValue ? "media-indicator available" : "media-indicator missing"}>
+          {hasValue ? <FaCheck /> : <FaMinus />}
+          {hasValue ? "Uploaded" : "Not uploaded"}
+        </span>
       </div>
 
       <div className="upload-actions">
