@@ -34,7 +34,7 @@ function getCachedLeadershipState() {
 
 export default function LeadershipDevelopmentPage({ section = "roles" }) {
   const activeSection = section;
-  const { members, lookupState, notifySuccess, notifyError, authUser } = useAppContext();
+  const { members, lookupState, notifySuccess, notifyError, authUser, requestConfirmation } = useAppContext();
   const cachedLeadershipState = useMemo(() => getCachedLeadershipState(), []);
   const roleTypeOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "leadership_role_type"),
@@ -145,7 +145,12 @@ export default function LeadershipDevelopmentPage({ section = "roles" }) {
   };
 
   const deleteRecord = async (label, action, collectionKey, id) => {
-    const confirmed = window.confirm(`Delete ${label}?`);
+    const confirmed = await requestConfirmation({
+      title: "Delete Leadership Record",
+      message: `Delete ${label}? This action cannot be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
     if (!confirmed) {
       return;
     }

@@ -3,6 +3,7 @@ import { churchApi } from "../apis/churchApi";
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
+import { exportRowsToCsv, exportRowsToPdf } from "../utils/exportUtils";
 
 function getCachedStrategicState() {
   const plans = churchApi.peekCached("/strategic/plans");
@@ -35,7 +36,7 @@ function getCachedStrategicState() {
 
 export default function StrategicPlanningPage({ section = "plans" }) {
   const activeSection = section;
-  const { ministries, lookupState, notifySuccess, notifyError } = useAppContext();
+  const { ministries, lookupState, notifySuccess, notifyError, requestConfirmation } = useAppContext();
   const cachedStrategicState = useMemo(() => getCachedStrategicState(), []);
   const planStatusOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "strategic_plan_status"),
@@ -105,6 +106,10 @@ export default function StrategicPlanningPage({ section = "plans" }) {
     correctiveActionDueDate: "",
   });
   const [selectedMinistryId, setSelectedMinistryId] = useState("");
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [planStatusFilter, setPlanStatusFilter] = useState("all");
+  const [objectiveMinistryFilter, setObjectiveMinistryFilter] = useState("all");
+  const [kpiPlanFilter, setKpiPlanFilter] = useState("all");
 
   useEffect(() => {
     if (!cachedStrategicState) {
@@ -112,6 +117,19 @@ export default function StrategicPlanningPage({ section = "plans" }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cachedStrategicState, planStatusOptions.length, frequencyOptions.length]);
+
+  useEffect(() => {
+    if (!state.plans.length) {
+      if (selectedPlanId) {
+        setSelectedPlanId("");
+      }
+      return;
+    }
+
+    if (!selectedPlanId || !state.plans.some((plan) => plan._id === selectedPlanId)) {
+      setSelectedPlanId(state.plans[0]._id);
+    }
+  }, [selectedPlanId, state.plans]);
 
   const loadData = async () => {
     try {
@@ -138,6 +156,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
         churchScorecard,
         ministryScorecard: null,
       });
+      setSelectedPlanId((current) => current || plans[0]?._id || "");
       setPlanForm((current) => ({ ...current, status: current.status || plans[0]?.status?._id || planStatusOptions[0]?._id || "" }));
       setPillarForm((current) => ({ ...current, planId: current.planId || plans[0]?._id || "" }));
       setObjectiveForm((current) => ({ ...current, pillarId: current.pillarId || pillars[0]?._id || "" }));
@@ -171,8 +190,211 @@ export default function StrategicPlanningPage({ section = "plans" }) {
     }
   };
 
+  const filteredPlans = useMemo(() => {
+    return state.plans.filter((plan) => {
+      if (planStatusFilter === "all") {
+        return true;
+      }
+      return String(plan.status?._id || plan.status) === planStatusFilter;
+    });
+  }, [planStatusFilter, state.plans]);
+
+  const activePlan = useMemo(
+    () => state.plans.find((plan) => plan._id === selectedPlanId) || null,
+    [selectedPlanId, state.plans]
+  );
+  const pillarPlanLookup = useMemo(() => {
+    return new Map(
+      state.pillars.map((pillar) => [
+        String(pillar._id),
+        String(pillar.planId?._id || pillar.planId || ""),
+      ])
+    );
+  }, [state.pillars]);
+
+  const planPillars = useMemo(() => {
+    if (!activePlan?._id) {
+      return [];
+    }
+    return state.pillars.filter((pillar) => String(pillar.planId?._id || pillar.planId) === String(activePlan._id));
+  }, [activePlan, state.pillars]);
+
+  const planObjectives = useMemo(() => {
+    if (!planPillars.length) {
+      return [];
+    }
+    const pillarIds = new Set(planPillars.map((pillar) => String(pillar._id)));
+    return state.objectives.filter((objective) => {
+      const matchesPlan = pillarIds.has(String(objective.pillarId?._id || objective.pillarId));
+      const objectiveMinistry = objective.responsibleMinistryId?._id || objective.responsibleMinistryId || "";
+      const matchesMinistry =
+        objectiveMinistryFilter === "all" || String(objectiveMinistry) === String(objectiveMinistryFilter);
+      return matchesPlan && matchesMinistry;
+    });
+  }, [objectiveMinistryFilter, planPillars, state.objectives]);
+
+  const planInitiatives = useMemo(() => {
+    if (!planObjectives.length) {
+      return [];
+    }
+    const objectiveIds = new Set(planObjectives.map((objective) => String(objective._id)));
+    return state.initiatives.filter((initiative) => objectiveIds.has(String(initiative.objectiveId?._id || initiative.objectiveId)));
+  }, [planObjectives, state.initiatives]);
+
+  const filteredKpiObjectives = useMemo(() => {
+    const scopedObjectives =
+      kpiPlanFilter === "all"
+        ? state.objectives
+        : state.objectives.filter((objective) =>
+            pillarPlanLookup.get(String(objective.pillarId?._id || objective.pillarId || "")) === String(kpiPlanFilter)
+          );
+    if (objectiveMinistryFilter === "all") {
+      return scopedObjectives;
+    }
+    return scopedObjectives.filter(
+      (objective) =>
+        String(objective.responsibleMinistryId?._id || objective.responsibleMinistryId || "") === String(objectiveMinistryFilter)
+    );
+  }, [kpiPlanFilter, objectiveMinistryFilter, pillarPlanLookup, state.objectives]);
+
+  const filteredKpiInitiatives = useMemo(() => {
+    const objectiveIds = new Set(filteredKpiObjectives.map((objective) => String(objective._id)));
+    return state.initiatives.filter((initiative) => objectiveIds.has(String(initiative.objectiveId?._id || initiative.objectiveId)));
+  }, [filteredKpiObjectives, state.initiatives]);
+
+  const filteredKpis = useMemo(() => {
+    const initiativeIds = new Set(filteredKpiInitiatives.map((initiative) => String(initiative._id)));
+    return state.kpis.filter((kpi) => initiativeIds.has(String(kpi.initiativeId?._id || kpi.initiativeId)));
+  }, [filteredKpiInitiatives, state.kpis]);
+
+  const filteredTargets = useMemo(() => {
+    const kpiIds = new Set(filteredKpis.map((kpi) => String(kpi._id)));
+    return state.targets.filter((target) => kpiIds.has(String(target.kpiId?._id || target.kpiId)));
+  }, [filteredKpis, state.targets]);
+
+  const filteredActuals = useMemo(() => {
+    const kpiIds = new Set(filteredKpis.map((kpi) => String(kpi._id)));
+    return state.actuals.filter((actual) => kpiIds.has(String(actual.kpiId?._id || actual.kpiId)));
+  }, [filteredKpis, state.actuals]);
+
+  const strategicExportRows = useMemo(() => {
+    if (!activePlan) {
+      return filteredPlans.map((plan) => ({
+        plan: plan.name,
+        periodStart: formatDate(plan.periodStart),
+        periodEnd: formatDate(plan.periodEnd),
+        status: plan.status?.label || "",
+        pillar: "",
+        objective: "",
+        initiative: "",
+        objectiveMinistry: "",
+      }));
+    }
+
+    if (!planPillars.length) {
+      return [
+        {
+          plan: activePlan.name,
+          periodStart: formatDate(activePlan.periodStart),
+          periodEnd: formatDate(activePlan.periodEnd),
+          status: activePlan.status?.label || "",
+          pillar: "",
+          objective: "",
+          initiative: "",
+          objectiveMinistry: "",
+        },
+      ];
+    }
+
+    return planPillars.flatMap((pillar) => {
+      const pillarObjectives = planObjectives.filter(
+        (objective) => String(objective.pillarId?._id || objective.pillarId) === String(pillar._id)
+      );
+
+      if (!pillarObjectives.length) {
+        return [
+          {
+            plan: activePlan.name,
+            periodStart: formatDate(activePlan.periodStart),
+            periodEnd: formatDate(activePlan.periodEnd),
+            status: activePlan.status?.label || "",
+            pillar: pillar.name,
+            objective: "",
+            initiative: "",
+            objectiveMinistry: "",
+          },
+        ];
+      }
+
+      return pillarObjectives.flatMap((objective) => {
+        const objectiveInitiatives = state.initiatives.filter(
+          (initiative) => String(initiative.objectiveId?._id || initiative.objectId || initiative.objectiveId) === String(objective._id)
+        );
+
+        if (!objectiveInitiatives.length) {
+          return [
+            {
+              plan: activePlan.name,
+              periodStart: formatDate(activePlan.periodStart),
+              periodEnd: formatDate(activePlan.periodEnd),
+              status: activePlan.status?.label || "",
+              pillar: pillar.name,
+              objective: objective.title,
+              initiative: "",
+              objectiveMinistry: objective.responsibleMinistryId?.name || "",
+            },
+          ];
+        }
+
+        return objectiveInitiatives.map((initiative) => ({
+          plan: activePlan.name,
+          periodStart: formatDate(activePlan.periodStart),
+          periodEnd: formatDate(activePlan.periodEnd),
+          status: activePlan.status?.label || "",
+          pillar: pillar.name,
+          objective: objective.title,
+          initiative: initiative.title,
+          objectiveMinistry: objective.responsibleMinistryId?.name || "",
+        }));
+      });
+    });
+  }, [activePlan, filteredPlans, planObjectives, planPillars, state.initiatives]);
+
+  const strategicExportColumns = [
+    { key: "plan", header: "Plan" },
+    { key: "periodStart", header: "Period Start" },
+    { key: "periodEnd", header: "Period End" },
+    { key: "status", header: "Status" },
+    { key: "pillar", header: "Pillar" },
+    { key: "objective", header: "Objective" },
+    { key: "initiative", header: "Initiative" },
+    { key: "objectiveMinistry", header: "Responsible Ministry" },
+  ];
+
+  const handleExportStrategicCsv = () => {
+    exportRowsToCsv({
+      fileName: `${sanitizeFileName(activePlan?.name || "strategic-plans")}.csv`,
+      columns: strategicExportColumns,
+      rows: strategicExportRows,
+    });
+  };
+
+  const handleExportStrategicPdf = () => {
+    exportRowsToPdf({
+      fileName: `${sanitizeFileName(activePlan?.name || "strategic-plans")}.pdf`,
+      title: activePlan ? `Strategic Plan Export - ${activePlan.name}` : "Strategic Plans Export",
+      columns: strategicExportColumns,
+      rows: strategicExportRows,
+    });
+  };
+
   const deleteRecord = async (label, action, collectionKey, id) => {
-    const confirmed = window.confirm(`Delete ${label}?`);
+    const confirmed = await requestConfirmation({
+      title: "Delete Strategic Record",
+      message: `Delete ${label}? This action cannot be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
     if (!confirmed) {
       return;
     }
@@ -212,10 +434,16 @@ export default function StrategicPlanningPage({ section = "plans" }) {
           <section className="surface-card data-card">
             <div className="section-headline compact">
               <div>
-                <h3>Strategic Structure</h3>
-                <p>Create the plan hierarchy from focused modal forms instead of stacked page forms.</p>
+                <h3>Strategic Plans</h3>
+                <p>Open one plan at a time so pillars, objectives, and initiatives stay scoped to the selected plan.</p>
               </div>
               <div className="toolbar-row">
+                <button type="button" className="ghost-button" onClick={handleExportStrategicCsv}>
+                  Export CSV
+                </button>
+                <button type="button" className="ghost-button" onClick={handleExportStrategicPdf}>
+                  Export PDF
+                </button>
                 <button type="button" className="ghost-button" onClick={() => setActiveModal("plan")}>
                   Add Plan
                 </button>
@@ -230,15 +458,47 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 </button>
               </div>
             </div>
+            <div className="form-grid">
+              <label>
+                Plan Status
+                <select value={planStatusFilter} onChange={(event) => setPlanStatusFilter(event.target.value)}>
+                  <option value="all">All statuses</option>
+                  {planStatusOptions.map((option) => (
+                    <option key={option._id} value={option._id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Objective Ministry
+                <select value={objectiveMinistryFilter} onChange={(event) => setObjectiveMinistryFilter(event.target.value)}>
+                  <option value="all">All ministries</option>
+                  {ministries.map((ministry) => (
+                    <option key={ministry._id || ministry.id} value={ministry._id || ministry.id}>
+                      {ministry.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </section>
 
           <TableCard
             title="Strategic Plans"
-            columns={["Plan", "Period", "Status", "Actions"]}
-            rows={state.plans.map((plan) => [
+            columns={["Plan", "Period", "Status", "Open", "Actions"]}
+            rows={filteredPlans.map((plan) => [
               plan.name,
               `${formatDate(plan.periodStart)} to ${formatDate(plan.periodEnd)}`,
               plan.status?.label || "-",
+              <button
+                key={`open-plan-${plan._id}`}
+                type="button"
+                className={selectedPlanId === plan._id ? "primary-button small" : "ghost-button small"}
+                onClick={() => setSelectedPlanId(plan._id)}
+              >
+                {selectedPlanId === plan._id ? "Opened" : "Open"}
+              </button>,
               <DeleteButton
                 key={`delete-plan-${plan._id}`}
                 onClick={() => deleteRecord(plan.name, () => churchApi.deleteStrategicPlan(plan._id), "plans", plan._id)}
@@ -246,48 +506,72 @@ export default function StrategicPlanningPage({ section = "plans" }) {
             ])}
             emptyMessage="No strategic plans recorded yet."
           />
-          <TableCard
-            title="Strategic Pillars"
-            columns={["Pillar", "Plan", "Description", "Actions"]}
-            rows={state.pillars.map((pillar) => [
-              pillar.name,
-              pillar.planId?.name || "-",
-              pillar.description || "-",
-              <DeleteButton
-                key={`delete-pillar-${pillar._id}`}
-                onClick={() => deleteRecord(pillar.name, () => churchApi.deleteStrategicPillar(pillar._id), "pillars", pillar._id)}
-              />,
-            ])}
-            emptyMessage="No pillars recorded yet."
-          />
-          <TableCard
-            title="Strategic Objectives"
-            columns={["Objective", "Pillar", "Ministry", "Actions"]}
-            rows={state.objectives.map((objective) => [
-              objective.title,
-              objective.pillarId?.name || "-",
-              objective.responsibleMinistryId?.name || "-",
-              <DeleteButton
-                key={`delete-objective-${objective._id}`}
-                onClick={() => deleteRecord(objective.title, () => churchApi.deleteStrategicObjective(objective._id), "objectives", objective._id)}
-              />,
-            ])}
-            emptyMessage="No strategic objectives recorded yet."
-          />
-          <TableCard
-            title="Initiatives"
-            columns={["Initiative", "Objective", "Description", "Actions"]}
-            rows={state.initiatives.map((initiative) => [
-              initiative.title,
-              initiative.objectiveId?.title || "-",
-              initiative.description || "-",
-              <DeleteButton
-                key={`delete-initiative-${initiative._id}`}
-                onClick={() => deleteRecord(initiative.title, () => churchApi.deleteStrategicInitiative(initiative._id), "initiatives", initiative._id)}
-              />,
-            ])}
-            emptyMessage="No initiatives recorded yet."
-          />
+
+          {activePlan ? (
+            <>
+              <section className="surface-card data-card">
+                <div className="section-headline compact">
+                  <div>
+                    <h3>{activePlan.name}</h3>
+                    <p>
+                      {formatDate(activePlan.periodStart)} to {formatDate(activePlan.periodEnd)} | {activePlan.status?.label || "No status"}
+                    </p>
+                  </div>
+                </div>
+                <div className="compact-stats-grid">
+                  <StatCard color="purple" label="Pillars" value={planPillars.length} />
+                  <StatCard color="blue" label="Objectives" value={planObjectives.length} />
+                  <StatCard color="orange" label="Initiatives" value={planInitiatives.length} />
+                </div>
+              </section>
+
+              <TableCard
+                title="Selected Plan Pillars"
+                columns={["Pillar", "Description", "Actions"]}
+                rows={planPillars.map((pillar) => [
+                  pillar.name,
+                  pillar.description || "-",
+                  <DeleteButton
+                    key={`delete-pillar-${pillar._id}`}
+                    onClick={() => deleteRecord(pillar.name, () => churchApi.deleteStrategicPillar(pillar._id), "pillars", pillar._id)}
+                  />,
+                ])}
+                emptyMessage="No pillars recorded for the selected plan yet."
+              />
+              <TableCard
+                title="Selected Plan Objectives"
+                columns={["Objective", "Pillar", "Ministry", "Actions"]}
+                rows={planObjectives.map((objective) => [
+                  objective.title,
+                  objective.pillarId?.name || "-",
+                  objective.responsibleMinistryId?.name || "-",
+                  <DeleteButton
+                    key={`delete-objective-${objective._id}`}
+                    onClick={() => deleteRecord(objective.title, () => churchApi.deleteStrategicObjective(objective._id), "objectives", objective._id)}
+                  />,
+                ])}
+                emptyMessage="No objectives recorded for the selected plan and filter yet."
+              />
+              <TableCard
+                title="Selected Plan Initiatives"
+                columns={["Initiative", "Objective", "Description", "Actions"]}
+                rows={planInitiatives.map((initiative) => [
+                  initiative.title,
+                  initiative.objectiveId?.title || "-",
+                  initiative.description || "-",
+                  <DeleteButton
+                    key={`delete-initiative-${initiative._id}`}
+                    onClick={() => deleteRecord(initiative.title, () => churchApi.deleteStrategicInitiative(initiative._id), "initiatives", initiative._id)}
+                  />,
+                ])}
+                emptyMessage="No initiatives recorded for the selected plan and filter yet."
+              />
+            </>
+          ) : (
+            <section className="surface-card data-card">
+              <div className="empty-note">Select a plan to see its pillars, objectives, and initiatives.</div>
+            </section>
+          )}
         </>
       ) : null}
 
@@ -311,12 +595,36 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 </button>
               </div>
             </div>
+            <div className="form-grid">
+              <label>
+                Plan Scope
+                <select value={kpiPlanFilter} onChange={(event) => setKpiPlanFilter(event.target.value)}>
+                  <option value="all">All plans</option>
+                  {state.plans.map((plan) => (
+                    <option key={plan._id} value={plan._id}>
+                      {plan.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Ministry Scope
+                <select value={objectiveMinistryFilter} onChange={(event) => setObjectiveMinistryFilter(event.target.value)}>
+                  <option value="all">All ministries</option>
+                  {ministries.map((ministry) => (
+                    <option key={ministry._id || ministry.id} value={ministry._id || ministry.id}>
+                      {ministry.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </section>
 
           <TableCard
             title="Strategic KPIs"
             columns={["KPI", "Initiative", "Frequency", "Unit", "Actions"]}
-            rows={state.kpis.map((kpi) => [
+            rows={filteredKpis.map((kpi) => [
               kpi.name,
               kpi.initiativeId?.title || "-",
               kpi.targetFrequency?.label || "-",
@@ -326,12 +634,12 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 onClick={() => deleteRecord(kpi.name, () => churchApi.deleteKpi(kpi._id), "kpis", kpi._id)}
               />,
             ])}
-            emptyMessage="No KPIs configured yet."
+            emptyMessage="No KPIs match the selected plan and ministry filters."
           />
           <TableCard
             title="KPI Targets"
             columns={["KPI", "Period", "Target", "Actions"]}
-            rows={state.targets.map((target) => [
+            rows={filteredTargets.map((target) => [
               target.kpiId?.name || "-",
               target.period,
               target.targetValue,
@@ -340,12 +648,12 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 onClick={() => deleteRecord(`${target.kpiId?.name || "KPI"} target`, () => churchApi.deleteKpiTarget(target._id), "targets", target._id)}
               />,
             ])}
-            emptyMessage="No KPI targets captured yet."
+            emptyMessage="No KPI targets match the selected plan and ministry filters."
           />
           <TableCard
             title="KPI Actuals"
             columns={["KPI", "Period", "Actual", "Variance", "RAG", "Due", "Actions"]}
-            rows={state.actuals.map((actual) => [
+            rows={filteredActuals.map((actual) => [
               actual.kpiId?.name || "-",
               actual.period,
               actual.actualValue,
@@ -357,7 +665,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 onClick={() => deleteRecord(`${actual.kpiId?.name || "KPI"} actual`, () => churchApi.deleteKpiActual(actual._id), "actuals", actual._id)}
               />,
             ])}
-            emptyMessage="No KPI actuals captured yet."
+            emptyMessage="No KPI actuals match the selected plan and ministry filters."
           />
         </>
       ) : null}
@@ -470,6 +778,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 onClick={async () => {
                   const created = await runAction(() => churchApi.createStrategicPlan(planForm), "Strategic plan saved.");
                   setState((current) => ({ ...current, plans: [created, ...current.plans] }));
+                  setSelectedPlanId(created._id);
                   setPillarForm((current) => ({ ...current, planId: created._id }));
                   setActiveModal("");
                 }}
@@ -531,7 +840,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 Pillar
                 <select value={objectiveForm.pillarId} onChange={(event) => setObjectiveForm((current) => ({ ...current, pillarId: event.target.value }))}>
                   <option value="">Select pillar</option>
-                  {state.pillars.map((pillar) => (
+                  {(activePlan ? planPillars : state.pillars).map((pillar) => (
                     <option key={pillar._id} value={pillar._id}>
                       {pillar.name}
                     </option>
@@ -587,7 +896,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 Objective
                 <select value={initiativeForm.objectiveId} onChange={(event) => setInitiativeForm((current) => ({ ...current, objectiveId: event.target.value }))}>
                   <option value="">Select objective</option>
-                  {state.objectives.map((objective) => (
+                  {(activePlan ? planObjectives : state.objectives).map((objective) => (
                     <option key={objective._id} value={objective._id}>
                       {objective.title}
                     </option>
@@ -629,7 +938,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 Initiative
                 <select value={kpiForm.initiativeId} onChange={(event) => setKpiForm((current) => ({ ...current, initiativeId: event.target.value }))}>
                   <option value="">Select initiative</option>
-                  {state.initiatives.map((initiative) => (
+                  {(kpiPlanFilter !== "all" || objectiveMinistryFilter !== "all" ? filteredKpiInitiatives : state.initiatives).map((initiative) => (
                     <option key={initiative._id} value={initiative._id}>
                       {initiative.title}
                     </option>
@@ -717,7 +1026,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 KPI
                 <select value={targetForm.kpiId} onChange={(event) => setTargetForm((current) => ({ ...current, kpiId: event.target.value }))}>
                   <option value="">Select KPI</option>
-                  {state.kpis.map((kpi) => (
+                  {(kpiPlanFilter !== "all" || objectiveMinistryFilter !== "all" ? filteredKpis : state.kpis).map((kpi) => (
                     <option key={kpi._id} value={kpi._id}>
                       {kpi.name}
                     </option>
@@ -766,7 +1075,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                 KPI
                 <select value={actualForm.kpiId} onChange={(event) => setActualForm((current) => ({ ...current, kpiId: event.target.value }))}>
                   <option value="">Select KPI</option>
-                  {state.kpis.map((kpi) => (
+                  {(kpiPlanFilter !== "all" || objectiveMinistryFilter !== "all" ? filteredKpis : state.kpis).map((kpi) => (
                     <option key={kpi._id} value={kpi._id}>
                       {kpi.name}
                     </option>
@@ -906,4 +1215,12 @@ function formatDate(value) {
   }
 
   return new Date(value).toLocaleDateString();
+}
+
+function sanitizeFileName(value) {
+  return String(value || "export")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

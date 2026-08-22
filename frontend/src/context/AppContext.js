@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   financeFormTemplate,
   familyFormTemplate,
@@ -78,6 +78,14 @@ export function AppProvider({ children }) {
     record: null,
     draft: null,
   });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "Confirm Action",
+    message: "",
+    confirmLabel: "Confirm",
+    tone: "danger",
+  });
+  const confirmResolverRef = useRef(null);
 
   const groupsByParent = useMemo(() => {
     return groups.reduce((accumulator, group) => {
@@ -252,6 +260,36 @@ export function AppProvider({ children }) {
 
   const openModal = (name) => setActiveModal(name);
   const closeModal = () => setActiveModal(null);
+  const closeConfirmDialog = () => {
+    setConfirmDialog((current) => ({ ...current, open: false }));
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(false);
+      confirmResolverRef.current = null;
+    }
+  };
+  const resolveConfirmDialog = (confirmed) => {
+    setConfirmDialog((current) => ({ ...current, open: false }));
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(confirmed);
+      confirmResolverRef.current = null;
+    }
+  };
+  const requestConfirmation = ({
+    title = "Confirm Action",
+    message = "",
+    confirmLabel = "Confirm",
+    tone = "danger",
+  } = {}) =>
+    new Promise((resolve) => {
+      confirmResolverRef.current = resolve;
+      setConfirmDialog({
+        open: true,
+        title,
+        message,
+        confirmLabel,
+        tone,
+      });
+    });
 
   const openRecordModal = async (type, record, mode = "view") => {
     const resolvedRecord =
@@ -390,11 +428,14 @@ export function AppProvider({ children }) {
       return;
     }
 
-    if (typeof window !== "undefined") {
-      const confirmed = window.confirm("Delete this record?");
-      if (!confirmed) {
-        return;
-      }
+    const confirmed = await requestConfirmation({
+      title: "Delete Record",
+      message: "Delete this record? This action cannot be undone.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!confirmed) {
+      return;
     }
 
     try {
@@ -1679,6 +1720,10 @@ export function AppProvider({ children }) {
     activeModal,
     openModal,
     closeModal,
+    confirmDialog,
+    requestConfirmation,
+    closeConfirmDialog,
+    resolveConfirmDialog,
     recordModal,
     openRecordModal,
     closeRecordModal,
@@ -2390,12 +2435,12 @@ function buildNewRecord(type, { families, members, ministries, roles, users, aut
 
   if (type === "user") {
     return {
-        displayName: "",
-        username: "",
+      displayName: "",
+      username: "",
       email: "",
-        pin: "",
-        roleIds: roles[0] ? [roles[0]._id || roles[0].id || roles[0].name] : [],
-        permissions: roles[0]?.permissions || [],
+      pin: "",
+      roleIds: [],
+      permissions: [],
       status: "Pending",
     };
   }

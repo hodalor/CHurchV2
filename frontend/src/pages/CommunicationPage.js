@@ -26,7 +26,7 @@ function getCachedCommunicationState() {
 
 export default function CommunicationPage({ section = "groups" }) {
   const activeSection = section;
-  const { lookupState, members, visitors, notifySuccess, notifyError } = useAppContext();
+  const { lookupState, members, visitors, notifySuccess, notifyError, requestConfirmation } = useAppContext();
   const cachedCommunicationState = useMemo(() => getCachedCommunicationState(), []);
   const channelOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "communication_channel"),
@@ -269,7 +269,12 @@ export default function CommunicationPage({ section = "groups" }) {
                   type="button"
                   className="ghost-button small delete-button"
                   onClick={async () => {
-                    const confirmed = window.confirm(`Delete ${group.name}?`);
+                    const confirmed = await requestConfirmation({
+                      title: "Delete Communication Group",
+                      message: `Delete ${group.name}? This action cannot be undone.`,
+                      confirmLabel: "Delete",
+                      tone: "danger",
+                    });
                     if (!confirmed) {
                       return;
                     }

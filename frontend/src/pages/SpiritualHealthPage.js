@@ -21,7 +21,7 @@ function getCachedSpiritualHealthState() {
 
 export default function SpiritualHealthPage({ section = "dashboard" }) {
   const activeSection = section;
-  const { users, notifySuccess, notifyError } = useAppContext();
+  const { users, notifySuccess, notifyError, requestConfirmation } = useAppContext();
   const cachedSpiritualHealthState = useMemo(() => getCachedSpiritualHealthState(), []);
   const [state, setState] = useState(cachedSpiritualHealthState || {
     loading: true,
@@ -206,7 +206,12 @@ export default function SpiritualHealthPage({ section = "dashboard" }) {
                   type="button"
                   className="ghost-button small delete-button"
                   onClick={async () => {
-                    const confirmed = window.confirm(`Delete ${rule.name}?`);
+                    const confirmed = await requestConfirmation({
+                      title: "Delete Trigger Rule",
+                      message: `Delete ${rule.name}? This action cannot be undone.`,
+                      confirmLabel: "Delete",
+                      tone: "danger",
+                    });
                     if (!confirmed) {
                       return;
                     }

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { FaCheck, FaMinus, FaSearch } from "react-icons/fa";
 import BulkImportModal from "../components/common/BulkImportModal";
 import { useAppContext } from "../context/AppContext";
+import { exportRowsToCsv, exportRowsToPdf } from "../utils/exportUtils";
 
 export default function MembersPage() {
   const [showImportModal, setShowImportModal] = useState(false);
@@ -186,6 +187,49 @@ export default function MembersPage() {
     { label: "Children", value: memberRows.filter((member) => member.memberType === "Child").length, className: "orange" },
   ];
 
+  const memberExportColumns = [
+    { key: "memberId", header: "Member ID" },
+    { key: "firstName", header: "First Name" },
+    { key: "otherName", header: "Other Name" },
+    { key: "lastName", header: "Surname" },
+    { key: "preferredName", header: "Preferred Name" },
+    { key: "gender", header: "Gender" },
+    { key: "maritalStatus", header: "Marital Status" },
+    { key: "memberType", header: "Member Type" },
+    { key: "membershipStatus", header: "Membership Status" },
+    { key: "ministryName", header: "Ministry" },
+    { key: "groupLabel", header: "Groups" },
+    { key: "familyId", header: "Household ID" },
+    { key: "householdName", header: "Household Name" },
+    { key: "householdRole", header: "Household Role" },
+    { key: "phone", header: "Phone" },
+    { key: "email", header: "Email" },
+    { key: "dateOfBirth", header: "Date of Birth" },
+    { key: "dateJoined", header: "Date Joined" },
+    { key: "residentialArea", header: "Residential Area" },
+    { key: "city", header: "City" },
+    { key: "address", header: "Address" },
+    { key: "occupation", header: "Occupation" },
+    { key: "baptismStatus", header: "Baptism Status" },
+  ];
+
+  const handleExportMembersCsv = () => {
+    exportRowsToCsv({
+      fileName: "members-export.csv",
+      columns: memberExportColumns,
+      rows: memberRows,
+    });
+  };
+
+  const handleExportMembersPdf = () => {
+    exportRowsToPdf({
+      fileName: "members-export.pdf",
+      title: "Members Export",
+      columns: memberExportColumns,
+      rows: memberRows,
+    });
+  };
+
   return (
     <div className="page-grid">
       <section className="compact-stats-grid">
@@ -265,6 +309,12 @@ export default function MembersPage() {
             <option value="name_desc">Sort: Name Z-A</option>
           </select>
           <div className="toolbar-actions">
+            <button type="button" className="ghost-button" onClick={handleExportMembersCsv}>
+              Export CSV
+            </button>
+            <button type="button" className="ghost-button" onClick={handleExportMembersPdf}>
+              Export PDF
+            </button>
             <button type="button" className="ghost-button" onClick={() => setShowImportModal(true)}>
               Bulk Upload
             </button>

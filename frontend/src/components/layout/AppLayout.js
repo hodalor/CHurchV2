@@ -23,13 +23,25 @@ import StrategicPlanningPage from "../../pages/StrategicPlanningPage";
 import SettingsPage from "../../pages/SettingsPage";
 import UsersPage from "../../pages/UsersPage";
 import MemberEnrollmentModal from "../members/MemberEnrollmentModal";
+import ConfirmDialog from "../common/ConfirmDialog";
 import RecordDetailModal from "../common/RecordDetailModal";
 import ToastViewport from "../common/ToastViewport";
 import { useAppContext } from "../../context/AppContext";
 
 export default function AppLayout() {
   const location = useLocation();
-  const { authUser, openMemberEnrollment, openRecordModal, activeSetupTab, branding, toasts, dismissToast } = useAppContext();
+  const {
+    authUser,
+    openMemberEnrollment,
+    openRecordModal,
+    activeSetupTab,
+    branding,
+    toasts,
+    dismissToast,
+    confirmDialog,
+    closeConfirmDialog,
+    resolveConfirmDialog,
+  } = useAppContext();
   const pageMeta = getPageMeta(location.pathname);
   const pageAction = getPageAction(pageMeta.action, activeSetupTab, { openMemberEnrollment, openRecordModal, branding, authUser }, location.pathname);
 
@@ -118,6 +130,7 @@ export default function AppLayout() {
       </div>
 
       <MemberEnrollmentModal />
+      <ConfirmDialog dialog={confirmDialog} onCancel={closeConfirmDialog} onConfirm={() => resolveConfirmDialog(true)} />
       <RecordDetailModal />
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </>

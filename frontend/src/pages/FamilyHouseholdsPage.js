@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { FaSearch } from "react-icons/fa";
 import BulkImportModal from "../components/common/BulkImportModal";
 import { useAppContext } from "../context/AppContext";
+import { exportRowsToCsv, exportRowsToPdf } from "../utils/exportUtils";
 
 function getName(value) {
   if (!value) {
@@ -80,6 +81,55 @@ export default function FamilyHouseholdsPage() {
     [families]
   );
 
+  const familyExportRows = useMemo(
+    () =>
+      filteredFamilies.map((family) => ({
+        familyId: family.familyId,
+        familyName: family.familyName,
+        residentialArea: family.residentialArea,
+        fellowshipZone: groups.find((group) => group.id === family.fellowshipZone)?.name || family.fellowshipZone || "",
+        headOfHousehold: getName(family.headOfHousehold),
+        spouse: family.spouse?.memberName || "",
+        familyContact: family.familyContact,
+        totalMembers: family.householdMembers?.length || 0,
+        householdMembers: (family.householdMembers || [])
+          .map((member) => `${member.relationshipToHead}: ${member.memberName}`)
+          .join(", "),
+        visitationHistory: family.visitationHistory || "",
+      })),
+    [filteredFamilies, groups]
+  );
+
+  const familyExportColumns = [
+    { key: "familyId", header: "Family ID" },
+    { key: "familyName", header: "Family Name" },
+    { key: "residentialArea", header: "Residential Area" },
+    { key: "fellowshipZone", header: "Fellowship Or Zone" },
+    { key: "headOfHousehold", header: "Head Of Household" },
+    { key: "spouse", header: "Spouse" },
+    { key: "familyContact", header: "Contact" },
+    { key: "totalMembers", header: "Total Members" },
+    { key: "householdMembers", header: "Household Members" },
+    { key: "visitationHistory", header: "Visit History" },
+  ];
+
+  const handleExportHouseholdsCsv = () => {
+    exportRowsToCsv({
+      fileName: "households-export.csv",
+      columns: familyExportColumns,
+      rows: familyExportRows,
+    });
+  };
+
+  const handleExportHouseholdsPdf = () => {
+    exportRowsToPdf({
+      fileName: "households-export.pdf",
+      title: "Households Export",
+      columns: familyExportColumns,
+      rows: familyExportRows,
+    });
+  };
+
   if (familyApiState.loading) {
     return <div className="empty-note">Loading households...</div>;
   }
@@ -97,6 +147,12 @@ export default function FamilyHouseholdsPage() {
             <p>Open any row to view or edit a household, or import many households from a template.</p>
           </div>
           <div className="toolbar-actions">
+            <button type="button" className="ghost-button" onClick={handleExportHouseholdsCsv}>
+              Export CSV
+            </button>
+            <button type="button" className="ghost-button" onClick={handleExportHouseholdsPdf}>
+              Export PDF
+            </button>
             <button type="button" className="ghost-button" onClick={() => setShowImportModal(true)}>
               Bulk Upload
             </button>
