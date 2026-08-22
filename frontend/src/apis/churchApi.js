@@ -142,8 +142,16 @@ async function safeJson(response) {
   }
 
   const trimmed = text.trim();
-  if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
-    throw new Error("The server returned an HTML page instead of API JSON. Check that the backend is running on the expected API port.");
+  const normalizedTrimmed = trimmed.toLowerCase();
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+  if (
+    normalizedTrimmed.startsWith("<!doctype") ||
+    normalizedTrimmed.startsWith("<html") ||
+    contentType.includes("text/html")
+  ) {
+    throw new Error(
+      `The server returned an HTML page instead of API JSON from ${API_BASE_URL}. Check REACT_APP_API_URL on Netlify and confirm the site was redeployed after saving it.`
+    );
   }
 
   return JSON.parse(text);
