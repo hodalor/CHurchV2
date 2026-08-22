@@ -299,7 +299,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
           periodStart: formatDate(activePlan.periodStart),
           periodEnd: formatDate(activePlan.periodEnd),
           status: activePlan.status?.label || "",
-          pillar: "",
+            pillar: { primary: "", secondary: "" },
           objective: "",
           initiative: "",
           objectiveMinistry: "",
@@ -319,7 +319,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
             periodStart: formatDate(activePlan.periodStart),
             periodEnd: formatDate(activePlan.periodEnd),
             status: activePlan.status?.label || "",
-            pillar: pillar.name,
+            pillar: { primary: pillar.name, secondary: pillar.description || "" },
             objective: "",
             initiative: "",
             objectiveMinistry: "",
@@ -339,7 +339,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
               periodStart: formatDate(activePlan.periodStart),
               periodEnd: formatDate(activePlan.periodEnd),
               status: activePlan.status?.label || "",
-              pillar: pillar.name,
+              pillar: { primary: pillar.name, secondary: pillar.description || "" },
               objective: objective.title,
               initiative: "",
               objectiveMinistry: objective.responsibleMinistryId?.name || "",
@@ -352,7 +352,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
           periodStart: formatDate(activePlan.periodStart),
           periodEnd: formatDate(activePlan.periodEnd),
           status: activePlan.status?.label || "",
-          pillar: pillar.name,
+          pillar: { primary: pillar.name, secondary: pillar.description || "" },
           objective: objective.title,
           initiative: initiative.title,
           objectiveMinistry: objective.responsibleMinistryId?.name || "",
@@ -362,14 +362,19 @@ export default function StrategicPlanningPage({ section = "plans" }) {
   }, [activePlan, filteredPlans, planObjectives, planPillars, state.initiatives]);
 
   const strategicExportColumns = [
-    { key: "plan", header: "Plan" },
-    { key: "periodStart", header: "Period Start" },
-    { key: "periodEnd", header: "Period End" },
-    { key: "status", header: "Status" },
-    { key: "pillar", header: "Pillar" },
-    { key: "objective", header: "Objective" },
-    { key: "initiative", header: "Initiative" },
-    { key: "objectiveMinistry", header: "Responsible Ministry" },
+    { key: "plan", header: "Plan", pdfWidth: 105 },
+    { key: "periodStart", header: "Period Start", pdfWidth: 72 },
+    { key: "periodEnd", header: "Period End", pdfWidth: 72 },
+    { key: "status", header: "Status", pdfWidth: 55 },
+    { key: "pillar", header: "Pillar", pdfWidth: 230 },
+    { key: "objective", header: "Objective", pdfWidth: 120 },
+    { key: "initiative", header: "Initiative", pdfWidth: 120 },
+    {
+      key: "objectiveMinistry",
+      header: "Responsible Ministry",
+      pdfHeader: "Responsible\nMinistry",
+      pdfWidth: 72,
+    },
   ];
 
   const deleteRecord = async (label, action, collectionKey, id) => {

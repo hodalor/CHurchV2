@@ -1,6 +1,10 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+function isCompositeCell(value) {
+  return Boolean(value && typeof value === "object" && ("primary" in value || "secondary" in value));
+}
+
 function normalizeCell(value) {
   if (value === null || value === undefined) {
     return "";
@@ -11,10 +15,21 @@ function normalizeCell(value) {
   }
 
   if (typeof value === "object") {
+    if (isCompositeCell(value)) {
+      return [value.primary, value.secondary].filter(Boolean).join(" - ");
+    }
     return value.label || value.name || value.title || value.memberName || value.value || "";
   }
 
   return String(value);
+}
+
+function buildPdfCellContent(value) {
+  if (isCompositeCell(value)) {
+    return [value.primary, value.secondary].filter(Boolean).join("\n");
+  }
+
+  return normalizeCell(value);
 }
 
 function downloadBlob(blob, fileName) {
@@ -149,10 +164,27 @@ export async function exportRowsToPdf({
     summaryY += 44;
   }
 
+  const pdfColumnStyles = columns.reduce((styles, column, index) => {
+    if (!column.pdfWidth) {
+      return styles;
+    }
+
+    styles[index] = {
+      ...(styles[index] || {}),
+      cellWidth: column.pdfWidth,
+    };
+    return styles;
+  }, {});
+
   autoTable(doc, {
     startY: summaryY,
-    head: [columns.map((column) => column.header)],
-    body: rows.map((row) => columns.map((column) => normalizeCell(row[column.key]))),
+    head: [columns.map((column) => column.pdfHeader || column.header)],
+    body: rows.map((row) =>
+      columns.map((column) => ({
+        content: buildPdfCellContent(row[column.key]),
+        rawValue: row[column.key],
+      }))
+    ),
     styles: {
       fontSize: 8,
       cellPadding: 4,
@@ -170,6 +202,47 @@ export async function exportRowsToPdf({
       fillColor: [248, 250, 252],
     },
     margin: { left: 28, right: 28, top: 146, bottom: 34 },
+    columnStyles: pdfColumnStyles,
+    didParseCell(data) {
+      const rawValue = data.cell.raw?.rawValue;
+      if (!isCompositeCell(rawValue) || data.section !== "body") {
+        return;
+      }
+
+      data.cell.text = [""];
+      const availableWidth = Math.max((data.cell.width || 120) - 8, 40);
+      const primaryLines = rawValue.primary ? doc.splitTextToSize(String(rawValue.primary), availableWidth) : [];
+      const secondaryLines = rawValue.secondary ? doc.splitTextToSize(String(rawValue.secondary), availableWidth) : [];
+      const lineCount = primaryLines.length + secondaryLines.length;
+      data.cell.styles.minCellHeight = Math.max(24, 8 + lineCount * 9);
+    },
+    didDrawCell(data) {
+      const rawValue = data.cell.raw?.rawValue;
+      if (!isCompositeCell(rawValue) || data.section !== "body") {
+        return;
+      }
+
+      const availableWidth = Math.max((data.cell.width || 120) - 8, 40);
+      const startX = data.cell.x + 4;
+      let currentY = data.cell.y + 10;
+      const primaryLines = rawValue.primary ? doc.splitTextToSize(String(rawValue.primary), availableWidth) : [];
+      const secondaryLines = rawValue.secondary ? doc.splitTextToSize(String(rawValue.secondary), availableWidth) : [];
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      primaryLines.forEach((line) => {
+        doc.text(line, startX, currentY);
+        currentY += 9;
+      });
+
+      if (secondaryLines.length) {
+        doc.setFont("helvetica", "normal");
+        secondaryLines.forEach((line) => {
+          doc.text(line, startX, currentY);
+          currentY += 9;
+        });
+      }
+    },
     didDrawPage(data) {
       drawPdfLetterhead(doc, {
         branding,
