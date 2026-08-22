@@ -2,13 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { churchApi } from "../apis/churchApi";
 import { useAppContext } from "../context/AppContext";
 
+function getCachedAiAssistPayload(section) {
+  return section === "duplicates"
+    ? churchApi.peekCached("/ai-assist/duplicates?status=pending")
+    : churchApi.peekCached("/ai-assist/suggestions?status=pending");
+}
+
 export default function AiAssistPage({ section = "duplicates" }) {
   const { notifyError, notifySuccess } = useAppContext();
-  const [loading, setLoading] = useState(true);
+  const cachedPayload = useMemo(() => getCachedAiAssistPayload(section), [section]);
+  const [loading, setLoading] = useState(!cachedPayload);
   const [generating, setGenerating] = useState("");
   const [error, setError] = useState("");
-  const [duplicates, setDuplicates] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
+  const [duplicates, setDuplicates] = useState(section === "duplicates" && Array.isArray(cachedPayload) ? cachedPayload : []);
+  const [suggestions, setSuggestions] = useState(section === "suggestions" && Array.isArray(cachedPayload) ? cachedPayload : []);
   const [generatorForm, setGeneratorForm] = useState({
     moduleKey: "visitor",
     promptText: "",
@@ -21,7 +28,9 @@ export default function AiAssistPage({ section = "duplicates" }) {
     let active = true;
 
     async function load() {
-      setLoading(true);
+      if (!cachedPayload) {
+        setLoading(true);
+      }
       setError("");
       try {
         if (section === "duplicates") {
@@ -46,11 +55,13 @@ export default function AiAssistPage({ section = "duplicates" }) {
       }
     }
 
-    load();
+    if (!cachedPayload) {
+      load();
+    }
     return () => {
       active = false;
     };
-  }, [section]);
+  }, [cachedPayload, section]);
 
   const duplicateSummary = useMemo(
     () => ({

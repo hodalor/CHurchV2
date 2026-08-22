@@ -4,9 +4,38 @@ import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
+function getCachedLeadershipState() {
+  const roles = churchApi.peekCached("/leadership/roles");
+  const skills = churchApi.peekCached("/leadership/skills");
+  const flags = churchApi.peekCached("/leadership/emerging-flags");
+  const mentors = churchApi.peekCached("/leadership/mentors");
+  const trainings = churchApi.peekCached("/leadership/training-records");
+  const requirements = churchApi.peekCached("/leadership/succession-requirements");
+  const readiness = churchApi.peekCached("/leadership/succession-readiness");
+  const report = churchApi.peekCached("/leadership/reports/pipeline");
+
+  if ([roles, skills, flags, mentors, trainings, requirements, readiness, report].some((item) => item === null)) {
+    return null;
+  }
+
+  return {
+    loading: false,
+    error: "",
+    roles: Array.isArray(roles) ? roles : [],
+    skills: Array.isArray(skills) ? skills : [],
+    flags: Array.isArray(flags) ? flags : [],
+    mentors: Array.isArray(mentors) ? mentors : [],
+    trainings: Array.isArray(trainings) ? trainings : [],
+    requirements: Array.isArray(requirements) ? requirements : [],
+    readiness: Array.isArray(readiness) ? readiness : [],
+    report,
+  };
+}
+
 export default function LeadershipDevelopmentPage({ section = "roles" }) {
   const activeSection = section;
   const { members, lookupState, notifySuccess, notifyError, authUser } = useAppContext();
+  const cachedLeadershipState = useMemo(() => getCachedLeadershipState(), []);
   const roleTypeOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "leadership_role_type"),
     [lookupState.values]
@@ -23,7 +52,7 @@ export default function LeadershipDevelopmentPage({ section = "roles" }) {
     () => lookupState.values.filter((item) => item.type?.key === "succession_readiness_category"),
     [lookupState.values]
   );
-  const [state, setState] = useState({
+  const [state, setState] = useState(cachedLeadershipState || {
     loading: true,
     error: "",
     roles: [],
@@ -78,9 +107,11 @@ export default function LeadershipDevelopmentPage({ section = "roles" }) {
   const activeSuccessionTab = successionTabs.find((item) => item.key === successionTab) || successionTabs[0];
 
   useEffect(() => {
-    loadData();
+    if (!cachedLeadershipState) {
+      loadData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cachedLeadershipState]);
 
   const loadData = async () => {
     try {

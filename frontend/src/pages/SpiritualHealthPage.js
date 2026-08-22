@@ -3,10 +3,27 @@ import { churchApi } from "../apis/churchApi";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
+function getCachedSpiritualHealthState() {
+  const rules = churchApi.peekCached("/spiritual-health/trigger-rules");
+  const alerts = churchApi.peekCached("/spiritual-health/alerts?resolved=false");
+
+  if ([rules, alerts].some((item) => item === null)) {
+    return null;
+  }
+
+  return {
+    loading: false,
+    error: "",
+    rules: Array.isArray(rules) ? rules : [],
+    alerts: Array.isArray(alerts) ? alerts : [],
+  };
+}
+
 export default function SpiritualHealthPage({ section = "dashboard" }) {
   const activeSection = section;
   const { users, notifySuccess, notifyError } = useAppContext();
-  const [state, setState] = useState({
+  const cachedSpiritualHealthState = useMemo(() => getCachedSpiritualHealthState(), []);
+  const [state, setState] = useState(cachedSpiritualHealthState || {
     loading: true,
     error: "",
     rules: [],
@@ -23,9 +40,11 @@ export default function SpiritualHealthPage({ section = "dashboard" }) {
   const [assignments, setAssignments] = useState({});
 
   useEffect(() => {
-    loadData();
+    if (!cachedSpiritualHealthState) {
+      loadData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cachedSpiritualHealthState]);
 
   const loadData = async () => {
     try {

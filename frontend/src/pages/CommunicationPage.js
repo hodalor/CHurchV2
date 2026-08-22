@@ -4,14 +4,35 @@ import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
+function getCachedCommunicationState() {
+  const groups = churchApi.peekCached("/communication/groups");
+  const preferences = churchApi.peekCached("/communication/preferences");
+  const logs = churchApi.peekCached("/communication/logs");
+
+  if ([groups, preferences, logs].some((item) => item === null)) {
+    return null;
+  }
+
+  return {
+    loading: false,
+    error: "",
+    groups: Array.isArray(groups) ? groups : [],
+    preferences: Array.isArray(preferences) ? preferences : [],
+    logs: Array.isArray(logs) ? logs : [],
+    preview: null,
+    exportSummary: null,
+  };
+}
+
 export default function CommunicationPage({ section = "groups" }) {
   const activeSection = section;
   const { lookupState, members, visitors, notifySuccess, notifyError } = useAppContext();
+  const cachedCommunicationState = useMemo(() => getCachedCommunicationState(), []);
   const channelOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "communication_channel"),
     [lookupState.values]
   );
-  const [state, setState] = useState({
+  const [state, setState] = useState(cachedCommunicationState || {
     loading: true,
     error: "",
     groups: [],
@@ -41,9 +62,11 @@ export default function CommunicationPage({ section = "groups" }) {
   });
 
   useEffect(() => {
-    loadCommunicationData();
+    if (!cachedCommunicationState) {
+      loadCommunicationData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cachedCommunicationState]);
 
   const loadCommunicationData = async () => {
     try {

@@ -45,7 +45,7 @@ export default function AppLayout() {
             <PageHeader title={pageMeta.title} subtitle={pageMeta.subtitle} action={pageAction} />
 
             <div className="page-scroll-area">
-              <Routes location={location} key={location.pathname}>
+              <Routes location={location}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/setup" element={<SetupPage />} />
                 <Route path="/members" element={<MembersPage />} />

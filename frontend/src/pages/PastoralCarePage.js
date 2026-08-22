@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import ModalShell from "../components/common/ModalShell";
 import { churchApi } from "../apis/churchApi";
@@ -44,23 +44,44 @@ const emptyVisitationForm = {
   followUpDate: "",
 };
 
+function getCachedCareState() {
+  const cases = churchApi.peekCached("/care/cases");
+  const notes = churchApi.peekCached("/care/notes");
+  const options = churchApi.peekCached("/care/options");
+
+  if ([cases, notes, options].some((item) => item === null)) {
+    return null;
+  }
+
+  return {
+    cases: Array.isArray(cases) ? cases : [],
+    notes: Array.isArray(notes) ? notes : [],
+    options: {
+      noteTypes: options.noteTypes || [],
+    },
+  };
+}
+
 export default function PastoralCarePage({ section = "notes" }) {
   const activeSection = section;
   const { members, families, users, notifyError, notifySuccess } = useAppContext();
-  const [cases, setCases] = useState([]);
-  const [notes, setNotes] = useState([]);
-  const [options, setOptions] = useState({ noteTypes: [] });
+  const cachedCareState = useMemo(() => getCachedCareState(), []);
+  const [cases, setCases] = useState(cachedCareState?.cases || []);
+  const [notes, setNotes] = useState(cachedCareState?.notes || []);
+  const [options, setOptions] = useState(cachedCareState?.options || { noteTypes: [] });
   const [caseForm, setCaseForm] = useState(emptyCaseForm);
   const [noteForm, setNoteForm] = useState(emptyNoteForm);
   const [counselingForm, setCounselingForm] = useState(emptyCounselingForm);
   const [visitationForm, setVisitationForm] = useState(emptyVisitationForm);
   const [activeModal, setActiveModal] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedCareState);
 
   useEffect(() => {
     let cancelled = false;
     async function loadCareState() {
-      setLoading(true);
+      if (!cachedCareState) {
+        setLoading(true);
+      }
       try {
         const [casesResponse, notesResponse, optionsResponse] = await Promise.all([
           churchApi.getCareCases(),
@@ -84,11 +105,13 @@ export default function PastoralCarePage({ section = "notes" }) {
       }
     }
 
-    loadCareState();
+    if (!cachedCareState) {
+      loadCareState();
+    }
     return () => {
       cancelled = true;
     };
-  }, [notifyError]);
+  }, [cachedCareState, notifyError]);
 
   useEffect(() => {
     if (options.noteTypes.length && !noteForm.noteType) {

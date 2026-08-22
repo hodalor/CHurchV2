@@ -72,29 +72,63 @@ const createBatchLine = () => ({
   notes: "",
 });
 
+function getCachedFinanceState() {
+  const overview = churchApi.peekCached("/finance/overview");
+  const optionsResponse = churchApi.peekCached("/finance/options");
+  const transactions = churchApi.peekCached("/finance/transactions");
+  const pledges = churchApi.peekCached("/finance/pledges");
+  const expenses = churchApi.peekCached("/finance/expenses");
+  const budgets = churchApi.peekCached("/finance/budgets");
+  const reconciliations = churchApi.peekCached("/finance/reconciliations");
+
+  if ([overview, optionsResponse, transactions, pledges, expenses, budgets, reconciliations].some((item) => item === null)) {
+    return null;
+  }
+
+  return {
+    overview,
+    funds: optionsResponse.funds || [],
+    options: {
+      transactionMethods: optionsResponse.transactionMethods || [],
+      expensePaymentMethods: optionsResponse.expensePaymentMethods || [],
+      transactionTypes: optionsResponse.transactionTypes || [],
+      expenseCategories: optionsResponse.expenseCategories || [],
+      depositAccounts: optionsResponse.depositAccounts || [],
+    },
+    transactions: Array.isArray(transactions) ? transactions : [],
+    pledges: Array.isArray(pledges) ? pledges : [],
+    expenses: Array.isArray(expenses) ? expenses : [],
+    budgets: Array.isArray(budgets) ? budgets : [],
+    reconciliations: Array.isArray(reconciliations) ? reconciliations : [],
+  };
+}
+
 export default function FinancePage({ section = "overview" }) {
   const { authUser, members, families, ministries, formatCurrency, notifyError, notifySuccess } = useAppContext();
   const activeSection = section;
+  const cachedFinanceState = useMemo(() => getCachedFinanceState(), []);
   const canManageFinance = authUser?.permissions?.includes("manage_finance");
   const canReviewAi = authUser?.permissions?.includes("review_ai_assist");
 
-  const [overview, setOverview] = useState(null);
-  const [funds, setFunds] = useState([]);
-  const [options, setOptions] = useState({
-    transactionMethods: [],
-    expensePaymentMethods: [],
-    transactionTypes: [],
-    expenseCategories: [],
-    depositAccounts: [],
-  });
-  const [transactions, setTransactions] = useState([]);
-  const [pledges, setPledges] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-  const [budgets, setBudgets] = useState([]);
-  const [reconciliations, setReconciliations] = useState([]);
+  const [overview, setOverview] = useState(cachedFinanceState?.overview || null);
+  const [funds, setFunds] = useState(cachedFinanceState?.funds || []);
+  const [options, setOptions] = useState(
+    cachedFinanceState?.options || {
+      transactionMethods: [],
+      expensePaymentMethods: [],
+      transactionTypes: [],
+      expenseCategories: [],
+      depositAccounts: [],
+    }
+  );
+  const [transactions, setTransactions] = useState(cachedFinanceState?.transactions || []);
+  const [pledges, setPledges] = useState(cachedFinanceState?.pledges || []);
+  const [expenses, setExpenses] = useState(cachedFinanceState?.expenses || []);
+  const [budgets, setBudgets] = useState(cachedFinanceState?.budgets || []);
+  const [reconciliations, setReconciliations] = useState(cachedFinanceState?.reconciliations || []);
   const [reportType, setReportType] = useState("income-statement");
   const [reportData, setReportData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedFinanceState);
   const [activeModal, setActiveModal] = useState("");
   const [search, setSearch] = useState("");
   const [transactionForm, setTransactionForm] = useState(emptyTransactionForm);
@@ -112,6 +146,12 @@ export default function FinancePage({ section = "overview" }) {
   });
   const loadReport = useCallback(async (nextType) => {
     try {
+      const cachedReport = churchApi.peekCached(`/finance/reports/${nextType}`);
+      if (cachedReport) {
+        setReportData(cachedReport);
+        return;
+      }
+
       const payload = await churchApi.getFinanceReport(nextType);
       setReportData(payload);
     } catch (error) {
@@ -123,7 +163,9 @@ export default function FinancePage({ section = "overview" }) {
     let cancelled = false;
 
     async function loadFinanceState() {
-      setLoading(true);
+      if (!cachedFinanceState) {
+        setLoading(true);
+      }
       try {
         const [overviewResponse, optionsResponse, transactionsResponse, pledgesResponse, expensesResponse, budgetsResponse, reconciliationsResponse] =
           await Promise.all([
@@ -165,11 +207,13 @@ export default function FinancePage({ section = "overview" }) {
       }
     }
 
-    loadFinanceState();
+    if (!cachedFinanceState) {
+      loadFinanceState();
+    }
     return () => {
       cancelled = true;
     };
-  }, [notifyError]);
+  }, [cachedFinanceState, notifyError]);
 
   useEffect(() => {
     if (funds.length && !transactionForm.fundId) {

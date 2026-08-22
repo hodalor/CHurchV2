@@ -1,5 +1,6 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5100/api";
 const SESSION_STORAGE_KEY = "churchflow.session";
+const responseCache = new Map();
 
 function getStoredSession() {
   const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
@@ -14,7 +15,36 @@ function clearStoredSession() {
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
+function clonePayload(payload) {
+  if (typeof structuredClone === "function") {
+    return structuredClone(payload);
+  }
+
+  return JSON.parse(JSON.stringify(payload));
+}
+
+function getRequestMethod(options = {}) {
+  return String(options.method || "GET").toUpperCase();
+}
+
+function peekCached(path) {
+  if (!responseCache.has(path)) {
+    return null;
+  }
+
+  return clonePayload(responseCache.get(path));
+}
+
+function clearRequestCache() {
+  responseCache.clear();
+}
+
 async function request(path, options = {}, retryOnUnauthorized = true) {
+  const method = getRequestMethod(options);
+  if (method === "GET" && responseCache.has(path)) {
+    return clonePayload(responseCache.get(path));
+  }
+
   const session = getStoredSession();
   const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
@@ -50,7 +80,15 @@ async function request(path, options = {}, retryOnUnauthorized = true) {
     throw new Error(payload.message || "Request failed.");
   }
 
-  return safeJson(response);
+  const payload = await safeJson(response);
+
+  if (method === "GET") {
+    responseCache.set(path, payload);
+  } else {
+    clearRequestCache();
+  }
+
+  return clonePayload(payload);
 }
 
 async function safeJson(response) {
@@ -88,6 +126,8 @@ export const churchApi = {
   getStoredSession,
   clearStoredSession,
   storeSession,
+  peekCached,
+  clearRequestCache,
 
   async login(username, pin) {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -103,6 +143,7 @@ export const churchApi = {
       throw new Error(payload.message || "Login failed.");
     }
 
+    clearRequestCache();
     storeSession(payload);
     return payload;
   },
@@ -120,6 +161,7 @@ export const churchApi = {
     }
 
     clearStoredSession();
+    clearRequestCache();
   },
 
   async getCurrentUser() {

@@ -4,9 +4,39 @@ import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
+function getCachedStrategicState() {
+  const plans = churchApi.peekCached("/strategic/plans");
+  const pillars = churchApi.peekCached("/strategic/pillars");
+  const objectives = churchApi.peekCached("/strategic/objectives");
+  const initiatives = churchApi.peekCached("/strategic/initiatives");
+  const kpis = churchApi.peekCached("/strategic/kpis");
+  const targets = churchApi.peekCached("/strategic/targets");
+  const actuals = churchApi.peekCached("/strategic/actuals");
+  const churchScorecard = churchApi.peekCached("/strategic/scorecards/church");
+
+  if ([plans, pillars, objectives, initiatives, kpis, targets, actuals, churchScorecard].some((item) => item === null)) {
+    return null;
+  }
+
+  return {
+    loading: false,
+    error: "",
+    plans: Array.isArray(plans) ? plans : [],
+    pillars: Array.isArray(pillars) ? pillars : [],
+    objectives: Array.isArray(objectives) ? objectives : [],
+    initiatives: Array.isArray(initiatives) ? initiatives : [],
+    kpis: Array.isArray(kpis) ? kpis : [],
+    targets: Array.isArray(targets) ? targets : [],
+    actuals: Array.isArray(actuals) ? actuals : [],
+    churchScorecard,
+    ministryScorecard: null,
+  };
+}
+
 export default function StrategicPlanningPage({ section = "plans" }) {
   const activeSection = section;
   const { ministries, lookupState, notifySuccess, notifyError } = useAppContext();
+  const cachedStrategicState = useMemo(() => getCachedStrategicState(), []);
   const planStatusOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "strategic_plan_status"),
     [lookupState.values]
@@ -15,7 +45,7 @@ export default function StrategicPlanningPage({ section = "plans" }) {
     () => lookupState.values.filter((item) => item.type?.key === "kpi_target_frequency"),
     [lookupState.values]
   );
-  const [state, setState] = useState({
+  const [state, setState] = useState(cachedStrategicState || {
     loading: true,
     error: "",
     plans: [],
@@ -77,9 +107,11 @@ export default function StrategicPlanningPage({ section = "plans" }) {
   const [selectedMinistryId, setSelectedMinistryId] = useState("");
 
   useEffect(() => {
-    loadData();
+    if (!cachedStrategicState) {
+      loadData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planStatusOptions.length, frequencyOptions.length]);
+  }, [cachedStrategicState, planStatusOptions.length, frequencyOptions.length]);
 
   const loadData = async () => {
     try {
