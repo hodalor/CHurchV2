@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { FaSearch } from "react-icons/fa";
 import {
   Bar,
   BarChart,
@@ -76,6 +77,12 @@ function ServicesView({ events, members, onOpen }) {
   const latestRate = events[0]?.attendanceRate ? `${events[0].attendanceRate}%` : "0%";
   const openCheckInCount = events.filter((event) => event.isCheckInOpen !== false).length;
   const [serviceTab, setServiceTab] = useState("upcoming");
+  const [search, setSearch] = useState("");
+  const [ministryFilter, setMinistryFilter] = useState("all");
+  const [eventTypeFilter, setEventTypeFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortOrder, setSortOrder] = useState("date_desc");
   const serviceTabs = [
     {
       key: "upcoming",
@@ -100,6 +107,51 @@ function ServicesView({ events, members, onOpen }) {
     },
   ];
   const activeTab = serviceTabs.find((item) => item.key === serviceTab) || serviceTabs[0];
+  const ministryOptions = useMemo(
+    () =>
+      [...new Map(
+        events
+          .filter((event) => event.ministryId?._id || event.ministryId?.id || event.ministryId?.name)
+          .map((event) => [
+            event.ministryId?._id || event.ministryId?.id || event.ministryId?.name,
+            event.ministryId?.name || "Unknown ministry",
+          ])
+      ).entries()].sort((left, right) => compareText(left[1], right[1])),
+    [events]
+  );
+  const eventTypeOptions = useMemo(
+    () =>
+      [...new Set(events.map((event) => event.eventTypeId?.label).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [events]
+  );
+  const filteredEvents = useMemo(() => {
+    return [...activeTab.events]
+      .filter((event) => {
+        const haystack = [
+          event.title,
+          event.location,
+          event.eventTypeId?.label,
+          event.ministryId?.name,
+          event.description,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const eventDate = event?.date ? new Date(event.date) : null;
+        const matchesSearch = haystack.includes(search.toLowerCase());
+        const matchesMinistry =
+          ministryFilter === "all" ||
+          (event.ministryId?._id || event.ministryId?.id || event.ministryId?.name) === ministryFilter;
+        const matchesType = eventTypeFilter === "all" || event.eventTypeId?.label === eventTypeFilter;
+        const matchesFrom = !dateFrom || isSameOrAfter(eventDate, dateFrom);
+        const matchesTo = !dateTo || isSameOrBefore(eventDate, dateTo);
+
+        return matchesSearch && matchesMinistry && matchesType && matchesFrom && matchesTo;
+      })
+      .sort((left, right) => sortAttendanceEvents(left, right, sortOrder));
+  }, [activeTab.events, dateFrom, dateTo, eventTypeFilter, ministryFilter, search, sortOrder]);
 
   return (
     <>
@@ -139,7 +191,21 @@ function ServicesView({ events, members, onOpen }) {
       <ServiceTableCard
         title={activeTab.title}
         subtitle={activeTab.subtitle}
-        events={activeTab.events}
+        events={filteredEvents}
+        search={search}
+        setSearch={setSearch}
+        ministryFilter={ministryFilter}
+        setMinistryFilter={setMinistryFilter}
+        ministryOptions={ministryOptions}
+        eventTypeFilter={eventTypeFilter}
+        setEventTypeFilter={setEventTypeFilter}
+        eventTypeOptions={eventTypeOptions}
+        dateFrom={dateFrom}
+        setDateFrom={setDateFrom}
+        dateTo={dateTo}
+        setDateTo={setDateTo}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
         emptyMessage={activeTab.emptyMessage}
         onOpen={onOpen}
       />
@@ -147,7 +213,27 @@ function ServicesView({ events, members, onOpen }) {
   );
 }
 
-function ServiceTableCard({ title, subtitle, events, emptyMessage, onOpen }) {
+function ServiceTableCard({
+  title,
+  subtitle,
+  events,
+  search,
+  setSearch,
+  ministryFilter,
+  setMinistryFilter,
+  ministryOptions,
+  eventTypeFilter,
+  setEventTypeFilter,
+  eventTypeOptions,
+  dateFrom,
+  setDateFrom,
+  dateTo,
+  setDateTo,
+  sortOrder,
+  setSortOrder,
+  emptyMessage,
+  onOpen,
+}) {
   return (
     <section className="surface-card data-card">
       <div className="section-headline compact">
@@ -155,6 +241,36 @@ function ServiceTableCard({ title, subtitle, events, emptyMessage, onOpen }) {
           <h3>{title}</h3>
           <p>{subtitle}</p>
         </div>
+      </div>
+      <div className="toolbar-row inline-toolbar">
+        <div className="search-field">
+          <FaSearch />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search event, type, location, or ministry" />
+        </div>
+        <select className="filter-select" value={ministryFilter} onChange={(event) => setMinistryFilter(event.target.value)}>
+          <option value="all">All ministries</option>
+          {ministryOptions.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select className="filter-select" value={eventTypeFilter} onChange={(event) => setEventTypeFilter(event.target.value)}>
+          <option value="all">All event types</option>
+          {eventTypeOptions.map((eventType) => (
+            <option key={eventType} value={eventType}>
+              {eventType}
+            </option>
+          ))}
+        </select>
+        <input className="toolbar-date-input" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+        <input className="toolbar-date-input" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+        <select className="filter-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+          <option value="date_desc">Sort: Newest</option>
+          <option value="date_asc">Sort: Oldest</option>
+          <option value="attendance_desc">Sort: Highest Attendance</option>
+          <option value="title_asc">Sort: Title A-Z</option>
+        </select>
       </div>
       <div className="table-accent-bar" />
       <div className="table-wrap">
@@ -382,4 +498,42 @@ function isUpcomingEvent(event) {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   return eventDate.getTime() >= startOfToday.getTime();
+}
+
+function sortAttendanceEvents(left, right, sortOrder) {
+  switch (sortOrder) {
+    case "date_asc":
+      return getDateValue(left.date) - getDateValue(right.date);
+    case "attendance_desc":
+      return Number(right.presentCount || 0) - Number(left.presentCount || 0);
+    case "title_asc":
+      return compareText(left.title, right.title);
+    case "date_desc":
+    default:
+      return getDateValue(right.date) - getDateValue(left.date);
+  }
+}
+
+function isSameOrAfter(date, boundary) {
+  if (!date || Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return date.getTime() >= getDateValue(boundary);
+}
+
+function isSameOrBefore(date, boundary) {
+  if (!date || Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return date.getTime() <= getDateValue(`${boundary}T23:59:59`);
+}
+
+function getDateValue(value) {
+  return new Date(value || 0).getTime();
+}
+
+function compareText(left, right) {
+  return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
 }

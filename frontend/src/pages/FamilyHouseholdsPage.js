@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { FaSearch } from "react-icons/fa";
 import BulkImportModal from "../components/common/BulkImportModal";
 import { useAppContext } from "../context/AppContext";
 
@@ -10,9 +11,64 @@ function getName(value) {
   return typeof value === "string" ? value : value.memberName;
 }
 
+function sortFamilies(left, right, sortOrder, groups) {
+  switch (sortOrder) {
+    case "members_desc":
+      return (right.householdMembers?.length || 0) - (left.householdMembers?.length || 0);
+    case "zone_asc": {
+      const leftZone = groups.find((group) => group.id === left.fellowshipZone)?.name || left.fellowshipZone;
+      const rightZone = groups.find((group) => group.id === right.fellowshipZone)?.name || right.fellowshipZone;
+      return compareText(leftZone, rightZone) || compareText(left.familyName, right.familyName);
+    }
+    case "name_asc":
+    default:
+      return compareText(left.familyName, right.familyName);
+  }
+}
+
+function compareText(left, right) {
+  return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
+}
+
 export default function FamilyHouseholdsPage() {
   const [showImportModal, setShowImportModal] = useState(false);
+  const [search, setSearch] = useState("");
+  const [zoneFilter, setZoneFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("name_asc");
   const { families, groups, openRecordModal, familyApiState } = useAppContext();
+
+  const filteredFamilies = useMemo(() => {
+    return [...families]
+      .filter((family) => {
+        const zoneName = groups.find((group) => group.id === family.fellowshipZone)?.name || family.fellowshipZone || "";
+        const haystack = [
+          family.familyId,
+          family.familyName,
+          family.residentialArea,
+          getName(family.headOfHousehold),
+          family.familyContact,
+          zoneName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const matchesSearch = haystack.includes(search.toLowerCase());
+        const matchesZone = zoneFilter === "all" || zoneName === zoneFilter;
+
+        return matchesSearch && matchesZone;
+      })
+      .sort((left, right) => sortFamilies(left, right, sortOrder, groups));
+  }, [families, groups, search, sortOrder, zoneFilter]);
+
+  const zoneOptions = useMemo(
+    () =>
+      [...new Set(
+        families
+          .map((family) => groups.find((group) => group.id === family.fellowshipZone)?.name || family.fellowshipZone)
+          .filter(Boolean)
+      )].sort((left, right) => compareText(left, right)),
+    [families, groups]
+  );
 
   if (familyApiState.loading) {
     return <div className="empty-note">Loading households...</div>;
@@ -36,6 +92,25 @@ export default function FamilyHouseholdsPage() {
             </button>
           </div>
         </div>
+        <div className="toolbar-row inline-toolbar">
+          <div className="search-field">
+            <FaSearch />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search household, head, contact, or area" />
+          </div>
+          <select className="filter-select" value={zoneFilter} onChange={(event) => setZoneFilter(event.target.value)}>
+            <option value="all">All zones</option>
+            {zoneOptions.map((zone) => (
+              <option key={zone} value={zone}>
+                {zone}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+            <option value="name_asc">Sort: Name A-Z</option>
+            <option value="members_desc">Sort: Largest Household</option>
+            <option value="zone_asc">Sort: Zone</option>
+          </select>
+        </div>
         <div className="table-accent-bar" />
         <div className="table-wrap">
           <table className="data-table">
@@ -51,7 +126,7 @@ export default function FamilyHouseholdsPage() {
               </tr>
             </thead>
             <tbody>
-              {families.map((family) => (
+              {filteredFamilies.length ? filteredFamilies.map((family) => (
                 <tr
                   key={family.familyId}
                   className="clickable-row"
@@ -73,7 +148,13 @@ export default function FamilyHouseholdsPage() {
                   <td>{family.familyContact}</td>
                   <td>{family.visitationHistory || "No visit recorded"}</td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={7} className="empty-table">
+                    No households found for the current filter.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

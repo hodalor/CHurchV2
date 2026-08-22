@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { FaSearch } from "react-icons/fa";
 import {
   Bar,
   BarChart,
@@ -149,6 +150,52 @@ export default function VisitorsPage() {
 }
 
 function RegisterListView({ visitors, repeatVisitors, retentionRate, onOpenVisitor }) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortOrder, setSortOrder] = useState("last_visit_desc");
+  const statusOptions = useMemo(
+    () =>
+      [...new Set(visitors.map((visitor) => visitor.statusLabel).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [visitors]
+  );
+  const assigneeOptions = useMemo(
+    () =>
+      [...new Set(visitors.map((visitor) => visitor.assigneeName).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [visitors]
+  );
+  const filteredVisitors = useMemo(() => {
+    return [...visitors]
+      .filter((visitor) => {
+        const haystack = [
+          visitor.visitorId,
+          visitor.fullName,
+          visitor.phone,
+          visitor.statusLabel,
+          visitor.howHeard?.label,
+          visitor.assigneeName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const lastVisitDate = visitor.lastChurchVisit ? new Date(visitor.lastChurchVisit) : null;
+        const matchesSearch = haystack.includes(search.toLowerCase());
+        const matchesStatus = statusFilter === "all" || visitor.statusLabel === statusFilter;
+        const matchesAssignee = assigneeFilter === "all" || visitor.assigneeName === assigneeFilter;
+        const matchesFrom = !dateFrom || isSameOrAfter(lastVisitDate, dateFrom);
+        const matchesTo = !dateTo || isSameOrBefore(lastVisitDate, dateTo);
+
+        return matchesSearch && matchesStatus && matchesAssignee && matchesFrom && matchesTo;
+      })
+      .sort((left, right) => sortVisitors(left, right, sortOrder));
+  }, [assigneeFilter, dateFrom, dateTo, search, sortOrder, statusFilter, visitors]);
+
   return (
     <>
       <section className="compact-stats-grid">
@@ -173,6 +220,35 @@ function RegisterListView({ visitors, repeatVisitors, retentionRate, onOpenVisit
       </section>
 
       <section className="surface-card data-card">
+        <div className="toolbar-row inline-toolbar">
+          <div className="search-field">
+            <FaSearch />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search visitor, phone, assignee, or source" />
+          </div>
+          <select className="filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="all">All statuses</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)}>
+            <option value="all">All assignees</option>
+            {assigneeOptions.map((assignee) => (
+              <option key={assignee} value={assignee}>
+                {assignee}
+              </option>
+            ))}
+          </select>
+          <input className="toolbar-date-input" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <input className="toolbar-date-input" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <select className="filter-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+            <option value="last_visit_desc">Sort: Latest Visit</option>
+            <option value="name_asc">Sort: Name A-Z</option>
+            <option value="visits_desc">Sort: Most Visits</option>
+          </select>
+        </div>
         <div className="table-accent-bar" />
         <div className="table-wrap">
           <table className="data-table">
@@ -189,8 +265,8 @@ function RegisterListView({ visitors, repeatVisitors, retentionRate, onOpenVisit
               </tr>
             </thead>
             <tbody>
-              {visitors.length ? (
-                visitors.map((visitor) => (
+              {filteredVisitors.length ? (
+                filteredVisitors.map((visitor) => (
                   <tr
                     key={visitor._id || visitor.visitorId}
                     className="clickable-row"
@@ -769,6 +845,42 @@ function formatShortDate(value) {
 
   const date = new Date(value);
   return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function sortVisitors(left, right, sortOrder) {
+  switch (sortOrder) {
+    case "name_asc":
+      return compareText(left.fullName, right.fullName);
+    case "visits_desc":
+      return Number(right.visitCount || 0) - Number(left.visitCount || 0);
+    case "last_visit_desc":
+    default:
+      return getDateValue(right.lastChurchVisit) - getDateValue(left.lastChurchVisit);
+  }
+}
+
+function isSameOrAfter(date, boundary) {
+  if (!date || Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return date.getTime() >= getDateValue(boundary);
+}
+
+function isSameOrBefore(date, boundary) {
+  if (!date || Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return date.getTime() <= getDateValue(`${boundary}T23:59:59`);
+}
+
+function getDateValue(value) {
+  return new Date(value || 0).getTime();
+}
+
+function compareText(left, right) {
+  return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
 }
 
 function PipelineBoard({ columns, onOpen, onDropItem }) {
