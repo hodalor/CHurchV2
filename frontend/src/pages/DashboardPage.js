@@ -63,7 +63,7 @@ export default function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis dataKey="month" tickLine={false} axisLine={false} />
               <YAxis tickLine={false} axisLine={false} />
-              <Tooltip />
+              <Tooltip formatter={(value, name) => formatDashboardMetric(name, value, formatCurrency)} />
               <Area type="monotone" dataKey="attendance" stroke="#7c5cff" fill="url(#attendanceColor)" />
               <Area type="monotone" dataKey="giving" stroke="#0ea5e9" fill="url(#givingColor)" />
             </AreaChart>
@@ -237,4 +237,16 @@ export default function DashboardPage() {
       </section>
     </div>
   );
+}
+
+function formatDashboardMetric(name, value, formatCurrency) {
+  if (name === "giving") {
+    return [formatCurrency(value), "Giving"];
+  }
+
+  if (name === "attendance") {
+    return [Number(value || 0), "Attendance"];
+  }
+
+  return [value, name];
 }

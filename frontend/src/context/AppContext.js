@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   attendanceFormTemplate,
-  attendanceTrend,
   financeFormTemplate,
   familyFormTemplate,
   groupFormTemplate,
@@ -178,6 +177,11 @@ export function AppProvider({ children }) {
       }))
       .sort((left, right) => right.value - left.value);
   }, [members]);
+
+  const attendanceTrend = useMemo(
+    () => buildDashboardAttendanceTrend(attendanceSessions, financeRecords),
+    [attendanceSessions, financeRecords]
+  );
 
   const visitorHowHeardOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "visitor_how_heard"),
@@ -2662,6 +2666,50 @@ function getPersonAge(value) {
   }
 
   return age >= 0 ? age : null;
+}
+
+function buildDashboardAttendanceTrend(attendanceSessions = [], financeRecords = []) {
+  const formatter = new Intl.DateTimeFormat("en-US", { month: "short" });
+  const months = [];
+  const today = new Date();
+
+  for (let index = 5; index >= 0; index -= 1) {
+    const date = new Date(today.getFullYear(), today.getMonth() - index, 1);
+    months.push({
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+      month: formatter.format(date),
+      attendance: 0,
+      giving: 0,
+    });
+  }
+
+  const attendanceByMonth = attendanceSessions.reduce((accumulator, session) => {
+    const eventDate = session?.date ? new Date(session.date) : null;
+    if (!eventDate || Number.isNaN(eventDate.getTime())) {
+      return accumulator;
+    }
+
+    const key = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, "0")}`;
+    accumulator[key] = (accumulator[key] || 0) + Number(session.presentCount || 0);
+    return accumulator;
+  }, {});
+
+  const givingByMonth = financeRecords.reduce((accumulator, record) => {
+    const recordDate = record?.date ? new Date(record.date) : null;
+    if (!recordDate || Number.isNaN(recordDate.getTime())) {
+      return accumulator;
+    }
+
+    const key = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, "0")}`;
+    accumulator[key] = (accumulator[key] || 0) + Number(record.amount || 0);
+    return accumulator;
+  }, {});
+
+  return months.map((entry) => ({
+    month: entry.month,
+    attendance: attendanceByMonth[entry.key] || 0,
+    giving: givingByMonth[entry.key] || 0,
+  }));
 }
 
 function buildPermissionCatalog() {

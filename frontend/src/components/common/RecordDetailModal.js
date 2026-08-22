@@ -40,6 +40,7 @@ export default function RecordDetailModal() {
     prospects,
     discipleshipProgrammes,
     ministries,
+    formatCurrency,
     regenerateMemberQr,
     mediaUploadState,
   } = useAppContext();
@@ -424,7 +425,10 @@ export default function RecordDetailModal() {
             <DetailGrid
               items={fields.map((field) => ({
                 label: field.label,
-                value: getFieldValue(field, draft),
+                value:
+                  type === "finance" && field.name === "amount"
+                    ? formatCurrency(draft.amount)
+                    : getFieldValue(field, draft),
                 wide: field.wide,
               }))}
             />
