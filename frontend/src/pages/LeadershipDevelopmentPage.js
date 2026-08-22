@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { churchApi } from "../apis/churchApi";
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
-export default function LeadershipDevelopmentPage() {
-  const location = useLocation();
-  const activeSection = location.pathname.split("/")[2] || "roles";
+export default function LeadershipDevelopmentPage({ section = "roles" }) {
+  const activeSection = section;
   const { members, lookupState, notifySuccess, notifyError, authUser } = useAppContext();
   const roleTypeOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "leadership_role_type"),

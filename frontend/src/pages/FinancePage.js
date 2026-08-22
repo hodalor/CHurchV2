@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { FaPlus, FaRobot, FaSearch } from "react-icons/fa";
 import ModalShell from "../components/common/ModalShell";
 import { churchApi } from "../apis/churchApi";
@@ -73,10 +72,9 @@ const createBatchLine = () => ({
   notes: "",
 });
 
-export default function FinancePage() {
-  const location = useLocation();
+export default function FinancePage({ section = "overview" }) {
   const { authUser, members, families, ministries, formatCurrency, notifyError, notifySuccess } = useAppContext();
-  const activeSection = location.pathname.split("/")[2] || "overview";
+  const activeSection = section;
   const canManageFinance = authUser?.permissions?.includes("manage_finance");
   const canReviewAi = authUser?.permissions?.includes("review_ai_assist");
 

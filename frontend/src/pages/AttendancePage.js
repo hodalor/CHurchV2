@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { FaSearch } from "react-icons/fa";
 import {
   Bar,
@@ -17,8 +16,7 @@ import { useAppContext } from "../context/AppContext";
 
 const CHART_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
 
-export default function AttendancePage() {
-  const location = useLocation();
+export default function AttendancePage({ section = "services" }) {
   const {
     attendanceSessions,
     attendanceAbsentees,
@@ -26,7 +24,7 @@ export default function AttendancePage() {
     members,
     openRecordModal,
   } = useAppContext();
-  const activeSection = location.pathname.split("/")[2] || "services";
+  const activeSection = section;
 
   const eventTypeData = useMemo(
     () => buildCountData(attendanceSessions, (event) => event.eventTypeId?.label || "Unknown"),

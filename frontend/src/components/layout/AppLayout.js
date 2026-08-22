@@ -51,61 +51,61 @@ export default function AppLayout() {
                 <Route path="/members" element={<MembersPage />} />
                 <Route path="/ministries" element={<MinistriesPage />} />
                 <Route path="/evangelism" element={<Navigate to="/evangelism/pipeline" replace />} />
-                <Route path="/evangelism/pipeline" element={<EvangelismPage />} />
-                <Route path="/evangelism/contacts" element={<EvangelismPage />} />
-                <Route path="/evangelism/bible-study" element={<EvangelismPage />} />
-                <Route path="/evangelism/campaigns" element={<EvangelismPage />} />
-                <Route path="/evangelism/reports" element={<EvangelismPage />} />
+                <Route path="/evangelism/pipeline" element={<EvangelismPage section="pipeline" key="evangelism-pipeline" />} />
+                <Route path="/evangelism/contacts" element={<EvangelismPage section="contacts" key="evangelism-contacts" />} />
+                <Route path="/evangelism/bible-study" element={<EvangelismPage section="bible-study" key="evangelism-bible-study" />} />
+                <Route path="/evangelism/campaigns" element={<EvangelismPage section="campaigns" key="evangelism-campaigns" />} />
+                <Route path="/evangelism/reports" element={<EvangelismPage section="reports" key="evangelism-reports" />} />
                 <Route path="/discipleship" element={<Navigate to="/discipleship/programmes" replace />} />
-                <Route path="/discipleship/programmes" element={<DiscipleshipPage />} />
-                <Route path="/discipleship/enrollments" element={<DiscipleshipPage />} />
-                <Route path="/discipleship/follow-ups" element={<DiscipleshipPage />} />
-                <Route path="/discipleship/reports" element={<DiscipleshipPage />} />
+                <Route path="/discipleship/programmes" element={<DiscipleshipPage section="programmes" key="discipleship-programmes" />} />
+                <Route path="/discipleship/enrollments" element={<DiscipleshipPage section="enrollments" key="discipleship-enrollments" />} />
+                <Route path="/discipleship/follow-ups" element={<DiscipleshipPage section="follow-ups" key="discipleship-follow-ups" />} />
+                <Route path="/discipleship/reports" element={<DiscipleshipPage section="reports" key="discipleship-reports" />} />
                 <Route path="/visitors" element={<Navigate to="/visitors/register-list" replace />} />
-                <Route path="/visitors/register-list" element={<VisitorsPage />} />
-                <Route path="/visitors/pipeline" element={<VisitorsPage />} />
-                <Route path="/visitors/follow-ups" element={<VisitorsPage />} />
-                <Route path="/visitors/workflow" element={<VisitorsPage />} />
-                <Route path="/visitors/reports" element={<VisitorsPage />} />
+                <Route path="/visitors/register-list" element={<VisitorsPage section="register-list" key="visitors-register-list" />} />
+                <Route path="/visitors/pipeline" element={<VisitorsPage section="pipeline" key="visitors-pipeline" />} />
+                <Route path="/visitors/follow-ups" element={<VisitorsPage section="follow-ups" key="visitors-follow-ups" />} />
+                <Route path="/visitors/workflow" element={<VisitorsPage section="workflow" key="visitors-workflow" />} />
+                <Route path="/visitors/reports" element={<VisitorsPage section="reports" key="visitors-reports" />} />
                 <Route path="/family" element={<Navigate to="/family/overview" replace />} />
                 <Route path="/family/overview" element={<FamilyOverviewPage />} />
                 <Route path="/family/households" element={<FamilyHouseholdsPage />} />
                 <Route path="/finance" element={<Navigate to="/finance/overview" replace />} />
-                <Route path="/finance/overview" element={<FinancePage />} />
-                <Route path="/finance/transactions" element={<FinancePage />} />
-                <Route path="/finance/pledges" element={<FinancePage />} />
-                <Route path="/finance/expenses" element={<FinancePage />} />
-                <Route path="/finance/budgets" element={<FinancePage />} />
-                <Route path="/finance/reports" element={<FinancePage />} />
+                <Route path="/finance/overview" element={<FinancePage section="overview" key="finance-overview" />} />
+                <Route path="/finance/transactions" element={<FinancePage section="transactions" key="finance-transactions" />} />
+                <Route path="/finance/pledges" element={<FinancePage section="pledges" key="finance-pledges" />} />
+                <Route path="/finance/expenses" element={<FinancePage section="expenses" key="finance-expenses" />} />
+                <Route path="/finance/budgets" element={<FinancePage section="budgets" key="finance-budgets" />} />
+                <Route path="/finance/reports" element={<FinancePage section="reports" key="finance-reports" />} />
                 <Route path="/care" element={<Navigate to="/care/notes" replace />} />
-                <Route path="/care/notes" element={<PastoralCarePage />} />
-                <Route path="/care/cases" element={<PastoralCarePage />} />
-                <Route path="/care/counseling" element={<PastoralCarePage />} />
-                <Route path="/care/visitations" element={<PastoralCarePage />} />
+                <Route path="/care/notes" element={<PastoralCarePage section="notes" key="care-notes" />} />
+                <Route path="/care/cases" element={<PastoralCarePage section="cases" key="care-cases" />} />
+                <Route path="/care/counseling" element={<PastoralCarePage section="counseling" key="care-counseling" />} />
+                <Route path="/care/visitations" element={<PastoralCarePage section="visitations" key="care-visitations" />} />
                 <Route path="/attendance" element={<Navigate to="/attendance/services" replace />} />
-                <Route path="/attendance/services" element={<AttendancePage />} />
-                <Route path="/attendance/reports" element={<AttendancePage />} />
-                <Route path="/attendance/absentees" element={<AttendancePage />} />
+                <Route path="/attendance/services" element={<AttendancePage section="services" key="attendance-services" />} />
+                <Route path="/attendance/reports" element={<AttendancePage section="reports" key="attendance-reports" />} />
+                <Route path="/attendance/absentees" element={<AttendancePage section="absentees" key="attendance-absentees" />} />
                 <Route path="/communication" element={<Navigate to="/communication/groups" replace />} />
-                <Route path="/communication/groups" element={<CommunicationPage />} />
-                <Route path="/communication/preferences" element={<CommunicationPage />} />
-                <Route path="/communication/logs" element={<CommunicationPage />} />
+                <Route path="/communication/groups" element={<CommunicationPage section="groups" key="communication-groups" />} />
+                <Route path="/communication/preferences" element={<CommunicationPage section="preferences" key="communication-preferences" />} />
+                <Route path="/communication/logs" element={<CommunicationPage section="logs" key="communication-logs" />} />
                 <Route path="/spiritual-health" element={<Navigate to="/spiritual-health/dashboard" replace />} />
-                <Route path="/spiritual-health/dashboard" element={<SpiritualHealthPage />} />
-                <Route path="/spiritual-health/alerts" element={<SpiritualHealthPage />} />
-                <Route path="/spiritual-health/rules" element={<SpiritualHealthPage />} />
+                <Route path="/spiritual-health/dashboard" element={<SpiritualHealthPage section="dashboard" key="spiritual-health-dashboard" />} />
+                <Route path="/spiritual-health/alerts" element={<SpiritualHealthPage section="alerts" key="spiritual-health-alerts" />} />
+                <Route path="/spiritual-health/rules" element={<SpiritualHealthPage section="rules" key="spiritual-health-rules" />} />
                 <Route path="/leadership" element={<Navigate to="/leadership/roles" replace />} />
-                <Route path="/leadership/roles" element={<LeadershipDevelopmentPage />} />
-                <Route path="/leadership/talent" element={<LeadershipDevelopmentPage />} />
-                <Route path="/leadership/succession" element={<LeadershipDevelopmentPage />} />
-                <Route path="/leadership/reports" element={<LeadershipDevelopmentPage />} />
+                <Route path="/leadership/roles" element={<LeadershipDevelopmentPage section="roles" key="leadership-roles" />} />
+                <Route path="/leadership/talent" element={<LeadershipDevelopmentPage section="talent" key="leadership-talent" />} />
+                <Route path="/leadership/succession" element={<LeadershipDevelopmentPage section="succession" key="leadership-succession" />} />
+                <Route path="/leadership/reports" element={<LeadershipDevelopmentPage section="reports" key="leadership-reports" />} />
                 <Route path="/strategic" element={<Navigate to="/strategic/plans" replace />} />
-                <Route path="/strategic/plans" element={<StrategicPlanningPage />} />
-                <Route path="/strategic/kpis" element={<StrategicPlanningPage />} />
-                <Route path="/strategic/scorecards" element={<StrategicPlanningPage />} />
+                <Route path="/strategic/plans" element={<StrategicPlanningPage section="plans" key="strategic-plans" />} />
+                <Route path="/strategic/kpis" element={<StrategicPlanningPage section="kpis" key="strategic-kpis" />} />
+                <Route path="/strategic/scorecards" element={<StrategicPlanningPage section="scorecards" key="strategic-scorecards" />} />
                 <Route path="/ai-assist" element={<Navigate to="/ai-assist/duplicates" replace />} />
-                <Route path="/ai-assist/duplicates" element={authUser?.permissions?.includes("view_ai_assist") ? <AiAssistPage /> : <Navigate to="/dashboard" replace />} />
-                <Route path="/ai-assist/suggestions" element={authUser?.permissions?.includes("view_ai_assist") ? <AiAssistPage /> : <Navigate to="/dashboard" replace />} />
+                <Route path="/ai-assist/duplicates" element={authUser?.permissions?.includes("view_ai_assist") ? <AiAssistPage section="duplicates" key="ai-assist-duplicates" /> : <Navigate to="/dashboard" replace />} />
+                <Route path="/ai-assist/suggestions" element={authUser?.permissions?.includes("view_ai_assist") ? <AiAssistPage section="suggestions" key="ai-assist-suggestions" /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/users" element={authUser?.permissions?.includes("manage_users") ? <UsersPage /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/settings" element={<Navigate to="/settings/app-config" replace />} />
                 <Route path="/settings/app-config" element={authUser?.permissions?.includes("manage_settings") ? <SettingsPage /> : <Navigate to="/dashboard" replace />} />

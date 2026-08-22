@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { useLocation } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -16,8 +15,7 @@ import { useAppContext } from "../context/AppContext";
 
 const CHART_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
 
-export default function DiscipleshipPage() {
-  const location = useLocation();
+export default function DiscipleshipPage({ section = "programmes" }) {
   const {
     discipleshipProgrammes,
     discipleshipEnrollments,
@@ -25,7 +23,7 @@ export default function DiscipleshipPage() {
     discipleshipApiState,
     openRecordModal,
   } = useAppContext();
-  const sectionName = location.pathname.split("/")[2] || "programmes";
+  const sectionName = section;
 
   const statusData = useMemo(
     () => buildCountData(discipleshipEnrollments, (item) => item.status?.label || "Unknown"),

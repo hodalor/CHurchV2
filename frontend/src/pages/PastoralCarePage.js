@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { FaPlus } from "react-icons/fa";
 import ModalShell from "../components/common/ModalShell";
 import { churchApi } from "../apis/churchApi";
@@ -45,9 +44,8 @@ const emptyVisitationForm = {
   followUpDate: "",
 };
 
-export default function PastoralCarePage() {
-  const location = useLocation();
-  const activeSection = location.pathname.split("/")[2] || "notes";
+export default function PastoralCarePage({ section = "notes" }) {
+  const activeSection = section;
   const { members, families, users, notifyError, notifySuccess } = useAppContext();
   const [cases, setCases] = useState([]);
   const [notes, setNotes] = useState([]);

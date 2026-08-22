@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { FaSearch } from "react-icons/fa";
 import {
   Bar,
@@ -18,8 +17,7 @@ import { churchApi } from "../apis/churchApi";
 
 const CHART_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
 
-export default function EvangelismPage() {
-  const location = useLocation();
+export default function EvangelismPage({ section = "pipeline" }) {
   const {
     prospects,
     evangelismContacts,
@@ -32,7 +30,7 @@ export default function EvangelismPage() {
     notifyError,
     evangelismStageOptions,
   } = useAppContext();
-  const sectionName = location.pathname.split("/")[2] || "pipeline";
+  const sectionName = section;
 
   const stageData = useMemo(
     () => buildCountData(prospects, (item) => item.currentStage?.label || "Unassigned"),

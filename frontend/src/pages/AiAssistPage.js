@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { churchApi } from "../apis/churchApi";
 import { useAppContext } from "../context/AppContext";
 
-export default function AiAssistPage() {
-  const location = useLocation();
-  const section = location.pathname.split("/")[2] || "duplicates";
+export default function AiAssistPage({ section = "duplicates" }) {
   const { notifyError, notifySuccess } = useAppContext();
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState("");

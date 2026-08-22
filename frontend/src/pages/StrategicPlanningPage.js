@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { churchApi } from "../apis/churchApi";
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
-export default function StrategicPlanningPage() {
-  const location = useLocation();
-  const activeSection = location.pathname.split("/")[2] || "plans";
+export default function StrategicPlanningPage({ section = "plans" }) {
+  const activeSection = section;
   const { ministries, lookupState, notifySuccess, notifyError } = useAppContext();
   const planStatusOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "strategic_plan_status"),

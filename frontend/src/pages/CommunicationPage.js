@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { churchApi } from "../apis/churchApi";
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
-export default function CommunicationPage() {
-  const location = useLocation();
-  const activeSection = location.pathname.split("/")[2] || "groups";
+export default function CommunicationPage({ section = "groups" }) {
+  const activeSection = section;
   const { lookupState, members, visitors, notifySuccess, notifyError } = useAppContext();
   const channelOptions = useMemo(
     () => lookupState.values.filter((item) => item.type?.key === "communication_channel"),

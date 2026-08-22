@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { churchApi } from "../apis/churchApi";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
 
-export default function SpiritualHealthPage() {
-  const location = useLocation();
-  const activeSection = location.pathname.split("/")[2] || "dashboard";
+export default function SpiritualHealthPage({ section = "dashboard" }) {
+  const activeSection = section;
   const { users, notifySuccess, notifyError } = useAppContext();
   const [state, setState] = useState({
     loading: true,

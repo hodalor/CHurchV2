@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { FaSearch } from "react-icons/fa";
 import {
   Bar,
@@ -26,10 +25,9 @@ const VISITOR_PIPELINE_STAGES = [
   { statusKey: "converted_to_member", label: "Members", summaryLabel: "Members" },
 ];
 
-export default function VisitorsPage() {
-  const location = useLocation();
+export default function VisitorsPage({ section = "register-list" }) {
   const { visitors, openRecordModal, visitorApiState, pendingActionState, syncVisitorState, notifySuccess, notifyError, visitorStatusOptions } = useAppContext();
-  const sectionName = location.pathname.split("/")[2] || "register-list";
+  const sectionName = section;
 
   const visitorRows = useMemo(
     () =>
