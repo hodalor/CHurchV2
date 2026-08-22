@@ -1,6 +1,45 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5100/api";
+function normalizeApiBaseUrl(url = "") {
+  return String(url || "").trim().replace(/\/+$/, "");
+}
+
+function resolveApiBaseUrl() {
+  const configuredUrl = normalizeApiBaseUrl(process.env.REACT_APP_API_URL);
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  if (typeof window !== "undefined") {
+    const { hostname, origin } = window.location;
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]" ||
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname);
+
+    if (isLocalHost) {
+      return "http://127.0.0.1:5100/api";
+    }
+
+    return `${origin}/api`;
+  }
+
+  return "http://127.0.0.1:5100/api";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const SESSION_STORAGE_KEY = "churchflow.session";
 const responseCache = new Map();
+
+function buildNetworkError(error) {
+  if (error?.name === "AbortError") {
+    return error;
+  }
+
+  return new Error(
+    `Unable to reach the API server at ${API_BASE_URL}. Check REACT_APP_API_URL on the frontend and CORS_ORIGIN on the backend deployment.`
+  );
+}
 
 function getStoredSession() {
   const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
@@ -59,10 +98,15 @@ async function request(path, options = {}, retryOnUnauthorized = true) {
     headers.Authorization = `Bearer ${session.accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    throw buildNetworkError(error);
+  }
 
   if (response.status === 401 && retryOnUnauthorized && session?.refreshToken) {
     try {
@@ -106,13 +150,18 @@ async function safeJson(response) {
 }
 
 async function refreshSession(refreshToken) {
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ refreshToken }),
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+  } catch (error) {
+    throw buildNetworkError(error);
+  }
 
   if (!response.ok) {
     const payload = await safeJson(response);
@@ -130,13 +179,18 @@ export const churchApi = {
   clearRequestCache,
 
   async login(username, pin) {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ username, pin }),
-    });
+    let response;
+    try {
+      response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, pin }),
+      });
+    } catch (error) {
+      throw buildNetworkError(error);
+    }
 
     const payload = await safeJson(response);
     if (!response.ok) {
@@ -151,13 +205,17 @@ export const churchApi = {
   async logout() {
     const session = getStoredSession();
     if (session?.refreshToken) {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refreshToken: session.refreshToken }),
-      });
+      try {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ refreshToken: session.refreshToken }),
+        });
+      } catch (error) {
+        // Logout should still clear local session even if the deployed API cannot be reached.
+      }
     }
 
     clearStoredSession();
@@ -627,9 +685,14 @@ export const churchApi = {
 
   async downloadImportTemplate(entity) {
     const session = getStoredSession();
-    const response = await fetch(`${API_BASE_URL}/imports/template/${entity}`, {
-      headers: session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {},
-    });
+    let response;
+    try {
+      response = await fetch(`${API_BASE_URL}/imports/template/${entity}`, {
+        headers: session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {},
+      });
+    } catch (error) {
+      throw buildNetworkError(error);
+    }
 
     if (!response.ok) {
       const payload = await safeJson(response);
