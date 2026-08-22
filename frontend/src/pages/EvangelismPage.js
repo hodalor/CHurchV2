@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { FaSearch } from "react-icons/fa";
 import {
   Bar,
   BarChart,
@@ -109,13 +110,64 @@ export default function EvangelismPage() {
 
 function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspect }) {
   const [viewMode, setViewMode] = useState("table");
+  const [search, setSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState("all");
+  const [evangelistFilter, setEvangelistFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("name_asc");
+  const stageFilterOptions = useMemo(
+    () =>
+      [...new Set(prospects.map((prospect) => prospect.currentStage?.label).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [prospects]
+  );
+  const evangelistOptions = useMemo(
+    () =>
+      [...new Set(prospects.map((prospect) => prospect.assignedEvangelistId?.displayName).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [prospects]
+  );
+  const sourceOptions = useMemo(
+    () =>
+      [...new Set(prospects.map((prospect) => prospect.source?.label).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [prospects]
+  );
+  const filteredProspects = useMemo(() => {
+    return [...prospects]
+      .filter((prospect) => {
+        const haystack = [
+          prospect.prospectId,
+          prospect.firstName,
+          prospect.surname,
+          prospect.source?.label,
+          prospect.currentStage?.label,
+          prospect.assignedEvangelistId?.displayName,
+          prospect.campaignId?.name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const matchesSearch = haystack.includes(search.toLowerCase());
+        const matchesStage = stageFilter === "all" || prospect.currentStage?.label === stageFilter;
+        const matchesEvangelist =
+          evangelistFilter === "all" || prospect.assignedEvangelistId?.displayName === evangelistFilter;
+        const matchesSource = sourceFilter === "all" || prospect.source?.label === sourceFilter;
+
+        return matchesSearch && matchesStage && matchesEvangelist && matchesSource;
+      })
+      .sort((left, right) => sortProspects(left, right, sortOrder));
+  }, [evangelistFilter, prospects, search, sortOrder, sourceFilter, stageFilter]);
   const boardColumns = [
     ...(stageOptions || []).map((stage, index) => ({
       key: stage?._id || stage?.key || `${stage?.label || "stage"}-${index}`,
       stageId: stage?._id || null,
       stageKey: stage?.key || "",
       label: stage?.label || `Stage ${index + 1}`,
-      items: prospects.filter(
+      items: filteredProspects.filter(
         (prospect) =>
           (stage?._id && prospect.currentStage?._id === stage._id) ||
           (!stage?._id && prospect.currentStage?.label === stage?.label)
@@ -126,7 +178,7 @@ function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspe
       stageId: null,
       stageKey: "unassigned",
       label: "Unassigned",
-      items: prospects.filter((prospect) => !prospect.currentStage?._id && !prospect.currentStage?.label),
+      items: filteredProspects.filter((prospect) => !prospect.currentStage?._id && !prospect.currentStage?.label),
     },
   ];
 
@@ -157,6 +209,42 @@ function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspe
               Board View
             </button>
           </div>
+        </div>
+        <div className="toolbar-row inline-toolbar">
+          <div className="search-field">
+            <FaSearch />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search prospect, source, evangelist, or campaign" />
+          </div>
+          <select className="filter-select" value={stageFilter} onChange={(event) => setStageFilter(event.target.value)}>
+            <option value="all">All stages</option>
+            {stageFilterOptions.map((stage) => (
+              <option key={stage} value={stage}>
+                {stage}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={evangelistFilter} onChange={(event) => setEvangelistFilter(event.target.value)}>
+            <option value="all">All evangelists</option>
+            {evangelistOptions.map((evangelist) => (
+              <option key={evangelist} value={evangelist}>
+                {evangelist}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+            <option value="all">All sources</option>
+            {sourceOptions.map((source) => (
+              <option key={source} value={source}>
+                {source}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+            <option value="name_asc">Sort: Name A-Z</option>
+            <option value="stage_asc">Sort: Stage A-Z</option>
+            <option value="source_asc">Sort: Source A-Z</option>
+            <option value="prospect_id">Sort: Prospect ID</option>
+          </select>
         </div>
       </section>
 
@@ -206,8 +294,8 @@ function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspe
                   </tr>
                 </thead>
                 <tbody>
-                  {prospects.length ? (
-                    prospects.map((prospect) => (
+                  {filteredProspects.length ? (
+                    filteredProspects.map((prospect) => (
                       <tr
                         key={prospect._id || prospect.prospectId}
                         className="clickable-row"
@@ -226,7 +314,7 @@ function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspe
                       </tr>
                     ))
                   ) : (
-                    <EmptyTable columns={6} message="No prospects recorded yet." />
+                    <EmptyTable columns={6} message="No prospects match the current filter." />
                   )}
                 </tbody>
               </table>
@@ -241,6 +329,42 @@ function PipelineView({ prospects, stageData, stageOptions, onOpen, onMoveProspe
 }
 
 function ContactsView({ contacts, prospects, onOpen }) {
+  const [search, setSearch] = useState("");
+  const [contactedByFilter, setContactedByFilter] = useState("all");
+  const [followUpFilter, setFollowUpFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("date_desc");
+  const contactedByOptions = useMemo(
+    () =>
+      [...new Set(contacts.map((contact) => contact.contactedBy?.displayName).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [contacts]
+  );
+  const filteredContacts = useMemo(() => {
+    return [...contacts]
+      .filter((contact) => {
+        const haystack = [
+          contact.prospect?.prospectId,
+          contact.prospect?.firstName,
+          contact.prospect?.surname,
+          contact.contactedBy?.displayName,
+          contact.notes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const matchesSearch = haystack.includes(search.toLowerCase());
+        const matchesContactedBy =
+          contactedByFilter === "all" || contact.contactedBy?.displayName === contactedByFilter;
+        const matchesFollowUp =
+          followUpFilter === "all" ||
+          (followUpFilter === "scheduled" ? Boolean(contact.nextFollowUpDate) : !contact.nextFollowUpDate);
+
+        return matchesSearch && matchesContactedBy && matchesFollowUp;
+      })
+      .sort((left, right) => sortContacts(left, right, sortOrder));
+  }, [contacts, contactedByFilter, followUpFilter, search, sortOrder]);
+
   return (
     <>
       <section className="compact-stats-grid">
@@ -251,6 +375,30 @@ function ContactsView({ contacts, prospects, onOpen }) {
       </section>
 
       <section className="surface-card data-card">
+        <div className="toolbar-row inline-toolbar">
+          <div className="search-field">
+            <FaSearch />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search prospect, contacted by, or notes" />
+          </div>
+          <select className="filter-select" value={contactedByFilter} onChange={(event) => setContactedByFilter(event.target.value)}>
+            <option value="all">All contact owners</option>
+            {contactedByOptions.map((contactedBy) => (
+              <option key={contactedBy} value={contactedBy}>
+                {contactedBy}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value)}>
+            <option value="all">All follow-up states</option>
+            <option value="scheduled">Has next follow-up</option>
+            <option value="unscheduled">No next follow-up</option>
+          </select>
+          <select className="filter-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+            <option value="date_desc">Sort: Latest Contact</option>
+            <option value="date_asc">Sort: Oldest Contact</option>
+            <option value="name_asc">Sort: Prospect A-Z</option>
+          </select>
+        </div>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -263,8 +411,8 @@ function ContactsView({ contacts, prospects, onOpen }) {
               </tr>
             </thead>
             <tbody>
-              {contacts.length ? (
-                contacts.map((contact) => (
+              {filteredContacts.length ? (
+                filteredContacts.map((contact) => (
                   <tr
                     key={contact._id}
                     className="clickable-row"
@@ -278,7 +426,7 @@ function ContactsView({ contacts, prospects, onOpen }) {
                   </tr>
                 ))
               ) : (
-                <EmptyTable columns={5} message="No evangelism contacts logged yet." />
+                <EmptyTable columns={5} message="No evangelism contacts match the current filter." />
               )}
             </tbody>
           </table>
@@ -289,6 +437,52 @@ function ContactsView({ contacts, prospects, onOpen }) {
 }
 
 function BibleStudyView({ studies, onOpen }) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [studyTypeFilter, setStudyTypeFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("date_desc");
+  const statusOptions = useMemo(
+    () =>
+      [...new Set(studies.map((study) => study.status?.label).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [studies]
+  );
+  const studyTypeOptions = useMemo(
+    () =>
+      [...new Set(studies.map((study) => study.studyType).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [studies]
+  );
+  const filteredStudies = useMemo(() => {
+    return [...studies]
+      .filter((study) => {
+        const participantName = study.prospect
+          ? `${study.prospect.prospectId || ""} ${study.prospect.firstName || ""} ${study.prospect.surname || ""}`.trim()
+          : study.member
+            ? `${study.member.memberId || ""} ${study.member.firstName || ""} ${study.member.lastName || ""}`.trim()
+            : "";
+        const haystack = [
+          study.bibleStudyId,
+          participantName,
+          study.teacherMemberId,
+          study.teacherId?.displayName,
+          study.studyType,
+          study.status?.label,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const matchesSearch = haystack.includes(search.toLowerCase());
+        const matchesStatus = statusFilter === "all" || study.status?.label === statusFilter;
+        const matchesType = studyTypeFilter === "all" || study.studyType === studyTypeFilter;
+
+        return matchesSearch && matchesStatus && matchesType;
+      })
+      .sort((left, right) => sortBibleStudies(left, right, sortOrder));
+  }, [search, sortOrder, statusFilter, studies, studyTypeFilter]);
+
   return (
     <>
       <section className="compact-stats-grid">
@@ -299,6 +493,34 @@ function BibleStudyView({ studies, onOpen }) {
       </section>
 
       <section className="surface-card data-card">
+        <div className="toolbar-row inline-toolbar">
+          <div className="search-field">
+            <FaSearch />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search participant, teacher, study type, or study ID" />
+          </div>
+          <select className="filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="all">All statuses</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={studyTypeFilter} onChange={(event) => setStudyTypeFilter(event.target.value)}>
+            <option value="all">All study types</option>
+            {studyTypeOptions.map((studyType) => (
+              <option key={studyType} value={studyType}>
+                {studyType}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+            <option value="date_desc">Sort: Latest Start Date</option>
+            <option value="date_asc">Sort: Oldest Start Date</option>
+            <option value="participant_asc">Sort: Participant A-Z</option>
+            <option value="lessons_desc">Sort: Most Lessons</option>
+          </select>
+        </div>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -313,8 +535,8 @@ function BibleStudyView({ studies, onOpen }) {
               </tr>
             </thead>
             <tbody>
-              {studies.length ? (
-                studies.map((study) => (
+              {filteredStudies.length ? (
+                filteredStudies.map((study) => (
                   <tr key={study._id} className="clickable-row" onClick={() => onOpen(study)}>
                     <td>{study.bibleStudyId || "-"}</td>
                     <td>
@@ -332,7 +554,7 @@ function BibleStudyView({ studies, onOpen }) {
                   </tr>
                 ))
               ) : (
-                <EmptyTable columns={7} message="No Bible study records yet." />
+                <EmptyTable columns={7} message="No Bible study records match the current filter." />
               )}
             </tbody>
           </table>
@@ -343,6 +565,30 @@ function BibleStudyView({ studies, onOpen }) {
 }
 
 function CampaignsView({ campaigns, onOpen }) {
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("start_desc");
+  const filteredCampaigns = useMemo(() => {
+    return [...campaigns]
+      .filter((campaign) => {
+        const haystack = [
+          campaign.name,
+          campaign.summaryNotes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const isActive = !campaign.endDate || new Date(campaign.endDate) >= new Date();
+        const matchesSearch = haystack.includes(search.toLowerCase());
+        const matchesActive =
+          activeFilter === "all" ||
+          (activeFilter === "active" ? isActive : !isActive);
+
+        return matchesSearch && matchesActive;
+      })
+      .sort((left, right) => sortCampaigns(left, right, sortOrder));
+  }, [activeFilter, campaigns, search, sortOrder]);
+
   return (
     <>
       <section className="compact-stats-grid">
@@ -353,6 +599,23 @@ function CampaignsView({ campaigns, onOpen }) {
       </section>
 
       <section className="surface-card data-card">
+        <div className="toolbar-row inline-toolbar">
+          <div className="search-field">
+            <FaSearch />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search campaign name or summary" />
+          </div>
+          <select className="filter-select" value={activeFilter} onChange={(event) => setActiveFilter(event.target.value)}>
+            <option value="all">All campaign states</option>
+            <option value="active">Active campaigns</option>
+            <option value="closed">Closed campaigns</option>
+          </select>
+          <select className="filter-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+            <option value="start_desc">Sort: Latest Start Date</option>
+            <option value="start_asc">Sort: Oldest Start Date</option>
+            <option value="linked_desc">Sort: Most Prospects</option>
+            <option value="name_asc">Sort: Name A-Z</option>
+          </select>
+        </div>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -365,8 +628,8 @@ function CampaignsView({ campaigns, onOpen }) {
               </tr>
             </thead>
             <tbody>
-              {campaigns.length ? (
-                campaigns.map((campaign) => (
+              {filteredCampaigns.length ? (
+                filteredCampaigns.map((campaign) => (
                   <tr key={campaign._id} className="clickable-row" onClick={() => onOpen(campaign)}>
                     <td>{campaign.name}</td>
                     <td>{formatDate(campaign.startDate)}</td>
@@ -376,7 +639,7 @@ function CampaignsView({ campaigns, onOpen }) {
                   </tr>
                 ))
               ) : (
-                <EmptyTable columns={5} message="No campaigns recorded yet." />
+                <EmptyTable columns={5} message="No campaigns match the current filter." />
               )}
             </tbody>
           </table>
@@ -507,6 +770,83 @@ function isToday(value) {
   }
 
   return new Date(value).toDateString() === new Date().toDateString();
+}
+
+function sortProspects(left, right, sortOrder) {
+  switch (sortOrder) {
+    case "stage_asc":
+      return compareText(left.currentStage?.label, right.currentStage?.label) || compareText(left.prospectId, right.prospectId);
+    case "source_asc":
+      return compareText(left.source?.label, right.source?.label) || compareText(left.prospectId, right.prospectId);
+    case "prospect_id":
+      return compareText(left.prospectId, right.prospectId);
+    case "name_asc":
+    default:
+      return compareText(`${left.firstName || ""} ${left.surname || ""}`, `${right.firstName || ""} ${right.surname || ""}`);
+  }
+}
+
+function sortContacts(left, right, sortOrder) {
+  switch (sortOrder) {
+    case "date_asc":
+      return getDateValue(left.date) - getDateValue(right.date);
+    case "name_asc":
+      return compareText(
+        `${left.prospect?.firstName || ""} ${left.prospect?.surname || ""}`,
+        `${right.prospect?.firstName || ""} ${right.prospect?.surname || ""}`
+      );
+    case "date_desc":
+    default:
+      return getDateValue(right.date) - getDateValue(left.date);
+  }
+}
+
+function sortBibleStudies(left, right, sortOrder) {
+  switch (sortOrder) {
+    case "date_asc":
+      return getDateValue(left.startDate) - getDateValue(right.startDate);
+    case "participant_asc":
+      return compareText(getStudyParticipantLabel(left), getStudyParticipantLabel(right));
+    case "lessons_desc":
+      return Number(right.lessonsCompleted?.length || 0) - Number(left.lessonsCompleted?.length || 0);
+    case "date_desc":
+    default:
+      return getDateValue(right.startDate) - getDateValue(left.startDate);
+  }
+}
+
+function sortCampaigns(left, right, sortOrder) {
+  switch (sortOrder) {
+    case "start_asc":
+      return getDateValue(left.startDate) - getDateValue(right.startDate);
+    case "linked_desc":
+      return Number(right.linkedProspects || 0) - Number(left.linkedProspects || 0);
+    case "name_asc":
+      return compareText(left.name, right.name);
+    case "start_desc":
+    default:
+      return getDateValue(right.startDate) - getDateValue(left.startDate);
+  }
+}
+
+function getStudyParticipantLabel(study) {
+  if (study.prospect) {
+    return `${study.prospect.firstName || ""} ${study.prospect.surname || ""}`.trim();
+  }
+
+  if (study.member) {
+    return `${study.member.firstName || ""} ${study.member.lastName || ""}`.trim();
+  }
+
+  return "";
+}
+
+function getDateValue(value) {
+  return new Date(value || 0).getTime();
+}
+
+function compareText(left, right) {
+  return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
 }
 
 function ProspectBoard({ columns, onOpen, onDropItem }) {

@@ -384,16 +384,89 @@ function ReportsView({ report, eventTypeData }) {
 }
 
 function AbsenteesView({ absentees, onOpenMember }) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("name_asc");
+  const statusOptions = useMemo(
+    () =>
+      [...new Set(absentees.map((member) => member.membershipStatus).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [absentees]
+  );
+  const genderOptions = useMemo(
+    () =>
+      [...new Set(absentees.map((member) => member.gender).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [absentees]
+  );
+  const filteredAbsentees = useMemo(() => {
+    return [...absentees]
+      .filter((member) => {
+        const haystack = [
+          member.memberId,
+          member.firstName,
+          member.lastName,
+          member.phone,
+          member.email,
+          member.membershipStatus,
+          member.gender,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        const matchesSearch = haystack.includes(search.toLowerCase());
+        const matchesStatus = statusFilter === "all" || member.membershipStatus === statusFilter;
+        const matchesGender = genderFilter === "all" || member.gender === genderFilter;
+
+        return matchesSearch && matchesStatus && matchesGender;
+      })
+      .sort((left, right) => sortAbsentees(left, right, sortOrder));
+  }, [absentees, genderFilter, search, sortOrder, statusFilter]);
+  const absenteeWindowDays = absentees[0]?.absenteeWindowDays;
+  const eventType = absentees[0]?.eventType || "";
+
   return (
     <>
       <section className="compact-stats-grid">
         <StatCard color="purple" label="Absentees" value={absentees.length} />
-        <StatCard color="pink" label="Window" value={`${absentees[0]?.absenteeWindowDays || 28} days`} />
-        <StatCard color="blue" label="Event Type" value={absentees[0]?.eventType || "Sunday Worship"} />
+        <StatCard color="pink" label="Window" value={absenteeWindowDays ? `${absenteeWindowDays} days` : "-"} />
+        <StatCard color="blue" label="Event Type" value={eventType || "-"} />
         <StatCard color="orange" label="Follow-Up Needed" value={absentees.length} />
       </section>
 
       <section className="surface-card data-card">
+        <div className="toolbar-row inline-toolbar">
+          <div className="search-field">
+            <FaSearch />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search absentee, phone, email, or member ID" />
+          </div>
+          <select className="filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="all">All statuses</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={genderFilter} onChange={(event) => setGenderFilter(event.target.value)}>
+            <option value="all">All genders</option>
+            {genderOptions.map((gender) => (
+              <option key={gender} value={gender}>
+                {gender}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+            <option value="name_asc">Sort: Name A-Z</option>
+            <option value="name_desc">Sort: Name Z-A</option>
+            <option value="member_id">Sort: Member ID</option>
+            <option value="status">Sort: Status</option>
+          </select>
+        </div>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -406,8 +479,8 @@ function AbsenteesView({ absentees, onOpenMember }) {
               </tr>
             </thead>
             <tbody>
-              {absentees.length ? (
-                absentees.map((member) => (
+              {filteredAbsentees.length ? (
+                filteredAbsentees.map((member) => (
                   <tr key={member._id || member.memberId} className="clickable-row" onClick={() => onOpenMember(member)}>
                     <td>{member.memberId}</td>
                     <td>{member.firstName} {member.lastName}</td>
@@ -417,7 +490,7 @@ function AbsenteesView({ absentees, onOpenMember }) {
                   </tr>
                 ))
               ) : (
-                <EmptyTable columns={5} message="No attendance absentees right now." />
+                <EmptyTable columns={5} message="No attendance absentees match the current filter." />
               )}
             </tbody>
           </table>
@@ -536,4 +609,18 @@ function getDateValue(value) {
 
 function compareText(left, right) {
   return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
+}
+
+function sortAbsentees(left, right, sortOrder) {
+  switch (sortOrder) {
+    case "name_desc":
+      return compareText(`${right.firstName || ""} ${right.lastName || ""}`, `${left.firstName || ""} ${left.lastName || ""}`);
+    case "member_id":
+      return compareText(left.memberId, right.memberId);
+    case "status":
+      return compareText(left.membershipStatus, right.membershipStatus) || compareText(left.memberId, right.memberId);
+    case "name_asc":
+    default:
+      return compareText(`${left.firstName || ""} ${left.lastName || ""}`, `${right.firstName || ""} ${right.lastName || ""}`);
+  }
 }

@@ -8,10 +8,14 @@ export default function MembersPage() {
   const [memberGenderFilter, setMemberGenderFilter] = useState("all");
   const [memberHouseholdFilter, setMemberHouseholdFilter] = useState("all");
   const [memberStatusFilter, setMemberStatusFilter] = useState("all");
+  const [memberGroupFilter, setMemberGroupFilter] = useState("all");
+  const [memberTypeFilter, setMemberTypeFilter] = useState("all");
+  const [memberMaritalStatusFilter, setMemberMaritalStatusFilter] = useState("all");
   const [memberSort, setMemberSort] = useState("name_asc");
   const {
     members,
     families,
+    groups,
     ministries,
     memberSearch,
     setMemberSearch,
@@ -49,6 +53,42 @@ export default function MembersPage() {
     [members]
   );
 
+  const memberTypeOptions = useMemo(
+    () =>
+      [...new Set(members.map((member) => member.memberType).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [members]
+  );
+
+  const maritalStatusOptions = useMemo(
+    () =>
+      [...new Set(members.map((member) => member.maritalStatus).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [members]
+  );
+
+  const groupOptions = useMemo(() => {
+    const options = members.reduce((accumulator, member) => {
+      (member.groups || []).forEach((group) => {
+        const value = group.groupId || group._id || group.id || "";
+        const matchedGroup = groups.find((item) => (item._id || item.id) === value);
+        const label =
+          group.groupName ||
+          group.name ||
+          matchedGroup?.name ||
+          "";
+        if (value && label) {
+          accumulator.set(value, label);
+        }
+      });
+      return accumulator;
+    }, new Map());
+
+    return [...options.entries()].sort((left, right) => compareText(left[1], right[1]));
+  }, [groups, members]);
+
   const memberRows = useMemo(() => {
     return members
       .map((member) => {
@@ -64,8 +104,19 @@ export default function MembersPage() {
           ministryName: ministry?.name || "Unassigned",
           householdName: household?.familyName || "",
           householdLabel: household ? `${household.familyName} (${household.familyId})` : "No household",
+          groupIds: (member.groups || []).map((group) => group.groupId || group._id || group.id).filter(Boolean),
+          groupNames: (member.groups || [])
+            .map((group) => {
+              const groupId = group.groupId || group._id || group.id || "";
+              return group.groupName || group.name || groups.find((item) => (item._id || item.id) === groupId)?.name || "";
+            })
+            .filter(Boolean),
         };
       })
+      .map((member) => ({
+        ...member,
+        groupLabel: member.groupNames.length ? member.groupNames.join(", ") : "No group assigned",
+      }))
       .filter((member) => {
         const haystack = [
           member.firstName,
@@ -78,6 +129,10 @@ export default function MembersPage() {
           member.householdName,
           member.ministryName,
           member.membershipStatus,
+          member.memberType,
+          member.maritalStatus,
+          member.householdRole,
+          member.groupLabel,
         ]
           .filter(Boolean)
           .join(" ")
@@ -92,19 +147,36 @@ export default function MembersPage() {
           memberHouseholdFilter === "all" ||
           (memberHouseholdFilter === "unassigned" ? !member.familyId : member.familyId === memberHouseholdFilter);
         const matchesStatus = memberStatusFilter === "all" || member.membershipStatus === memberStatusFilter;
+        const matchesGroup = memberGroupFilter === "all" || member.groupIds.includes(memberGroupFilter);
+        const matchesType = memberTypeFilter === "all" || member.memberType === memberTypeFilter;
+        const matchesMaritalStatus =
+          memberMaritalStatusFilter === "all" || member.maritalStatus === memberMaritalStatusFilter;
 
-        return matchesSearch && matchesMinistry && matchesGender && matchesHousehold && matchesStatus;
+        return (
+          matchesSearch &&
+          matchesMinistry &&
+          matchesGender &&
+          matchesHousehold &&
+          matchesStatus &&
+          matchesGroup &&
+          matchesType &&
+          matchesMaritalStatus
+        );
       })
       .sort((left, right) => sortMembers(left, right, memberSort));
   }, [
     families,
     memberGenderFilter,
+    memberGroupFilter,
     memberHouseholdFilter,
+    memberMaritalStatusFilter,
     memberMinistryFilter,
     memberSearch,
     memberSort,
     memberStatusFilter,
+    memberTypeFilter,
     members,
+    groups,
     ministries,
   ]);
 
@@ -156,9 +228,33 @@ export default function MembersPage() {
               </option>
             ))}
           </select>
+          <select className="filter-select" value={memberGroupFilter} onChange={(event) => setMemberGroupFilter(event.target.value)}>
+            <option value="all">All groups</option>
+            {groupOptions.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={memberTypeFilter} onChange={(event) => setMemberTypeFilter(event.target.value)}>
+            <option value="all">All member types</option>
+            {memberTypeOptions.map((memberType) => (
+              <option key={memberType} value={memberType}>
+                {memberType}
+              </option>
+            ))}
+          </select>
           <select className="filter-select" value={memberStatusFilter} onChange={(event) => setMemberStatusFilter(event.target.value)}>
             <option value="all">All statuses</option>
             {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={memberMaritalStatusFilter} onChange={(event) => setMemberMaritalStatusFilter(event.target.value)}>
+            <option value="all">All marital statuses</option>
+            {maritalStatusOptions.map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>
@@ -168,7 +264,10 @@ export default function MembersPage() {
             <option value="name_asc">Sort: Name A-Z</option>
             <option value="name_desc">Sort: Name Z-A</option>
             <option value="gender">Sort: Gender</option>
+            <option value="member_type">Sort: Member Type</option>
             <option value="ministry">Sort: Ministry</option>
+            <option value="status">Sort: Status</option>
+            <option value="group">Sort: Group</option>
             <option value="household">Sort: Household</option>
             <option value="member_id">Sort: Member ID</option>
           </select>
@@ -213,6 +312,7 @@ export default function MembersPage() {
                     <td>
                       <strong>{member.membershipStatus}</strong>
                       <p>{member.ministryName}</p>
+                      <p>{member.groupLabel}</p>
                     </td>
                     <td>
                       <strong>{member.householdLabel}</strong>
@@ -293,8 +393,14 @@ function sortMembers(left, right, sortKey) {
       return compareText(buildMemberName(right), buildMemberName(left));
     case "gender":
       return compareText(left.gender, right.gender) || compareText(buildMemberName(left), buildMemberName(right));
+    case "member_type":
+      return compareText(left.memberType, right.memberType) || compareText(buildMemberName(left), buildMemberName(right));
     case "ministry":
       return compareText(left.ministryName, right.ministryName) || compareText(buildMemberName(left), buildMemberName(right));
+    case "status":
+      return compareText(left.membershipStatus, right.membershipStatus) || compareText(buildMemberName(left), buildMemberName(right));
+    case "group":
+      return compareText(left.groupLabel, right.groupLabel) || compareText(buildMemberName(left), buildMemberName(right));
     case "household":
       return compareText(left.householdName, right.householdName) || compareText(buildMemberName(left), buildMemberName(right));
     case "member_id":

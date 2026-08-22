@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
-  attendanceFormTemplate,
   financeFormTemplate,
   familyFormTemplate,
   groupFormTemplate,
@@ -9,7 +8,7 @@ import {
   ministryFormTemplate,
   roleFormTemplate,
   userFormTemplate,
-} from "../data/mockData";
+} from "../data/appDefaults";
 import { churchApi } from "../apis/churchApi";
 import { useAuth } from "./AuthContext";
 import {
@@ -69,7 +68,6 @@ export function AppProvider({ children }) {
   const [groupForm, setGroupForm] = useState(groupFormTemplate);
   const [ministryForm, setMinistryForm] = useState(ministryFormTemplate);
   const [financeForm, setFinanceForm] = useState(financeFormTemplate);
-  const [attendanceForm, setAttendanceForm] = useState(attendanceFormTemplate);
   const [userForm, setUserForm] = useState(userFormTemplate);
   const [roleForm, setRoleForm] = useState(roleFormTemplate);
   const [familyForm, setFamilyForm] = useState(familyFormTemplate);
@@ -1707,8 +1705,6 @@ export function AppProvider({ children }) {
     setMinistryForm,
     financeForm,
     setFinanceForm,
-    attendanceForm,
-    setAttendanceForm,
     userForm,
     setUserForm,
     roleForm,

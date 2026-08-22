@@ -34,6 +34,7 @@ export default function FamilyHouseholdsPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [search, setSearch] = useState("");
   const [zoneFilter, setZoneFilter] = useState("all");
+  const [areaFilter, setAreaFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("name_asc");
   const { families, groups, openRecordModal, familyApiState } = useAppContext();
 
@@ -54,11 +55,12 @@ export default function FamilyHouseholdsPage() {
           .toLowerCase();
         const matchesSearch = haystack.includes(search.toLowerCase());
         const matchesZone = zoneFilter === "all" || zoneName === zoneFilter;
+        const matchesArea = areaFilter === "all" || family.residentialArea === areaFilter;
 
-        return matchesSearch && matchesZone;
+        return matchesSearch && matchesZone && matchesArea;
       })
       .sort((left, right) => sortFamilies(left, right, sortOrder, groups));
-  }, [families, groups, search, sortOrder, zoneFilter]);
+  }, [areaFilter, families, groups, search, sortOrder, zoneFilter]);
 
   const zoneOptions = useMemo(
     () =>
@@ -68,6 +70,14 @@ export default function FamilyHouseholdsPage() {
           .filter(Boolean)
       )].sort((left, right) => compareText(left, right)),
     [families, groups]
+  );
+
+  const areaOptions = useMemo(
+    () =>
+      [...new Set(families.map((family) => family.residentialArea).filter(Boolean))].sort((left, right) =>
+        compareText(left, right)
+      ),
+    [families]
   );
 
   if (familyApiState.loading) {
@@ -102,6 +112,14 @@ export default function FamilyHouseholdsPage() {
             {zoneOptions.map((zone) => (
               <option key={zone} value={zone}>
                 {zone}
+              </option>
+            ))}
+          </select>
+          <select className="filter-select" value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}>
+            <option value="all">All areas</option>
+            {areaOptions.map((area) => (
+              <option key={area} value={area}>
+                {area}
               </option>
             ))}
           </select>

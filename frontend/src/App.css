@@ -806,6 +806,27 @@
   margin-bottom: 14px;
 }
 
+.inline-toolbar {
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.inline-toolbar .search-field {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.inline-toolbar .filter-select,
+.inline-toolbar .toolbar-date-input {
+  flex: 0 1 170px;
+  min-width: 150px;
+  width: auto;
+}
+
+.inline-toolbar .toolbar-actions {
+  flex: 0 1 auto;
+}
+
 .search-field {
   flex: 1;
   min-width: 280px;
@@ -832,6 +853,10 @@
 
 .filter-select {
   min-width: 190px;
+}
+
+.toolbar-date-input {
+  min-width: 150px;
 }
 
 .table-accent-bar {
@@ -1749,6 +1774,7 @@ textarea:focus {
 
   .search-field,
   .filter-select,
+  .toolbar-date-input,
   .large-action {
     width: 100%;
   }
