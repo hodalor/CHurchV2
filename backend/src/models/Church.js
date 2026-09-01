@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 const createScopedModel = require("../utils/scopedModel");
 
 const tenantAdminSchema = new mongoose.Schema(
@@ -41,6 +41,12 @@ const churchSchema = new mongoose.Schema(
       type: String,
       enum: ["active", "suspended"],
       default: "active",
+    },
+    currencyCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "GHS",
     },
     enabledNavigation: [
       {

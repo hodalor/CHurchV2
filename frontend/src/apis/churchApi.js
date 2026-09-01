@@ -29,7 +29,49 @@ function resolveApiBaseUrl() {
 
 const API_BASE_URL = resolveApiBaseUrl();
 const SESSION_STORAGE_KEY = "churchflow.session";
+const RESPONSE_CACHE_KEY = "churchflow.responseCache";
 const responseCache = new Map();
+
+function canUseSessionStorage() {
+  return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
+}
+
+function syncResponseCacheToStorage() {
+  if (!canUseSessionStorage()) {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      RESPONSE_CACHE_KEY,
+      JSON.stringify(Object.fromEntries(responseCache.entries()))
+    );
+  } catch (error) {
+    // Ignore storage sync failures and keep the in-memory cache.
+  }
+}
+
+function hydrateResponseCacheFromStorage() {
+  if (!canUseSessionStorage()) {
+    return;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(RESPONSE_CACHE_KEY);
+    if (!raw) {
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+    Object.entries(parsed).forEach(([key, value]) => {
+      responseCache.set(key, value);
+    });
+  } catch (error) {
+    // Ignore malformed persisted cache data.
+  }
+}
+
+hydrateResponseCacheFromStorage();
 
 function buildNetworkError(error) {
   if (error?.name === "AbortError") {
@@ -76,6 +118,9 @@ function peekCached(path) {
 
 function clearRequestCache() {
   responseCache.clear();
+  if (canUseSessionStorage()) {
+    window.sessionStorage.removeItem(RESPONSE_CACHE_KEY);
+  }
 }
 
 async function request(path, options = {}, retryOnUnauthorized = true) {
@@ -128,6 +173,7 @@ async function request(path, options = {}, retryOnUnauthorized = true) {
 
   if (method === "GET") {
     responseCache.set(path, payload);
+    syncResponseCacheToStorage();
   } else {
     clearRequestCache();
   }
@@ -241,6 +287,13 @@ export const churchApi = {
   async createChurch(payload) {
     return request("/churches", {
       method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateChurch(churchId, payload) {
+    return request(`/churches/${churchId}`, {
+      method: "PUT",
       body: JSON.stringify(payload),
     });
   },

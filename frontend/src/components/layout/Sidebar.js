@@ -23,10 +23,6 @@ export default function Sidebar() {
           return isSuperadmin;
         }
 
-        if (isSuperadmin) {
-          return ["dashboard", "church-management", "settings"].includes(item.key);
-        }
-
         return !item.permission || permissionSet.has(item.permission);
       })
       .map((item) => {

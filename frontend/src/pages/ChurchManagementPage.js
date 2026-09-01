@@ -3,25 +3,19 @@ import { FaPlus } from "react-icons/fa";
 import ModalShell from "../components/common/ModalShell";
 import { churchApi } from "../apis/churchApi";
 import { navigationSections } from "../lib/navigation";
+import { useAppContext } from "../context/AppContext";
 
 const initialForm = {
   name: "",
   churchId: "",
-  slug: "",
+  status: "active",
   adminDisplayName: "",
   adminUsername: "",
   adminEmail: "",
   adminPin: "",
+  currencyCode: "",
   enabledNavigation: [],
 };
-
-function slugify(value = "") {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 function normalizeChurchId(value = "") {
   return String(value || "")
@@ -31,12 +25,15 @@ function normalizeChurchId(value = "") {
 }
 
 export default function ChurchManagementPage() {
+  const { branding, notifyError, notifySuccess } = useAppContext();
   const [churches, setChurches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(initialForm);
+  const [selectedChurch, setSelectedChurch] = useState(null);
+  const [detailMode, setDetailMode] = useState("view");
 
   const grantSections = useMemo(
     () =>
@@ -44,6 +41,13 @@ export default function ChurchManagementPage() {
         (section) => !section.superadminOnly && !["dashboard", "settings", "church-management"].includes(section.key)
       ),
     []
+  );
+  const currencyOptions = useMemo(
+    () =>
+      Array.isArray(branding.currencies) && branding.currencies.length
+        ? branding.currencies
+        : [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }],
+    [branding.currencies]
   );
 
   useEffect(() => {
@@ -73,6 +77,13 @@ export default function ChurchManagementPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      currencyCode: current.currencyCode || branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+    }));
+  }, [branding.defaultCurrencyCode, currencyOptions]);
 
   const toggleGrant = (key) => {
     setForm((current) => {
@@ -111,23 +122,67 @@ export default function ChurchManagementPage() {
     });
   };
 
+  const buildPayload = (draft) => ({
+    ...draft,
+    churchId: normalizeChurchId(draft.churchId || draft.name),
+    currencyCode: draft.currencyCode || branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+  });
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     try {
       setSaving(true);
-      const payload = {
-        ...form,
-        churchId: normalizeChurchId(form.churchId || form.name),
-        slug: slugify(form.slug || form.name),
-      };
+      const payload = buildPayload(form);
       const createdChurch = await churchApi.createChurch(payload);
       setChurches((current) => [createdChurch, ...current]);
-      setForm(initialForm);
+      setForm({
+        ...initialForm,
+        currencyCode: branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+      });
       setShowModal(false);
       setError("");
+      notifySuccess(`Tenant ${createdChurch.name} created successfully.`);
     } catch (saveError) {
       setError(saveError.message || "Unable to create church.");
+      notifyError(saveError.message || "Unable to create church.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openChurchModal = (church, mode = "view") => {
+    setSelectedChurch({
+      name: church.name || "",
+      churchId: church.churchId || "",
+      dbName: church.dbName || "",
+      status: church.status || "active",
+      adminDisplayName: church.createdAdmin?.displayName || "",
+      adminUsername: church.createdAdmin?.username || "",
+      adminEmail: church.createdAdmin?.email || "",
+      currencyCode: church.currencyCode || branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+      enabledNavigation: Array.isArray(church.enabledNavigation) ? church.enabledNavigation : [],
+    });
+    setDetailMode(mode);
+  };
+
+  const handleChurchUpdate = async () => {
+    if (!selectedChurch?.churchId) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedChurch = await churchApi.updateChurch(selectedChurch.churchId, buildPayload(selectedChurch));
+      setChurches((current) =>
+        current.map((church) =>
+          (church.churchId || church._id) === (savedChurch.churchId || savedChurch._id) ? savedChurch : church
+        )
+      );
+      openChurchModal(savedChurch, "view");
+      notifySuccess(`Tenant ${savedChurch.name} updated successfully.`);
+    } catch (saveError) {
+      notifyError(saveError.message || "Unable to update church.");
     } finally {
       setSaving(false);
     }
@@ -155,6 +210,7 @@ export default function ChurchManagementPage() {
               <tr>
                 <th>Church</th>
                 <th>Church ID</th>
+                <th>Currency</th>
                 <th>Database</th>
                 <th>Status</th>
                 <th>Default Admin</th>
@@ -164,13 +220,18 @@ export default function ChurchManagementPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="empty-table">Loading churches...</td>
+                  <td colSpan={7} className="empty-table">Loading churches...</td>
                 </tr>
               ) : churches.length ? (
                 churches.map((church) => (
-                  <tr key={church._id || church.churchId}>
+                  <tr
+                    key={church._id || church.churchId}
+                    className="clickable-row"
+                    onClick={() => openChurchModal(church)}
+                  >
                     <td>{church.name}</td>
                     <td>{church.churchId}</td>
+                    <td>{church.currencyCode || branding.defaultCurrencyCode || "-"}</td>
                     <td>{church.dbName}</td>
                     <td>{church.status}</td>
                     <td>
@@ -183,7 +244,7 @@ export default function ChurchManagementPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="empty-table">No churches created yet.</td>
+                  <td colSpan={7} className="empty-table">No churches created yet.</td>
                 </tr>
               )}
             </tbody>
@@ -197,7 +258,10 @@ export default function ChurchManagementPage() {
           subtitle="Create a tenant church, its dedicated database, default admin account, and tenant menu grants."
           onClose={() => {
             setShowModal(false);
-            setForm(initialForm);
+            setForm({
+              ...initialForm,
+              currencyCode: branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+            });
           }}
         >
           <form className="modal-form" onSubmit={handleSubmit}>
@@ -211,8 +275,14 @@ export default function ChurchManagementPage() {
                 <input value={form.churchId} onChange={(event) => setForm((current) => ({ ...current, churchId: event.target.value }))} placeholder="Used during login" />
               </label>
               <label>
-                Slug
-                <input value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="Optional URL-safe slug" />
+                Currency
+                <select value={form.currencyCode} onChange={(event) => setForm((current) => ({ ...current, currencyCode: event.target.value }))}>
+                  {currencyOptions.map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.code} - {currency.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Admin Display Name
@@ -273,6 +343,180 @@ export default function ChurchManagementPage() {
               </button>
             </div>
           </form>
+        </ModalShell>
+      ) : null}
+
+      {selectedChurch ? (
+        <ModalShell
+          title="Church Details"
+          subtitle="Review tenant details, then switch to edit mode to update the church name, admin details, menu grants, or assigned currency."
+          onClose={() => {
+            setSelectedChurch(null);
+            setDetailMode("view");
+          }}
+        >
+          <div className="modal-form">
+            <div className="form-grid">
+              <label>
+                Church Name
+                <input
+                  value={selectedChurch.name}
+                  readOnly={detailMode !== "edit"}
+                  onChange={(event) => setSelectedChurch((current) => ({ ...current, name: event.target.value }))}
+                />
+              </label>
+              <label>
+                Church ID
+                <input value={selectedChurch.churchId} readOnly />
+              </label>
+              <label>
+                Database
+                <input value={selectedChurch.dbName} readOnly />
+              </label>
+              <label>
+                Status
+                <select
+                  value={selectedChurch.status}
+                  disabled={detailMode !== "edit"}
+                  onChange={(event) => setSelectedChurch((current) => ({ ...current, status: event.target.value }))}
+                >
+                  <option value="active">active</option>
+                  <option value="suspended">suspended</option>
+                </select>
+              </label>
+              <label>
+                Currency
+                <select
+                  value={selectedChurch.currencyCode}
+                  disabled={detailMode !== "edit"}
+                  onChange={(event) => setSelectedChurch((current) => ({ ...current, currencyCode: event.target.value }))}
+                >
+                  {currencyOptions.map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.code} - {currency.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Admin Display Name
+                <input
+                  value={selectedChurch.adminDisplayName}
+                  readOnly={detailMode !== "edit"}
+                  onChange={(event) => setSelectedChurch((current) => ({ ...current, adminDisplayName: event.target.value }))}
+                />
+              </label>
+              <label>
+                Admin Username
+                <input
+                  value={selectedChurch.adminUsername}
+                  readOnly={detailMode !== "edit"}
+                  onChange={(event) => setSelectedChurch((current) => ({ ...current, adminUsername: event.target.value }))}
+                />
+              </label>
+              <label>
+                Admin Email
+                <input
+                  value={selectedChurch.adminEmail}
+                  readOnly={detailMode !== "edit"}
+                  onChange={(event) => setSelectedChurch((current) => ({ ...current, adminEmail: event.target.value }))}
+                />
+              </label>
+            </div>
+
+            <div className="surface-subsection">
+              <h3>Tenant Menu Grants</h3>
+              <p>Use the edit button to change the menus and submenus available in this tenant sidebar.</p>
+              <div className="simple-list">
+                {grantSections.map((section) => {
+                  const sectionKeys = [section.key, ...(Array.isArray(section.children) ? section.children.map((child) => child.key) : [])];
+                  const allSelected = sectionKeys.every((key) => selectedChurch.enabledNavigation.includes(key));
+
+                  return (
+                    <div key={section.key} className="simple-list-item">
+                      <label className="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          disabled={detailMode !== "edit"}
+                          onChange={() => {
+                            if (detailMode !== "edit") {
+                              return;
+                            }
+
+                            const currentSet = new Set(selectedChurch.enabledNavigation);
+                            if (allSelected) {
+                              sectionKeys.forEach((key) => currentSet.delete(key));
+                            } else {
+                              sectionKeys.forEach((key) => currentSet.add(key));
+                            }
+
+                            setSelectedChurch((current) => ({ ...current, enabledNavigation: Array.from(currentSet) }));
+                          }}
+                        />
+                        <strong>{section.label}</strong>
+                      </label>
+                      {Array.isArray(section.children) ? (
+                        <div className="checkbox-grid">
+                          {section.children.map((child) => (
+                            <label key={child.key} className="checkbox-row">
+                              <input
+                                type="checkbox"
+                                checked={selectedChurch.enabledNavigation.includes(child.key)}
+                                disabled={detailMode !== "edit"}
+                                onChange={() => {
+                                  if (detailMode !== "edit") {
+                                    return;
+                                  }
+
+                                  const currentSet = new Set(selectedChurch.enabledNavigation);
+                                  if (currentSet.has(child.key)) {
+                                    currentSet.delete(child.key);
+                                  } else {
+                                    currentSet.add(child.key);
+                                  }
+
+                                  setSelectedChurch((current) => ({ ...current, enabledNavigation: Array.from(currentSet) }));
+                                }}
+                              />
+                              <span>{child.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => {
+                  setSelectedChurch(null);
+                  setDetailMode("view");
+                }}
+              >
+                Close
+              </button>
+              {detailMode === "edit" ? (
+                <>
+                  <button type="button" className="ghost-button" onClick={() => setDetailMode("view")}>
+                    Cancel Edit
+                  </button>
+                  <button type="button" className="primary-button" disabled={saving} onClick={handleChurchUpdate}>
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="primary-button" onClick={() => setDetailMode("edit")}>
+                  Edit
+                </button>
+              )}
+            </div>
+          </div>
         </ModalShell>
       ) : null}
     </div>

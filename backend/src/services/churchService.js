@@ -50,23 +50,58 @@ async function ensureTenantRole(roleName) {
   });
 }
 
-async function seedTenantBaseData({ churchName, adminPayload }) {
-  await seedRoles();
-  await seedLookupData();
-  await seedDiscipleshipProgrammes();
-  await seedMinistries();
-  await seedStrategicPlanningData();
-  await ensureTenantRole(ROLES.CHURCH_ADMINISTRATOR);
+function normalizeCurrencyCode(value = "", currencies = []) {
+  const requested = String(value || "").trim().toUpperCase();
+  return currencies.find((item) => item.code === requested)?.code || currencies[0]?.code || "GHS";
+}
+
+function normalizeCurrencies(currencies = []) {
+  const normalized = Array.isArray(currencies)
+    ? currencies
+        .map((item) => ({
+          code: String(item?.code || "").trim().toUpperCase(),
+          name: String(item?.name || "").trim(),
+          symbol: String(item?.symbol || "").trim(),
+        }))
+        .filter((item) => item.code && item.name)
+    : [];
+
+  return normalized.length
+    ? normalized
+    : [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }];
+}
+
+async function seedTenantBaseData({ churchName, adminPayload, appConfig = {} }) {
+  await Promise.all([
+    seedRoles(),
+    seedLookupData(),
+    seedDiscipleshipProgrammes(),
+    seedMinistries(),
+  ]);
+
   const adminRole = await Role.findOne({ name: ROLES.CHURCH_ADMINISTRATOR });
   if (!adminRole) {
     throw new Error("Default tenant administrator role could not be prepared.");
   }
 
   const existingProfile = await ChurchProfile.findOne();
+  const currencies = normalizeCurrencies(appConfig.currencies);
+  const defaultCurrencyCode = normalizeCurrencyCode(appConfig.defaultCurrencyCode, currencies);
   if (!existingProfile) {
     await ChurchProfile.create({
       churchName,
+      appName: appConfig.appName || "ChurchSuite Pro",
+      appLogoUrl: appConfig.appLogoUrl || "",
+      currencies,
+      defaultCurrencyCode,
     });
+  } else {
+    existingProfile.churchName = churchName;
+    existingProfile.appName = appConfig.appName || existingProfile.appName || "ChurchSuite Pro";
+    existingProfile.appLogoUrl = appConfig.appLogoUrl || existingProfile.appLogoUrl || "";
+    existingProfile.currencies = currencies;
+    existingProfile.defaultCurrencyCode = defaultCurrencyCode;
+    await existingProfile.save();
   }
 
   const existingAdmin = await User.findOne({ username: adminPayload.username });
@@ -106,10 +141,22 @@ async function listChurches() {
   return Church.find().sort({ createdAt: -1 });
 }
 
+async function getMasterAppConfig() {
+  const profile = await ChurchProfile.findOne().sort({ createdAt: -1 });
+  const currencies = normalizeCurrencies(profile?.currencies);
+
+  return {
+    appName: profile?.appName || "ChurchSuite Pro",
+    appLogoUrl: profile?.appLogoUrl || "",
+    currencies,
+    defaultCurrencyCode: normalizeCurrencyCode(profile?.defaultCurrencyCode, currencies),
+  };
+}
+
 async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
   const name = String(payload.name || "").trim();
   const churchId = normalizeChurchId(payload.churchId || name);
-  const slug = slugify(payload.slug || name || churchId);
+  const slug = slugify(name || churchId);
   const adminUsername = String(payload.adminUsername || "").trim().toLowerCase();
   const adminPin = String(payload.adminPin || "").trim();
   const adminDisplayName = String(payload.adminDisplayName || "").trim();
@@ -135,6 +182,8 @@ async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
 
   const dbName = `churchflow_tenant_${churchId}`;
   const enabledNavigation = normalizeEnabledNavigation(payload.enabledNavigation);
+  const masterAppConfig = await getMasterAppConfig();
+  const currencyCode = normalizeCurrencyCode(payload.currencyCode, masterAppConfig.currencies);
 
   const church = await Church.create({
     churchId,
@@ -142,6 +191,7 @@ async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
     slug,
     dbName,
     status: payload.status === "suspended" ? "suspended" : "active",
+    currencyCode,
     enabledNavigation,
     createdAdmin: {
       displayName: adminDisplayName,
@@ -159,6 +209,10 @@ async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
         displayName: adminDisplayName,
         email: String(payload.adminEmail || "").trim().toLowerCase(),
       },
+      appConfig: {
+        ...masterAppConfig,
+        defaultCurrencyCode: currencyCode,
+      },
     })
   );
 
@@ -175,8 +229,78 @@ async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
   return church;
 }
 
+async function updateChurch({ churchId = "", payload = {}, user = null, ipAddress = "" }) {
+  const existingChurch = await Church.findOne({ churchId: normalizeChurchId(churchId) });
+  if (!existingChurch) {
+    throw new Error("Church not found.");
+  }
+
+  const previousValue = existingChurch.toObject();
+  const masterAppConfig = await getMasterAppConfig();
+  const normalizedName = String(payload.name || existingChurch.name || "").trim();
+  const normalizedEnabledNavigation = normalizeEnabledNavigation(
+    Array.isArray(payload.enabledNavigation) ? payload.enabledNavigation : existingChurch.enabledNavigation
+  );
+  const normalizedCurrencyCode = normalizeCurrencyCode(
+    payload.currencyCode || existingChurch.currencyCode,
+    masterAppConfig.currencies
+  );
+
+  existingChurch.name = normalizedName || existingChurch.name;
+  existingChurch.slug = slugify(existingChurch.name || existingChurch.churchId);
+  existingChurch.status = payload.status === "suspended" ? "suspended" : "active";
+  existingChurch.currencyCode = normalizedCurrencyCode;
+  existingChurch.enabledNavigation = normalizedEnabledNavigation;
+  existingChurch.createdAdmin = {
+    displayName: String(payload.adminDisplayName || existingChurch.createdAdmin?.displayName || "").trim(),
+    username: String(payload.adminUsername || existingChurch.createdAdmin?.username || "").trim().toLowerCase(),
+    email: String(payload.adminEmail || existingChurch.createdAdmin?.email || "").trim().toLowerCase(),
+  };
+  await existingChurch.save();
+
+  await withTenantContext(existingChurch.dbName, async () => {
+    const tenantProfile = await ChurchProfile.findOne().sort({ createdAt: -1 });
+    if (tenantProfile) {
+      tenantProfile.churchName = existingChurch.name;
+      tenantProfile.appName = masterAppConfig.appName;
+      tenantProfile.appLogoUrl = masterAppConfig.appLogoUrl;
+      tenantProfile.currencies = masterAppConfig.currencies;
+      tenantProfile.defaultCurrencyCode = normalizedCurrencyCode;
+      await tenantProfile.save();
+    }
+
+    if (payload.adminDisplayName || payload.adminEmail || payload.adminUsername) {
+      const previousAdminUsername = String(previousValue?.createdAdmin?.username || "").trim().toLowerCase();
+      const tenantAdmin = await User.findOne({
+        username: previousAdminUsername || existingChurch.createdAdmin.username,
+      });
+      if (tenantAdmin) {
+        tenantAdmin.username = existingChurch.createdAdmin.username || tenantAdmin.username;
+        tenantAdmin.displayName = existingChurch.createdAdmin.displayName || tenantAdmin.displayName;
+        tenantAdmin.email = existingChurch.createdAdmin.email || tenantAdmin.email || "";
+        await tenantAdmin.save();
+      }
+    }
+  });
+
+  await logAudit({
+    action: "update",
+    module: "Church Management",
+    recordType: "Church",
+    recordId: existingChurch._id.toString(),
+    previousValue,
+    newValue: existingChurch.toObject(),
+    user,
+    ipAddress,
+  });
+
+  return existingChurch;
+}
+
 module.exports = {
   createChurch,
   listChurches,
   normalizeEnabledNavigation,
+  normalizeCurrencies,
+  updateChurch,
 };
