@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const { login, authError, setAuthError } = useAuth();
-  const [form, setForm] = useState({ username: "admin", pin: "1234" });
+  const [form, setForm] = useState({ churchId: "", username: "superadmin", pin: "0902" });
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (event) => {
@@ -12,7 +12,7 @@ export default function LoginPage() {
     setAuthError("");
 
     try {
-      await login(form.username, form.pin);
+      await login(form);
     } catch (error) {
       setAuthError(error.message || "Unable to sign in.");
     } finally {
@@ -30,11 +30,20 @@ export default function LoginPage() {
         </p> */}
 
         <label>
+          Church ID
+          <input
+            value={form.churchId}
+            onChange={(event) => setForm((current) => ({ ...current, churchId: event.target.value }))}
+            placeholder="Leave blank for superadmin"
+          />
+        </label>
+
+        <label>
           Username
           <input
             value={form.username}
             onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-            placeholder="admin"
+            placeholder="superadmin or tenant admin"
           />
         </label>
 
@@ -44,7 +53,7 @@ export default function LoginPage() {
             type="password"
             value={form.pin}
             onChange={(event) => setForm((current) => ({ ...current, pin: event.target.value }))}
-            placeholder="1234"
+            placeholder="PIN"
           />
         </label>
 

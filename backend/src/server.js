@@ -5,11 +5,14 @@ require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const express = require("express");
 const cors = require("cors");
 const connectDatabase = require("./config/db");
+const attachRequestScope = require("./middleware/attachRequestScope");
+const { runWithRequestContext } = require("./lib/requestContext");
 const { bootstrapApplicationData } = require("./seed/bootstrap");
 const auditRoutes = require("./routes/auditRoutes");
 const aiAssistRoutes = require("./routes/aiAssistRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const authRoutes = require("./routes/authRoutes");
+const churchRoutes = require("./routes/churchRoutes");
 const communicationRoutes = require("./routes/communicationRoutes");
 const careRoutes = require("./routes/careRoutes");
 const discipleshipRoutes = require("./routes/discipleshipRoutes");
@@ -47,6 +50,17 @@ app.use(
   })
 );
 app.use(express.json({ limit: "10mb" }));
+app.use((req, res, next) =>
+  runWithRequestContext(
+    {
+      scope: "master",
+      churchId: "",
+      tenantDbName: "",
+    },
+    next
+  )
+);
+app.use(attachRequestScope);
 
 app.get("/api/health", (req, res) => {
   res.json({
@@ -59,6 +73,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/ai-assist", aiAssistRoutes);
 app.use("/api/audit-logs", auditRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/churches", churchRoutes);
 app.use("/api/communication", communicationRoutes);
 app.use("/api/care", careRoutes);
 app.use("/api/discipleship", discipleshipRoutes);

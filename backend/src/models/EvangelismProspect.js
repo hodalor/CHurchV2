@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const stageHistorySchema = new mongoose.Schema(
   {
@@ -114,4 +115,6 @@ const evangelismProspectSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("EvangelismProspect", evangelismProspectSchema);
+module.exports = createScopedModel("EvangelismProspect", evangelismProspectSchema);
+
+

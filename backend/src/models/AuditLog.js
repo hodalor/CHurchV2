@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const auditLogSchema = new mongoose.Schema(
   {
@@ -49,4 +50,6 @@ const auditLogSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("AuditLog", auditLogSchema);
+module.exports = createScopedModel("AuditLog", auditLogSchema);
+
+

@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const aiSuggestionSchema = new mongoose.Schema(
   {
@@ -90,4 +91,6 @@ const aiSuggestionSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("AiSuggestion", aiSuggestionSchema);
+module.exports = createScopedModel("AiSuggestion", aiSuggestionSchema);
+
+

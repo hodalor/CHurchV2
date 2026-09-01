@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const lookupTypeSchema = new mongoose.Schema(
   {
@@ -33,4 +34,6 @@ const lookupTypeSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("LookupType", lookupTypeSchema);
+module.exports = createScopedModel("LookupType", lookupTypeSchema);
+
+

@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const depositAccountSchema = new mongoose.Schema(
   {
@@ -106,4 +107,6 @@ const churchProfileSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("ChurchProfile", churchProfileSchema);
+module.exports = createScopedModel("ChurchProfile", churchProfileSchema);
+
+

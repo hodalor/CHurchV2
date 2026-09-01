@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const communicationLogSchema = new mongoose.Schema(
   {
@@ -49,4 +50,6 @@ const communicationLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("CommunicationLog", communicationLogSchema);
+module.exports = createScopedModel("CommunicationLog", communicationLogSchema);
+
+

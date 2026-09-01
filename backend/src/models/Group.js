@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const groupSchema = new mongoose.Schema(
   {
@@ -27,4 +28,6 @@ const groupSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Group", groupSchema);
+module.exports = createScopedModel("Group", groupSchema);
+
+

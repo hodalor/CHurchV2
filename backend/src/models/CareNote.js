@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const attachmentSchema = new mongoose.Schema(
   {
@@ -82,4 +83,6 @@ const careNoteSchema = new mongoose.Schema(
 
 careNoteSchema.index({ dateTime: -1, createdAt: -1 });
 
-module.exports = mongoose.model("CareNote", careNoteSchema);
+module.exports = createScopedModel("CareNote", careNoteSchema);
+
+

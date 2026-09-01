@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const leadershipRoleSchema = new mongoose.Schema(
   {
@@ -29,4 +30,6 @@ const leadershipRoleSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("LeadershipRole", leadershipRoleSchema);
+module.exports = createScopedModel("LeadershipRole", leadershipRoleSchema);
+
+

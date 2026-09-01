@@ -1943,3 +1943,28 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.surface-subsection {
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.02);
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 14px;
+  margin-top: 10px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.muted-inline {
+  color: #64748b;
+  font-size: 0.9em;
+}

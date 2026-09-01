@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const skillTalentSchema = new mongoose.Schema(
   {
@@ -21,4 +22,6 @@ const skillTalentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("SkillTalent", skillTalentSchema);
+module.exports = createScopedModel("SkillTalent", skillTalentSchema);
+
+

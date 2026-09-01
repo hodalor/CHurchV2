@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const duplicateCandidateSchema = new mongoose.Schema(
   {
@@ -73,4 +74,6 @@ const duplicateCandidateSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("DuplicateCandidate", duplicateCandidateSchema);
+module.exports = createScopedModel("DuplicateCandidate", duplicateCandidateSchema);
+
+

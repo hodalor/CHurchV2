@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const pledgeSchema = new mongoose.Schema(
   {
@@ -75,4 +76,6 @@ const pledgeSchema = new mongoose.Schema(
 
 pledgeSchema.index({ startDate: -1, createdAt: -1 });
 
-module.exports = mongoose.model("Pledge", pledgeSchema);
+module.exports = createScopedModel("Pledge", pledgeSchema);
+
+

@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const initiativeSchema = new mongoose.Schema(
   {
@@ -21,4 +22,6 @@ const initiativeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Initiative", initiativeSchema);
+module.exports = createScopedModel("Initiative", initiativeSchema);
+
+

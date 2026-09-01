@@ -1,7 +1,10 @@
 const bcrypt = require("bcryptjs");
+const Church = require("../models/Church");
 const User = require("../models/User");
 const RefreshTokenSession = require("../models/RefreshTokenSession");
+const { setRequestContext } = require("../lib/requestContext");
 const { createAccessToken, createRefreshToken, hashToken, verifyRefreshToken } = require("../utils/tokenUtils");
+const { ROLES } = require("../utils/permissions");
 
 function getEffectivePermissions(user) {
   const rolePermissions = user.roles.flatMap((role) => role.permissions || []);
@@ -12,10 +15,20 @@ function getEffectivePermissions(user) {
 }
 
 async function authenticateWithUsernameAndPin({ username, pin, ipAddress = "", userAgent = "" }) {
+  setRequestContext({
+    scope: "master",
+    churchId: "",
+    tenantDbName: "",
+  });
+
   const user = await User.findOne({ username: String(username || "").toLowerCase() }).populate("roles");
 
   if (!user || user.status !== "Active") {
     throw new Error("Invalid username or PIN.");
+  }
+
+  if (!user.roles.some((role) => role.name === ROLES.SUPERADMIN)) {
+    throw new Error("Church ID is required for tenant sign-in.");
   }
 
   const pinMatches = await bcrypt.compare(String(pin || ""), user.pinHash);
@@ -26,11 +39,65 @@ async function authenticateWithUsernameAndPin({ username, pin, ipAddress = "", u
   user.lastLoginAt = new Date();
   await user.save();
 
-  return issueTokensForUser(user, { ipAddress, userAgent });
+  return issueTokensForUser(user, {
+    ipAddress,
+    userAgent,
+    scope: "master",
+  });
+}
+
+async function authenticateWithChurchIdUsernameAndPin({
+  churchId,
+  username,
+  pin,
+  ipAddress = "",
+  userAgent = "",
+}) {
+  const normalizedChurchId = String(churchId || "").trim().toLowerCase();
+  if (!normalizedChurchId) {
+    throw new Error("Church ID is required.");
+  }
+
+  const church = await Church.findOne({ churchId: normalizedChurchId });
+  if (!church || church.status !== "active") {
+    throw new Error("Church account is unavailable.");
+  }
+
+  setRequestContext({
+    scope: "tenant",
+    churchId: church.churchId,
+    tenantDbName: church.dbName,
+  });
+
+  const user = await User.findOne({ username: String(username || "").toLowerCase() }).populate("roles");
+
+  if (!user || user.status !== "Active") {
+    throw new Error("Invalid church ID, username, or PIN.");
+  }
+
+  const pinMatches = await bcrypt.compare(String(pin || ""), user.pinHash);
+  if (!pinMatches) {
+    throw new Error("Invalid church ID, username, or PIN.");
+  }
+
+  user.lastLoginAt = new Date();
+  await user.save();
+
+  return issueTokensForUser(user, {
+    ipAddress,
+    userAgent,
+    scope: "tenant",
+    church,
+  });
 }
 
 async function refreshUserSession({ refreshToken, ipAddress = "", userAgent = "" }) {
   const decoded = verifyRefreshToken(refreshToken);
+  setRequestContext({
+    scope: decoded.scope === "tenant" ? "tenant" : "master",
+    churchId: decoded.churchId || "",
+    tenantDbName: decoded.tenantDbName || "",
+  });
   const existingTokenHash = hashToken(refreshToken);
 
   const session = await RefreshTokenSession.findOne({
@@ -43,6 +110,20 @@ async function refreshUserSession({ refreshToken, ipAddress = "", userAgent = ""
     throw new Error("Refresh session is invalid or expired.");
   }
 
+  let church = null;
+  if (decoded.scope === "tenant") {
+    church = await Church.findOne({ churchId: decoded.churchId });
+    if (!church || church.status !== "active") {
+      throw new Error("Church account is unavailable.");
+    }
+
+    setRequestContext({
+      scope: "tenant",
+      churchId: church.churchId,
+      tenantDbName: church.dbName,
+    });
+  }
+
   const user = await User.findById(session.user).populate("roles");
   if (!user || user.status !== "Active") {
     throw new Error("User is no longer active.");
@@ -51,7 +132,13 @@ async function refreshUserSession({ refreshToken, ipAddress = "", userAgent = ""
   session.revokedAt = new Date();
   session.revokedByIp = ipAddress;
 
-  const issued = await issueTokensForUser(user, { ipAddress, userAgent, existingSession: session });
+  const issued = await issueTokensForUser(user, {
+    ipAddress,
+    userAgent,
+    existingSession: session,
+    scope: decoded.scope === "tenant" ? "tenant" : "master",
+    church,
+  });
   await session.save();
 
   return issued;
@@ -63,6 +150,12 @@ async function revokeSession({ refreshToken, ipAddress = "" }) {
   }
 
   try {
+    const decoded = verifyRefreshToken(refreshToken);
+    setRequestContext({
+      scope: decoded.scope === "tenant" ? "tenant" : "master",
+      churchId: decoded.churchId || "",
+      tenantDbName: decoded.tenantDbName || "",
+    });
     const tokenHash = hashToken(refreshToken);
     const session = await RefreshTokenSession.findOne({ tokenHash, revokedAt: null });
     if (!session) {
@@ -80,15 +173,23 @@ async function revokeSession({ refreshToken, ipAddress = "" }) {
 async function issueTokensForUser(user, { ipAddress = "", userAgent = "", existingSession = null }) {
   const uniquePermissions = getEffectivePermissions(user);
   const roleNames = user.roles.map((role) => role.name);
+  const scope = arguments[1]?.scope || "master";
+  const church = arguments[1]?.church || null;
   const accessToken = createAccessToken({
     sub: user._id.toString(),
     username: user.username,
     roles: roleNames,
     permissions: uniquePermissions,
+    scope,
+    churchId: church?.churchId || "",
+    tenantDbName: church?.dbName || "",
   });
   const refreshTokenPayload = createRefreshToken({
     sub: user._id.toString(),
     username: user.username,
+    scope,
+    churchId: church?.churchId || "",
+    tenantDbName: church?.dbName || "",
   });
   const refreshTokenHash = hashToken(refreshTokenPayload.token);
 
@@ -99,6 +200,8 @@ async function issueTokensForUser(user, { ipAddress = "", userAgent = "", existi
     expiresAt: refreshTokenPayload.expiresAt,
     createdByIp: ipAddress,
     userAgent,
+    scope,
+    churchId: church?.churchId || "",
   });
 
   if (existingSession) {
@@ -115,6 +218,10 @@ async function issueTokensForUser(user, { ipAddress = "", userAgent = "", existi
       memberId: user.memberId || "",
       roles: roleNames,
       permissions: uniquePermissions,
+      scope,
+      churchId: church?.churchId || "",
+      churchName: church?.name || "",
+      enabledNavigation: Array.isArray(church?.enabledNavigation) ? church.enabledNavigation : [],
     },
   };
 }
@@ -125,6 +232,7 @@ async function hashPin(pin) {
 
 module.exports = {
   authenticateWithUsernameAndPin,
+  authenticateWithChurchIdUsernameAndPin,
   getEffectivePermissions,
   hashPin,
   refreshUserSession,

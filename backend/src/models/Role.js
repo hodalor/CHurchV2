@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const roleSchema = new mongoose.Schema(
   {
@@ -28,4 +29,6 @@ const roleSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Role", roleSchema);
+module.exports = createScopedModel("Role", roleSchema);
+
+

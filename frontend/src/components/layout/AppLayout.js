@@ -15,6 +15,7 @@ import FamilyHouseholdsPage from "../../pages/FamilyHouseholdsPage";
 import FinancePage from "../../pages/FinancePage";
 import AttendancePage from "../../pages/AttendancePage";
 import CommunicationPage from "../../pages/CommunicationPage";
+import ChurchManagementPage from "../../pages/ChurchManagementPage";
 import AiAssistPage from "../../pages/AiAssistPage";
 import PastoralCarePage from "../../pages/PastoralCarePage";
 import SpiritualHealthPage from "../../pages/SpiritualHealthPage";
@@ -119,6 +120,7 @@ export default function AppLayout() {
                 <Route path="/ai-assist/duplicates" element={authUser?.permissions?.includes("view_ai_assist") ? <AiAssistPage section="duplicates" key="ai-assist-duplicates" /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/ai-assist/suggestions" element={authUser?.permissions?.includes("view_ai_assist") ? <AiAssistPage section="suggestions" key="ai-assist-suggestions" /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/users" element={authUser?.permissions?.includes("manage_users") ? <UsersPage /> : <Navigate to="/dashboard" replace />} />
+                <Route path="/church-management" element={authUser?.roles?.includes("Superadmin") ? <ChurchManagementPage /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/settings" element={<Navigate to="/settings/app-config" replace />} />
                 <Route path="/settings/app-config" element={authUser?.permissions?.includes("manage_settings") ? <SettingsPage /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -223,6 +225,14 @@ function getPageMeta(pathname) {
       title: "Settings",
       subtitle: "Superadmin controls for application-wide shell and security configuration.",
       action: "settings",
+    };
+  }
+
+  if (pathname.startsWith("/church-management")) {
+    return {
+      title: "Church Management",
+      subtitle: "Create tenant churches, seed their default administrators, and control tenant sidebar access.",
+      action: null,
     };
   }
 

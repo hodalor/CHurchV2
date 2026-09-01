@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const visitEntrySchema = new mongoose.Schema(
   {
@@ -115,4 +116,6 @@ const visitorSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Visitor", visitorSchema);
+module.exports = createScopedModel("Visitor", visitorSchema);
+
+

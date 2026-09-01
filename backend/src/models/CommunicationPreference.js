@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const communicationPreferenceSchema = new mongoose.Schema(
   {
@@ -30,4 +31,6 @@ communicationPreferenceSchema.index(
   { unique: true, partialFilterExpression: { channel: { $type: "objectId" } } }
 );
 
-module.exports = mongoose.model("CommunicationPreference", communicationPreferenceSchema);
+module.exports = createScopedModel("CommunicationPreference", communicationPreferenceSchema);
+
+

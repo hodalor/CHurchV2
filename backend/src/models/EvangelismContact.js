@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const evangelismContactSchema = new mongoose.Schema(
   {
@@ -31,4 +32,6 @@ const evangelismContactSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("EvangelismContact", evangelismContactSchema);
+module.exports = createScopedModel("EvangelismContact", evangelismContactSchema);
+
+

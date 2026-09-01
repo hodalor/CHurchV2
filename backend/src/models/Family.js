@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const householdMemberSchema = new mongoose.Schema(
   {
@@ -114,4 +115,6 @@ const familySchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Family", familySchema);
+module.exports = createScopedModel("Family", familySchema);
+
+

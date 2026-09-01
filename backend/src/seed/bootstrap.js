@@ -410,4 +410,9 @@ async function seedInitialSuperadminUser() {
 
 module.exports = {
   bootstrapApplicationData,
+  seedDiscipleshipProgrammes,
+  seedLookupData,
+  seedMinistries,
+  seedRoles,
+  seedStrategicPlanningData,
 };

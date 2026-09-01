@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const ministryMemberSchema = new mongoose.Schema(
   {
@@ -52,4 +53,6 @@ const ministrySchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Ministry", ministrySchema);
+module.exports = createScopedModel("Ministry", ministrySchema);
+
+

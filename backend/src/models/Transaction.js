@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const batchMetadataSchema = new mongoose.Schema(
   {
@@ -144,4 +145,6 @@ const transactionSchema = new mongoose.Schema(
 
 transactionSchema.index({ date: -1, createdAt: -1 });
 
-module.exports = mongoose.model("Transaction", transactionSchema);
+module.exports = createScopedModel("Transaction", transactionSchema);
+
+

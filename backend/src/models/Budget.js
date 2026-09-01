@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const budgetSchema = new mongoose.Schema(
   {
@@ -63,4 +64,6 @@ const budgetSchema = new mongoose.Schema(
 
 budgetSchema.index({ period: 1, ministryId: 1, category: 1, fundId: 1, lineType: 1 });
 
-module.exports = mongoose.model("Budget", budgetSchema);
+module.exports = createScopedModel("Budget", budgetSchema);
+
+

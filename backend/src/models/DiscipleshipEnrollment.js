@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const completedSessionSchema = new mongoose.Schema(
   {
@@ -66,4 +67,6 @@ const discipleshipEnrollmentSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("DiscipleshipEnrollment", discipleshipEnrollmentSchema);
+module.exports = createScopedModel("DiscipleshipEnrollment", discipleshipEnrollmentSchema);
+
+

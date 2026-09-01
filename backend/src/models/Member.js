@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const photoSchema = new mongoose.Schema(
   {
@@ -255,4 +256,6 @@ const memberSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Member", memberSchema);
+module.exports = createScopedModel("Member", memberSchema);
+
+

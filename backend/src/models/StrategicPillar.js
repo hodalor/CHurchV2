@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const strategicPillarSchema = new mongoose.Schema(
   {
@@ -21,4 +22,6 @@ const strategicPillarSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("StrategicPillar", strategicPillarSchema);
+module.exports = createScopedModel("StrategicPillar", strategicPillarSchema);
+
+

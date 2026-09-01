@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const emergingLeaderFlagSchema = new mongoose.Schema(
   {
@@ -30,4 +31,6 @@ const emergingLeaderFlagSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("EmergingLeaderFlag", emergingLeaderFlagSchema);
+module.exports = createScopedModel("EmergingLeaderFlag", emergingLeaderFlagSchema);
+
+

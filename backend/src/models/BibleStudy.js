@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const completedLessonSchema = new mongoose.Schema(
   {
@@ -84,4 +85,6 @@ const bibleStudySchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("BibleStudy", bibleStudySchema);
+module.exports = createScopedModel("BibleStudy", bibleStudySchema);
+
+

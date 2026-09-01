@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const mentorAssignmentSchema = new mongoose.Schema(
   {
@@ -30,4 +31,6 @@ const mentorAssignmentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("MentorAssignment", mentorAssignmentSchema);
+module.exports = createScopedModel("MentorAssignment", mentorAssignmentSchema);
+
+

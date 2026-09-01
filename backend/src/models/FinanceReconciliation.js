@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const financeReconciliationSchema = new mongoose.Schema(
   {
@@ -70,4 +71,6 @@ const financeReconciliationSchema = new mongoose.Schema(
 
 financeReconciliationSchema.index({ reconciliationDate: -1, createdAt: -1 });
 
-module.exports = mongoose.model("FinanceReconciliation", financeReconciliationSchema);
+module.exports = createScopedModel("FinanceReconciliation", financeReconciliationSchema);
+
+

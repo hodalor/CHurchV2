@@ -44,9 +44,9 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = async (username, pin) => {
+  const login = async ({ churchId = "", username, pin }) => {
     setAuthError("");
-    const session = await churchApi.login(username, pin);
+    const session = await churchApi.login({ churchId, username, pin });
     setAuthUser(session.user);
     return session.user;
   };

@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const successionRequirementSchema = new mongoose.Schema(
   {
@@ -19,4 +20,6 @@ const successionRequirementSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("SuccessionRequirement", successionRequirementSchema);
+module.exports = createScopedModel("SuccessionRequirement", successionRequirementSchema);
+
+

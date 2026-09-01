@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const leadershipTrainingRecordSchema = new mongoose.Schema(
   {
@@ -30,4 +31,6 @@ const leadershipTrainingRecordSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("LeadershipTrainingRecord", leadershipTrainingRecordSchema);
+module.exports = createScopedModel("LeadershipTrainingRecord", leadershipTrainingRecordSchema);
+
+

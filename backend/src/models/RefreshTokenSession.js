@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const refreshTokenSessionSchema = new mongoose.Schema(
   {
@@ -39,10 +40,23 @@ const refreshTokenSessionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    scope: {
+      type: String,
+      enum: ["master", "tenant"],
+      default: "master",
+    },
+    churchId: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
   },
   {
     timestamps: true,
   }
 );
 
-module.exports = mongoose.model("RefreshTokenSession", refreshTokenSessionSchema);
+module.exports = createScopedModel("RefreshTokenSession", refreshTokenSessionSchema);
+
+

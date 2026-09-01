@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const pendingActionSchema = new mongoose.Schema(
   {
@@ -61,4 +62,6 @@ const pendingActionSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("PendingAction", pendingActionSchema);
+module.exports = createScopedModel("PendingAction", pendingActionSchema);
+
+

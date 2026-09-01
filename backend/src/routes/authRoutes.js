@@ -1,18 +1,30 @@
 const express = require("express");
 const User = require("../models/User");
 const authenticate = require("../middleware/authenticate");
-const { authenticateWithUsernameAndPin, getEffectivePermissions, refreshUserSession, revokeSession } = require("../services/authService");
+const {
+  authenticateWithChurchIdUsernameAndPin,
+  authenticateWithUsernameAndPin,
+  getEffectivePermissions,
+  refreshUserSession,
+  revokeSession,
+} = require("../services/authService");
 
 const router = express.Router();
 
 router.post("/login", async (req, res) => {
   try {
-    const result = await authenticateWithUsernameAndPin({
+    const loginPayload = {
       username: req.body.username,
       pin: req.body.pin,
       ipAddress: req.ip,
       userAgent: req.get("user-agent") || "",
-    });
+    };
+    const result = req.body.churchId
+      ? await authenticateWithChurchIdUsernameAndPin({
+          churchId: req.body.churchId,
+          ...loginPayload,
+        })
+      : await authenticateWithUsernameAndPin(loginPayload);
 
     res.json(result);
   } catch (error) {
@@ -56,6 +68,10 @@ router.get("/me", authenticate, async (req, res) => {
     memberId: user.memberId || "",
     roles: user.roles.map((role) => role.name),
     permissions: getEffectivePermissions(user),
+    scope: req.user.scope || "master",
+    churchId: req.user.churchId || "",
+    churchName: req.user.churchName || "",
+    enabledNavigation: Array.isArray(req.user.enabledNavigation) ? req.user.enabledNavigation : [],
   });
 });
 

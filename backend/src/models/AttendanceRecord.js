@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const attendanceRecordSchema = new mongoose.Schema(
   {
@@ -62,4 +63,6 @@ attendanceRecordSchema.index(
   }
 );
 
-module.exports = mongoose.model("AttendanceRecord", attendanceRecordSchema);
+module.exports = createScopedModel("AttendanceRecord", attendanceRecordSchema);
+
+

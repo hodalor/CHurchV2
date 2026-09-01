@@ -11,8 +11,44 @@ export default function Sidebar() {
   const { authUser } = useAuth();
   const availableSections = useMemo(() => {
     const permissionSet = new Set(authUser?.permissions || []);
-    return navigationSections.filter((item) => !item.permission || permissionSet.has(item.permission));
-  }, [authUser?.permissions]);
+    const enabledNavigationSet = new Set(authUser?.enabledNavigation || []);
+    const isSuperadmin = authUser?.roles?.includes("Superadmin");
+
+    const canShowByGrant = (key) =>
+      isSuperadmin || !enabledNavigationSet.size || enabledNavigationSet.has(key);
+
+    return navigationSections
+      .filter((item) => {
+        if (item.superadminOnly) {
+          return isSuperadmin;
+        }
+
+        if (isSuperadmin) {
+          return ["dashboard", "church-management", "settings"].includes(item.key);
+        }
+
+        return !item.permission || permissionSet.has(item.permission);
+      })
+      .map((item) => {
+        if (!Array.isArray(item.children)) {
+          return item;
+        }
+
+        const children = item.children.filter((child) => canShowByGrant(child.key || child.path));
+        const parentAllowed = canShowByGrant(item.key || item.path) || children.length > 0;
+
+        if (!parentAllowed) {
+          return null;
+        }
+
+        return {
+          ...item,
+          children,
+        };
+      })
+      .filter(Boolean)
+      .filter((item) => (Array.isArray(item.children) ? item.children.length > 0 || canShowByGrant(item.key || item.path) : canShowByGrant(item.key || item.path)));
+  }, [authUser?.enabledNavigation, authUser?.permissions, authUser?.roles]);
   const defaultOpenState = useMemo(() => {
     return availableSections.reduce((accumulator, item) => {
       if (item.children) {

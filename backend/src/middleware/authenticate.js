@@ -1,3 +1,5 @@
+const Church = require("../models/Church");
+const { setRequestContext } = require("../lib/requestContext");
 const User = require("../models/User");
 const { getEffectivePermissions } = require("../services/authService");
 const { verifyAccessToken } = require("../utils/tokenUtils");
@@ -12,6 +14,27 @@ async function authenticate(req, res, next) {
     }
 
     const decoded = verifyAccessToken(token);
+    let church = null;
+
+    if (decoded.scope === "tenant") {
+      church = await Church.findOne({ churchId: decoded.churchId });
+      if (!church || church.status !== "active") {
+        return res.status(401).json({ message: "Church account is unavailable." });
+      }
+
+      setRequestContext({
+        scope: "tenant",
+        churchId: church.churchId,
+        tenantDbName: church.dbName,
+      });
+    } else {
+      setRequestContext({
+        scope: "master",
+        churchId: "",
+        tenantDbName: "",
+      });
+    }
+
     const user = await User.findById(decoded.sub).populate("roles");
 
     if (!user || user.status !== "Active") {
@@ -25,6 +48,11 @@ async function authenticate(req, res, next) {
       memberId: user.memberId || "",
       roles: user.roles.map((role) => role.name),
       permissions: getEffectivePermissions(user),
+      scope: decoded.scope === "tenant" ? "tenant" : "master",
+      churchId: church?.churchId || "",
+      churchName: church?.name || "",
+      tenantDbName: church?.dbName || "",
+      enabledNavigation: Array.isArray(church?.enabledNavigation) ? church.enabledNavigation : [],
     };
 
     return next();

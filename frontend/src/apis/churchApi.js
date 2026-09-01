@@ -186,7 +186,7 @@ export const churchApi = {
   peekCached,
   clearRequestCache,
 
-  async login(username, pin) {
+  async login({ churchId = "", username, pin }) {
     let response;
     try {
       response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -194,7 +194,7 @@ export const churchApi = {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username, pin }),
+        body: JSON.stringify({ churchId, username, pin }),
       });
     } catch (error) {
       throw buildNetworkError(error);
@@ -232,6 +232,17 @@ export const churchApi = {
 
   async getCurrentUser() {
     return request("/auth/me");
+  },
+
+  async getChurches() {
+    return request("/churches");
+  },
+
+  async createChurch(payload) {
+    return request("/churches", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   async getHealth() {

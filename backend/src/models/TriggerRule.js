@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const triggerRuleSchema = new mongoose.Schema(
   {
@@ -33,4 +34,6 @@ const triggerRuleSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("TriggerRule", triggerRuleSchema);
+module.exports = createScopedModel("TriggerRule", triggerRuleSchema);
+
+

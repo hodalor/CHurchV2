@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const spiritualHealthAlertSchema = new mongoose.Schema(
   {
@@ -60,4 +61,6 @@ const spiritualHealthAlertSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("SpiritualHealthAlert", spiritualHealthAlertSchema);
+module.exports = createScopedModel("SpiritualHealthAlert", spiritualHealthAlertSchema);
+
+

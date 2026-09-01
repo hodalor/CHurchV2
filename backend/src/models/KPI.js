@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const kpiSchema = new mongoose.Schema(
   {
@@ -38,4 +39,6 @@ const kpiSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("KPI", kpiSchema);
+module.exports = createScopedModel("KPI", kpiSchema);
+
+

@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const fundSchema = new mongoose.Schema(
   {
@@ -23,4 +24,6 @@ const fundSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Fund", fundSchema);
+module.exports = createScopedModel("Fund", fundSchema);
+
+

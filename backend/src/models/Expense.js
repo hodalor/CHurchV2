@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
+const createScopedModel = require("../utils/scopedModel");
 
 const expenseSchema = new mongoose.Schema(
   {
@@ -134,4 +135,6 @@ const expenseSchema = new mongoose.Schema(
 
 expenseSchema.index({ date: -1, createdAt: -1 });
 
-module.exports = mongoose.model("Expense", expenseSchema);
+module.exports = createScopedModel("Expense", expenseSchema);
+
+
