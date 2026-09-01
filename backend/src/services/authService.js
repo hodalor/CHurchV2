@@ -4,7 +4,7 @@ const User = require("../models/User");
 const RefreshTokenSession = require("../models/RefreshTokenSession");
 const { setRequestContext } = require("../lib/requestContext");
 const { createAccessToken, createRefreshToken, hashToken, verifyRefreshToken } = require("../utils/tokenUtils");
-const { ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
+const { buildTenantAdminPermissions, ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
 
 function getEffectivePermissions(user) {
   const rolePermissions = user.roles.flatMap((role) => role.permissions || []);
@@ -27,7 +27,7 @@ async function syncDefaultTenantAdminPermissions(user, church) {
     return user;
   }
 
-  const nextPermissions = ROLE_PERMISSION_MAP[ROLES.CHURCH_ADMINISTRATOR] || [];
+  const nextPermissions = buildTenantAdminPermissions(church.enabledNavigation);
   const currentPermissions = Array.isArray(user.permissions) ? user.permissions : [];
   const samePermissions =
     currentPermissions.length === nextPermissions.length &&

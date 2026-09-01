@@ -13,7 +13,7 @@ const {
 const { logAudit } = require("./auditService");
 const { hashPin } = require("./authService");
 const { getTenantConnection } = require("../config/db");
-const { ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
+const { buildTenantAdminPermissions, ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
 
 function slugify(value = "") {
   return String(value || "")
@@ -71,7 +71,7 @@ function normalizeCurrencies(currencies = []) {
     : [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }];
 }
 
-async function seedTenantBaseData({ churchName, adminPayload, appConfig = {} }) {
+async function seedTenantBaseData({ churchName, adminPayload, appConfig = {}, enabledNavigation = [] }) {
   await Promise.all([
     seedRoles(),
     seedLookupData(),
@@ -105,6 +105,7 @@ async function seedTenantBaseData({ churchName, adminPayload, appConfig = {} }) 
   }
 
   const existingAdmin = await User.findOne({ username: adminPayload.username });
+  const tenantAdminPermissions = buildTenantAdminPermissions(enabledNavigation);
   if (!existingAdmin) {
     const pinHash = await hashPin(adminPayload.pin);
     await User.create({
@@ -113,10 +114,16 @@ async function seedTenantBaseData({ churchName, adminPayload, appConfig = {} }) 
       displayName: adminPayload.displayName,
       email: adminPayload.email || "",
       roles: [adminRole._id],
-      permissions: ROLE_PERMISSION_MAP[ROLES.CHURCH_ADMINISTRATOR],
+      permissions: tenantAdminPermissions,
       permissionsConfigured: true,
       status: "Active",
     });
+  } else {
+    existingAdmin.displayName = adminPayload.displayName || existingAdmin.displayName;
+    existingAdmin.email = adminPayload.email || existingAdmin.email || "";
+    existingAdmin.permissions = tenantAdminPermissions;
+    existingAdmin.permissionsConfigured = true;
+    await existingAdmin.save();
   }
 }
 
@@ -213,6 +220,7 @@ async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
         ...masterAppConfig,
         defaultCurrencyCode: currencyCode,
       },
+      enabledNavigation,
     })
   );
 
@@ -278,6 +286,15 @@ async function updateChurch({ churchId = "", payload = {}, user = null, ipAddres
         tenantAdmin.username = existingChurch.createdAdmin.username || tenantAdmin.username;
         tenantAdmin.displayName = existingChurch.createdAdmin.displayName || tenantAdmin.displayName;
         tenantAdmin.email = existingChurch.createdAdmin.email || tenantAdmin.email || "";
+        tenantAdmin.permissions = buildTenantAdminPermissions(existingChurch.enabledNavigation);
+        tenantAdmin.permissionsConfigured = true;
+        await tenantAdmin.save();
+      }
+    } else {
+      const tenantAdmin = await User.findOne({ username: existingChurch.createdAdmin.username });
+      if (tenantAdmin) {
+        tenantAdmin.permissions = buildTenantAdminPermissions(existingChurch.enabledNavigation);
+        tenantAdmin.permissionsConfigured = true;
         await tenantAdmin.save();
       }
     }
