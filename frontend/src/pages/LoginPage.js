@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const { login, authError, setAuthError } = useAuth();
-  const [form, setForm] = useState({ churchId: "", username: "superadmin", pin: "0902" });
+  const [form, setForm] = useState({ churchId: "master", username: "superadmin", pin: "0903" });
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (event) => {
@@ -34,7 +34,7 @@ export default function LoginPage() {
           <input
             value={form.churchId}
             onChange={(event) => setForm((current) => ({ ...current, churchId: event.target.value }))}
-            placeholder="Leave blank for superadmin"
+            placeholder="master or tenant church ID"
           />
         </label>
 

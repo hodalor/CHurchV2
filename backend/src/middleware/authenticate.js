@@ -49,8 +49,8 @@ async function authenticate(req, res, next) {
       roles: user.roles.map((role) => role.name),
       permissions: getEffectivePermissions(user),
       scope: decoded.scope === "tenant" ? "tenant" : "master",
-      churchId: church?.churchId || "",
-      churchName: church?.name || "",
+      churchId: decoded.scope === "tenant" ? church?.churchId || "" : "master",
+      churchName: decoded.scope === "tenant" ? church?.name || "" : "Master",
       tenantDbName: church?.dbName || "",
       enabledNavigation: Array.isArray(church?.enabledNavigation) ? church.enabledNavigation : [],
     };

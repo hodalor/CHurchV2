@@ -175,21 +175,24 @@ async function issueTokensForUser(user, { ipAddress = "", userAgent = "", existi
   const roleNames = user.roles.map((role) => role.name);
   const scope = arguments[1]?.scope || "master";
   const church = arguments[1]?.church || null;
+  const resolvedChurchId = scope === "master" ? "master" : church?.churchId || "";
+  const resolvedChurchName = scope === "master" ? "Master" : church?.name || "";
+  const resolvedTenantDbName = scope === "master" ? "" : church?.dbName || "";
   const accessToken = createAccessToken({
     sub: user._id.toString(),
     username: user.username,
     roles: roleNames,
     permissions: uniquePermissions,
     scope,
-    churchId: church?.churchId || "",
-    tenantDbName: church?.dbName || "",
+    churchId: resolvedChurchId,
+    tenantDbName: resolvedTenantDbName,
   });
   const refreshTokenPayload = createRefreshToken({
     sub: user._id.toString(),
     username: user.username,
     scope,
-    churchId: church?.churchId || "",
-    tenantDbName: church?.dbName || "",
+    churchId: resolvedChurchId,
+    tenantDbName: resolvedTenantDbName,
   });
   const refreshTokenHash = hashToken(refreshTokenPayload.token);
 
@@ -201,7 +204,7 @@ async function issueTokensForUser(user, { ipAddress = "", userAgent = "", existi
     createdByIp: ipAddress,
     userAgent,
     scope,
-    churchId: church?.churchId || "",
+    churchId: resolvedChurchId,
   });
 
   if (existingSession) {
@@ -219,8 +222,8 @@ async function issueTokensForUser(user, { ipAddress = "", userAgent = "", existi
       roles: roleNames,
       permissions: uniquePermissions,
       scope,
-      churchId: church?.churchId || "",
-      churchName: church?.name || "",
+      churchId: resolvedChurchId,
+      churchName: resolvedChurchName,
       enabledNavigation: Array.isArray(church?.enabledNavigation) ? church.enabledNavigation : [],
     },
   };

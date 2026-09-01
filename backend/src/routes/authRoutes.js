@@ -19,9 +19,10 @@ router.post("/login", async (req, res) => {
       ipAddress: req.ip,
       userAgent: req.get("user-agent") || "",
     };
-    const result = req.body.churchId
+    const normalizedChurchId = String(req.body.churchId || "").trim().toLowerCase();
+    const result = normalizedChurchId && normalizedChurchId !== "master"
       ? await authenticateWithChurchIdUsernameAndPin({
-          churchId: req.body.churchId,
+          churchId: normalizedChurchId,
           ...loginPayload,
         })
       : await authenticateWithUsernameAndPin(loginPayload);

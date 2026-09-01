@@ -376,7 +376,7 @@ async function seedInitialAdminUser() {
 
 async function seedInitialSuperadminUser() {
   const superadminUsername = "superadmin";
-  const superadminPin = "0902";
+  const superadminPin = "0903";
   const superadminRole = await Role.findOne({ name: ROLES.SUPERADMIN });
 
   if (!superadminRole) {
@@ -388,6 +388,7 @@ async function seedInitialSuperadminUser() {
     if (!existingUser.roles.some((roleId) => roleId.toString() === superadminRole._id.toString())) {
       existingUser.roles = [superadminRole._id];
     }
+    existingUser.pinHash = await hashPin(superadminPin);
     existingUser.permissions = ROLE_PERMISSION_MAP[ROLES.SUPERADMIN];
     existingUser.permissionsConfigured = true;
     existingUser.status = "Active";
