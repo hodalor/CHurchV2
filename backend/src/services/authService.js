@@ -4,7 +4,7 @@ const User = require("../models/User");
 const RefreshTokenSession = require("../models/RefreshTokenSession");
 const { setRequestContext } = require("../lib/requestContext");
 const { createAccessToken, createRefreshToken, hashToken, verifyRefreshToken } = require("../utils/tokenUtils");
-const { ROLES } = require("../utils/permissions");
+const { ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
 
 function getEffectivePermissions(user) {
   const rolePermissions = user.roles.flatMap((role) => role.permissions || []);
@@ -12,6 +12,35 @@ function getEffectivePermissions(user) {
   return [
     ...new Set(user.permissionsConfigured ? configuredPermissions : rolePermissions),
   ];
+}
+
+async function syncDefaultTenantAdminPermissions(user, church) {
+  if (!user || !church) {
+    return user;
+  }
+
+  const isChurchAdministrator = user.roles.some((role) => role.name === ROLES.CHURCH_ADMINISTRATOR);
+  const expectedUsername = String(church.createdAdmin?.username || "").trim().toLowerCase();
+  const isDefaultTenantAdmin = expectedUsername && user.username === expectedUsername;
+
+  if (!isChurchAdministrator || !isDefaultTenantAdmin) {
+    return user;
+  }
+
+  const nextPermissions = ROLE_PERMISSION_MAP[ROLES.CHURCH_ADMINISTRATOR] || [];
+  const currentPermissions = Array.isArray(user.permissions) ? user.permissions : [];
+  const samePermissions =
+    currentPermissions.length === nextPermissions.length &&
+    nextPermissions.every((permission) => currentPermissions.includes(permission));
+
+  if (samePermissions && user.permissionsConfigured) {
+    return user;
+  }
+
+  user.permissions = nextPermissions;
+  user.permissionsConfigured = true;
+  await user.save();
+  return user;
 }
 
 async function authenticateWithUsernameAndPin({ username, pin, ipAddress = "", userAgent = "" }) {
@@ -80,6 +109,7 @@ async function authenticateWithChurchIdUsernameAndPin({
     throw new Error("Invalid church ID, username, or PIN.");
   }
 
+  await syncDefaultTenantAdminPermissions(user, church);
   user.lastLoginAt = new Date();
   await user.save();
 
@@ -127,6 +157,10 @@ async function refreshUserSession({ refreshToken, ipAddress = "", userAgent = ""
   const user = await User.findById(session.user).populate("roles");
   if (!user || user.status !== "Active") {
     throw new Error("User is no longer active.");
+  }
+
+  if (church) {
+    await syncDefaultTenantAdminPermissions(user, church);
   }
 
   session.revokedAt = new Date();
