@@ -125,7 +125,8 @@ function clearRequestCache() {
 
 async function request(path, options = {}, retryOnUnauthorized = true) {
   const method = getRequestMethod(options);
-  if (method === "GET" && responseCache.has(path)) {
+  const skipCache = Boolean(options.skipCache);
+  if (method === "GET" && !skipCache && responseCache.has(path)) {
     return clonePayload(responseCache.get(path));
   }
 
@@ -712,6 +713,10 @@ export const churchApi = {
 
   async getAppConfig() {
     return request("/setup/app-config");
+  },
+
+  async getFreshAppConfig() {
+    return request("/setup/app-config", { skipCache: true });
   },
 
   async getDepositAccounts() {

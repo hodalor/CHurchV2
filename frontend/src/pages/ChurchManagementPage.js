@@ -34,6 +34,8 @@ export default function ChurchManagementPage() {
   const [form, setForm] = useState(initialForm);
   const [selectedChurch, setSelectedChurch] = useState(null);
   const [detailMode, setDetailMode] = useState("view");
+  const [appConfigCurrencies, setAppConfigCurrencies] = useState([]);
+  const [appConfigDefaultCurrencyCode, setAppConfigDefaultCurrencyCode] = useState("");
 
   const grantSections = useMemo(
     () =>
@@ -44,21 +46,28 @@ export default function ChurchManagementPage() {
   );
   const currencyOptions = useMemo(
     () =>
-      Array.isArray(branding.currencies) && branding.currencies.length
-        ? branding.currencies
+      Array.isArray(appConfigCurrencies) && appConfigCurrencies.length
+        ? appConfigCurrencies
+        : Array.isArray(branding.currencies) && branding.currencies.length
+          ? branding.currencies
         : [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }],
-    [branding.currencies]
+    [appConfigCurrencies, branding.currencies]
   );
 
   useEffect(() => {
     let active = true;
 
-    async function loadChurches() {
+    async function loadPageData() {
       try {
         setLoading(true);
-        const response = await churchApi.getChurches();
+        const [churchesResponse, appConfigResponse] = await Promise.all([
+          churchApi.getChurches(),
+          churchApi.getFreshAppConfig().catch(() => null),
+        ]);
         if (active) {
-          setChurches(Array.isArray(response) ? response : []);
+          setChurches(Array.isArray(churchesResponse) ? churchesResponse : []);
+          setAppConfigCurrencies(Array.isArray(appConfigResponse?.currencies) ? appConfigResponse.currencies : []);
+          setAppConfigDefaultCurrencyCode(appConfigResponse?.defaultCurrencyCode || "");
           setError("");
         }
       } catch (loadError) {
@@ -72,7 +81,7 @@ export default function ChurchManagementPage() {
       }
     }
 
-    loadChurches();
+    loadPageData();
     return () => {
       active = false;
     };
@@ -81,9 +90,14 @@ export default function ChurchManagementPage() {
   useEffect(() => {
     setForm((current) => ({
       ...current,
-      currencyCode: current.currencyCode || branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+      currencyCode:
+        current.currencyCode ||
+        appConfigDefaultCurrencyCode ||
+        branding.defaultCurrencyCode ||
+        currencyOptions[0]?.code ||
+        "GHS",
     }));
-  }, [branding.defaultCurrencyCode, currencyOptions]);
+  }, [appConfigDefaultCurrencyCode, branding.defaultCurrencyCode, currencyOptions]);
 
   const toggleGrant = (key) => {
     setForm((current) => {
@@ -125,8 +139,24 @@ export default function ChurchManagementPage() {
   const buildPayload = (draft) => ({
     ...draft,
     churchId: normalizeChurchId(draft.churchId || draft.name),
-    currencyCode: draft.currencyCode || branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+    currencyCode:
+      draft.currencyCode ||
+      appConfigDefaultCurrencyCode ||
+      branding.defaultCurrencyCode ||
+      currencyOptions[0]?.code ||
+      "GHS",
   });
+
+  const refreshCurrencyOptions = async () => {
+    try {
+      const appConfig = await churchApi.getFreshAppConfig();
+      setAppConfigCurrencies(Array.isArray(appConfig?.currencies) ? appConfig.currencies : []);
+      setAppConfigDefaultCurrencyCode(appConfig?.defaultCurrencyCode || "");
+      return appConfig;
+    } catch (loadError) {
+      return null;
+    }
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -152,6 +182,7 @@ export default function ChurchManagementPage() {
   };
 
   const openChurchModal = (church, mode = "view") => {
+    refreshCurrencyOptions();
     setSelectedChurch({
       name: church.name || "",
       churchId: church.churchId || "",
@@ -160,7 +191,12 @@ export default function ChurchManagementPage() {
       adminDisplayName: church.createdAdmin?.displayName || "",
       adminUsername: church.createdAdmin?.username || "",
       adminEmail: church.createdAdmin?.email || "",
-      currencyCode: church.currencyCode || branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+      currencyCode:
+        church.currencyCode ||
+        appConfigDefaultCurrencyCode ||
+        branding.defaultCurrencyCode ||
+        currencyOptions[0]?.code ||
+        "GHS",
       enabledNavigation: Array.isArray(church.enabledNavigation) ? church.enabledNavigation : [],
     });
     setDetailMode(mode);
@@ -196,7 +232,24 @@ export default function ChurchManagementPage() {
             <h3>Tenant Churches</h3>
             <p>Each church gets its own database on the same MongoDB cluster, with a seeded default admin and tenant-specific sidebar grants.</p>
           </div>
-          <button type="button" className="primary-button" onClick={() => setShowModal(true)}>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={async () => {
+              const appConfig = await refreshCurrencyOptions();
+              setForm((current) => ({
+                ...current,
+                currencyCode:
+                  current.currencyCode ||
+                  appConfig?.defaultCurrencyCode ||
+                  appConfigDefaultCurrencyCode ||
+                  branding.defaultCurrencyCode ||
+                  currencyOptions[0]?.code ||
+                  "GHS",
+              }));
+              setShowModal(true);
+            }}
+          >
             <FaPlus />
             Add Church
           </button>
@@ -260,7 +313,11 @@ export default function ChurchManagementPage() {
             setShowModal(false);
             setForm({
               ...initialForm,
-              currencyCode: branding.defaultCurrencyCode || currencyOptions[0]?.code || "GHS",
+              currencyCode:
+                appConfigDefaultCurrencyCode ||
+                branding.defaultCurrencyCode ||
+                currencyOptions[0]?.code ||
+                "GHS",
             });
           }}
         >
