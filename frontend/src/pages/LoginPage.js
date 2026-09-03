@@ -33,7 +33,7 @@ export default function LoginPage() {
           <input
             value={form.churchId}
             onChange={(event) => setForm((current) => ({ ...current, churchId: event.target.value }))}
-            placeholder="TENANT ID"
+            placeholder="CHURCH ID"
           />
         </div>
 
