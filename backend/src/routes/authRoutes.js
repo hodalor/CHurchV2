@@ -1,6 +1,7 @@
 const express = require("express");
 const User = require("../models/User");
 const authenticate = require("../middleware/authenticate");
+const { createRateLimiter } = require("../middleware/security");
 const {
   authenticateWithChurchIdUsernameAndPin,
   authenticateWithUsernameAndPin,
@@ -10,8 +11,20 @@ const {
 } = require("../services/authService");
 
 const router = express.Router();
+const loginRateLimiter = createRateLimiter({
+  keyPrefix: "auth-login",
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 8,
+  message: "Too many login attempts. Please wait a few minutes and try again.",
+});
+const refreshRateLimiter = createRateLimiter({
+  keyPrefix: "auth-refresh",
+  windowMs: 5 * 60 * 1000,
+  maxRequests: 20,
+  message: "Too many session refresh attempts. Please sign in again.",
+});
 
-router.post("/login", async (req, res) => {
+router.post("/login", loginRateLimiter, async (req, res) => {
   try {
     const loginPayload = {
       username: req.body.username,
@@ -33,7 +46,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", refreshRateLimiter, async (req, res) => {
   try {
     const result = await refreshUserSession({
       refreshToken: req.body.refreshToken,

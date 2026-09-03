@@ -89,6 +89,7 @@ export default function AppLayout() {
                 <Route path="/finance/pledges" element={<FinancePage section="pledges" key="finance-pledges" />} />
                 <Route path="/finance/expenses" element={<FinancePage section="expenses" key="finance-expenses" />} />
                 <Route path="/finance/budgets" element={<FinancePage section="budgets" key="finance-budgets" />} />
+                <Route path="/finance/reconciliation" element={<FinancePage section="reconciliation" key="finance-reconciliation" />} />
                 <Route path="/finance/reports" element={<FinancePage section="reports" key="finance-reports" />} />
                 <Route path="/care" element={<Navigate to="/care/notes" replace />} />
                 <Route path="/care/notes" element={<PastoralCarePage section="notes" key="care-notes" />} />

@@ -298,27 +298,84 @@ async function listReconciliations({ filters = {} } = {}) {
   return decorateReconciliations(rows);
 }
 
+async function listReconciliationCandidates({ user, filters = {} } = {}) {
+  const reservedTransactionIds = await getReservedTransactionIds();
+  const query = {
+    ...buildDateQuery(filters),
+    status: "posted",
+    isReversal: false,
+    amount: { $gt: 0 },
+  };
+
+  if (filters.method) {
+    query.method = filters.method;
+  }
+
+  if (reservedTransactionIds.size) {
+    query._id = {
+      $nin: [...reservedTransactionIds].map((value) => normalizeObjectIdLike(value)),
+    };
+  }
+
+  const rows = await Transaction.find(query)
+    .populate("memberId", "memberId firstName lastName")
+    .populate("householdId", "familyId familyName")
+    .populate("fundId", "name")
+    .populate("method", "label key")
+    .populate("transactionType", "label key")
+    .populate("recordedBy", "displayName username")
+    .sort({ date: -1, createdAt: -1 });
+
+  return rows.map((row) => sanitizeTransactionForUser(row, user));
+}
+
 async function createReconciliation({ payload, user, ipAddress = "" }) {
   if (!payload.reconciliationDate) {
     throw new Error("Reconciliation date is required.");
   }
-  if (!payload.method) {
-    throw new Error("Collection method is required.");
-  }
   if (!payload.depositAccountId) {
     throw new Error("Deposit account is required.");
   }
-  if (!Number.isFinite(Number(payload.amount || 0)) || Number(payload.amount || 0) <= 0) {
-    throw new Error("Deposit amount is required.");
+  const sourceTransactionIds = Array.isArray(payload.sourceTransactionIds)
+    ? [...new Set(payload.sourceTransactionIds.map((item) => String(item || "").trim()).filter(Boolean))]
+    : [];
+  if (!sourceTransactionIds.length) {
+    throw new Error("Select at least one unreconciled transaction.");
   }
 
+  const reservedTransactionIds = await getReservedTransactionIds();
+  const conflictingTransactionId = sourceTransactionIds.find((transactionId) => reservedTransactionIds.has(transactionId));
+  if (conflictingTransactionId) {
+    throw new Error("One or more selected transactions are already in reconciliation.");
+  }
+
+  const sourceTransactions = await Transaction.find({
+    _id: { $in: sourceTransactionIds.map((item) => normalizeObjectIdLike(item)) },
+    status: "posted",
+    isReversal: false,
+    amount: { $gt: 0 },
+  }).populate("method", "label key");
+
+  if (sourceTransactions.length !== sourceTransactionIds.length) {
+    throw new Error("Only posted transactions that are not already reconciled can be selected.");
+  }
+
+  const amount = sourceTransactions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Selected transactions must add up to a positive amount.");
+  }
+
+  const uniqueMethodIds = [...new Set(sourceTransactions.map((item) => String(item.method?._id || item.method || "")).filter(Boolean))];
+  const uniqueMethodLabels = [...new Set(sourceTransactions.map((item) => item.method?.label || "").filter(Boolean))];
   const reconciliation = await FinanceReconciliation.create({
     reconciliationDate: new Date(payload.reconciliationDate),
     serviceEventRef: String(payload.serviceEventRef || "").trim(),
-    method: payload.method,
-    sourceTransactionIds: Array.isArray(payload.sourceTransactionIds) ? payload.sourceTransactionIds.filter(Boolean) : [],
+    method: uniqueMethodIds.length === 1 ? uniqueMethodIds[0] : null,
+    methodSummary: uniqueMethodLabels.join(", ") || "Mixed",
+    sourceTransactionIds,
     depositAccountId: payload.depositAccountId,
-    amount: Number(payload.amount || 0),
+    amount,
+    selectedTransactionCount: sourceTransactions.length,
     initiatedBy: user?._id,
     notes: String(payload.notes || "").trim(),
   });
@@ -340,6 +397,9 @@ async function approveReconciliation({ reconciliationId, user, ipAddress = "", a
   const reconciliation = await FinanceReconciliation.findById(reconciliationId);
   if (!reconciliation) {
     throw new Error("Reconciliation not found.");
+  }
+  if (reconciliation.status !== "pending") {
+    throw new Error("Only pending reconciliations can be approved.");
   }
   if (!canApproveExpense(user, reconciliation.amount)) {
     throw new Error("You are not allowed to approve this reconciliation.");
@@ -905,8 +965,24 @@ async function decorateReconciliations(reconciliations = []) {
     return {
       ...plain,
       depositAccount: accountMap.get(String(plain.depositAccountId || "")) || null,
+      selectedTransactionCount:
+        Number(plain.selectedTransactionCount || 0) || (Array.isArray(plain.sourceTransactionIds) ? plain.sourceTransactionIds.length : 0),
+      methodSummary: plain.method?.label || plain.methodSummary || "Mixed",
     };
   });
+}
+
+async function getReservedTransactionIds() {
+  const reconciliations = await FinanceReconciliation.find(
+    { status: { $in: ["pending", "approved"] } },
+    { sourceTransactionIds: 1 }
+  ).lean();
+
+  return new Set(
+    reconciliations.flatMap((item) =>
+      Array.isArray(item.sourceTransactionIds) ? item.sourceTransactionIds.map((value) => String(value)) : []
+    )
+  );
 }
 
 function normalizeObjectIdLike(value) {
@@ -983,6 +1059,7 @@ module.exports = {
   listExpenses,
   listFunds,
   listPledges,
+  listReconciliationCandidates,
   listReconciliations,
   listTransactions,
   payExpense,

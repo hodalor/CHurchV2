@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const { login, authError, setAuthError } = useAuth();
-  const [form, setForm] = useState({ churchId: "master", username: "superadmin", pin: "0903" });
+  const [form, setForm] = useState({ churchId: "", username: "", pin: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (event) => {
@@ -29,33 +29,30 @@ export default function LoginPage() {
           We are using the new session flow now, so visitor records, audit logs, and admin lookups stay protected.
         </p> */}
 
-        <label>
-          Church ID
+        <div className="login-field">
           <input
             value={form.churchId}
             onChange={(event) => setForm((current) => ({ ...current, churchId: event.target.value }))}
-            placeholder="master or tenant church ID"
+            placeholder="TENANT ID"
           />
-        </label>
+        </div>
 
-        <label>
-          Username
+        <div className="login-field">
           <input
             value={form.username}
             onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-            placeholder="superadmin or tenant admin"
+            placeholder="USERNAME"
           />
-        </label>
+        </div>
 
-        <label>
-          PIN
+        <div className="login-field">
           <input
             type="password"
             value={form.pin}
             onChange={(event) => setForm((current) => ({ ...current, pin: event.target.value }))}
             placeholder="PIN"
           />
-        </label>
+        </div>
 
         {authError ? <div className="form-error">{authError}</div> : null}
 

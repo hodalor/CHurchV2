@@ -408,6 +408,12 @@
   overflow: hidden;
 }
 
+.compact-stat-card.small {
+  min-height: 76px;
+  padding: 14px 16px 12px;
+  border-radius: 18px;
+}
+
 .compact-stat-card::before {
   content: "";
   position: absolute;
@@ -459,6 +465,15 @@
   margin-top: 12px;
   font-size: 23px;
   font-weight: 800;
+}
+
+.compact-stat-card.small .compact-stat-label {
+  font-size: 11px;
+}
+
+.compact-stat-card.small .compact-stat-value {
+  margin-top: 8px;
+  font-size: 18px;
 }
 
 .section-value {
@@ -623,6 +638,10 @@
   gap: 8px;
   color: #425f82;
   font-weight: 700;
+}
+
+.login-field {
+  display: grid;
 }
 
 .login-button {

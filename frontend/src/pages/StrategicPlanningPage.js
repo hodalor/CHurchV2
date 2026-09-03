@@ -402,13 +402,6 @@ export default function StrategicPlanningPage({ section = "plans" }) {
     <div className="page-grid">
       {state.error ? <div className="form-error">{state.error}</div> : null}
 
-      <section className="compact-stats-grid">
-        <StatCard color="purple" label="Plans" value={state.plans.length} />
-        <StatCard color="blue" label="Objectives" value={state.objectives.length} />
-        <StatCard color="orange" label="KPIs" value={state.kpis.length} />
-        <StatCard color="pink" label="Actuals" value={state.actuals.length} />
-      </section>
-
       {activeSection === "scorecards" ? (
         <AiAssistGeneratorCard
           title="AI Strategic Commentary"
@@ -505,9 +498,10 @@ export default function StrategicPlanningPage({ section = "plans" }) {
                   </div>
                 </div>
                 <div className="compact-stats-grid">
-                  <StatCard color="purple" label="Pillars" value={planPillars.length} />
-                  <StatCard color="blue" label="Objectives" value={planObjectives.length} />
-                  <StatCard color="orange" label="Initiatives" value={planInitiatives.length} />
+                  <StatCard color="purple" label="Pillars" value={planPillars.length} compact />
+                  <StatCard color="blue" label="Objectives" value={planObjectives.length} compact />
+                  <StatCard color="orange" label="Initiatives" value={planInitiatives.length} compact />
+                  <StatCard color="pink" label="Status" value={activePlan.status?.label || "No status"} compact />
                 </div>
               </section>
 
@@ -1164,9 +1158,9 @@ function DeleteButton({ onClick }) {
   );
 }
 
-function StatCard({ color, label, value }) {
+function StatCard({ color, label, value, compact = false }) {
   return (
-    <article className={`compact-stat-card ${color}`}>
+    <article className={`compact-stat-card ${compact ? "small " : ""}${color}`.trim()}>
       <div className="compact-stat-label">{label}</div>
       <div className="compact-stat-value">{value}</div>
     </article>

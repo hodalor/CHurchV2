@@ -36,6 +36,10 @@ function canUseSessionStorage() {
   return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
 }
 
+function canUseLocalStorage() {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
 function syncResponseCacheToStorage() {
   if (!canUseSessionStorage()) {
     return;
@@ -84,16 +88,23 @@ function buildNetworkError(error) {
 }
 
 function getStoredSession() {
-  const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  const storage = canUseSessionStorage() ? window.sessionStorage : canUseLocalStorage() ? window.localStorage : null;
+  const raw = storage?.getItem(SESSION_STORAGE_KEY);
   return raw ? JSON.parse(raw) : null;
 }
 
 function storeSession(session) {
-  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  const storage = canUseSessionStorage() ? window.sessionStorage : canUseLocalStorage() ? window.localStorage : null;
+  storage?.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 }
 
 function clearStoredSession() {
-  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  if (canUseSessionStorage()) {
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  }
+  if (canUseLocalStorage()) {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  }
 }
 
 function clonePayload(payload) {
@@ -504,6 +515,11 @@ export const churchApi = {
   async getReconciliations(params = {}) {
     const search = new URLSearchParams(params).toString();
     return request(`/finance/reconciliations${search ? `?${search}` : ""}`);
+  },
+
+  async getReconciliationCandidates(params = {}) {
+    const search = new URLSearchParams(params).toString();
+    return request(`/finance/reconciliations/candidates${search ? `?${search}` : ""}`, { skipCache: true });
   },
 
   async createReconciliation(payload) {

@@ -2818,6 +2818,7 @@ function buildPermissionCatalog() {
         { key: "void_finance", label: "Void Finance" },
         { key: "approve_finance_expenses", label: "Approve Expenses" },
         { key: "approve_finance_high_value_expenses", label: "Approve High-Value Expenses" },
+        { key: "approve_finance_reconciliations", label: "Approve Reconciliations" },
       ],
     },
     {

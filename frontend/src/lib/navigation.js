@@ -52,6 +52,7 @@ export const navigationSections = [
     { key: "finance.pledges", label: "Pledges", path: "/finance/pledges" },
     { key: "finance.expenses", label: "Expenses", path: "/finance/expenses" },
     { key: "finance.budgets", label: "Budgets", path: "/finance/budgets" },
+    { key: "finance.reconciliation", label: "Reconciliation", path: "/finance/reconciliation" },
     { key: "finance.reports", label: "Reports", path: "/finance/reports" },
   ], permission: "view_finance" },
   { key: "care", label: "Pastoral Care", path: "/care", icon: FaHeartbeat, children: [

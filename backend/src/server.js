@@ -6,6 +6,7 @@ const express = require("express");
 const cors = require("cors");
 const connectDatabase = require("./config/db");
 const attachRequestScope = require("./middleware/attachRequestScope");
+const { applySecurityHeaders } = require("./middleware/security");
 const { runWithRequestContext } = require("./lib/requestContext");
 const { bootstrapApplicationData } = require("./seed/bootstrap");
 const auditRoutes = require("./routes/auditRoutes");
@@ -36,6 +37,8 @@ const visitorRoutes = require("./routes/visitorRoutes");
 const app = express();
 const PORT = process.env.PORT || 5100;
 
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
 app.use(
   cors({
     origin(origin, callback) {
@@ -49,6 +52,7 @@ app.use(
     },
   })
 );
+app.use(applySecurityHeaders);
 app.use(express.json({ limit: "10mb" }));
 app.use((req, res, next) =>
   runWithRequestContext(

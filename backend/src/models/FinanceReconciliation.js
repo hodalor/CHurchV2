@@ -15,7 +15,12 @@ const financeReconciliationSchema = new mongoose.Schema(
     method: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "LookupValue",
-      required: true,
+      default: null,
+    },
+    methodSummary: {
+      type: String,
+      trim: true,
+      default: "",
     },
     sourceTransactionIds: {
       type: [
@@ -33,6 +38,10 @@ const financeReconciliationSchema = new mongoose.Schema(
     amount: {
       type: Number,
       required: true,
+    },
+    selectedTransactionCount: {
+      type: Number,
+      default: 0,
     },
     initiatedBy: {
       type: mongoose.Schema.Types.ObjectId,

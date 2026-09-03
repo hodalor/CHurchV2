@@ -19,6 +19,7 @@ const {
   listExpenses,
   listFunds,
   listPledges,
+  listReconciliationCandidates,
   listReconciliations,
   listTransactions,
   payExpense,
@@ -217,6 +218,14 @@ router.get("/reconciliations", authorizePermissions(PERMISSIONS.VIEW_FINANCE), a
   }
 });
 
+router.get("/reconciliations/candidates", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
+  try {
+    res.json(await listReconciliationCandidates({ user: req.user, filters: req.query }));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post("/reconciliations", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     res.status(201).json(await createReconciliation({ payload: req.body, user: req.user, ipAddress: req.ip }));
@@ -225,7 +234,10 @@ router.post("/reconciliations", authorizePermissions(PERMISSIONS.MANAGE_FINANCE)
   }
 });
 
-router.post("/reconciliations/:reconciliationId/approve", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
+router.post(
+  "/reconciliations/:reconciliationId/approve",
+  authorizePermissions(PERMISSIONS.APPROVE_FINANCE_RECONCILIATIONS),
+  async (req, res) => {
   try {
     res.json(
       await approveReconciliation({

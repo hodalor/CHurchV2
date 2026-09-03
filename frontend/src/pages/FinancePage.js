@@ -54,11 +54,9 @@ const emptyBudgetForm = {
 
 const emptyReconciliationForm = {
   reconciliationDate: new Date().toISOString().slice(0, 10),
-  serviceEventRef: "",
-  method: "",
   depositAccountId: "",
-  amount: "",
   notes: "",
+  sourceTransactionIds: [],
 };
 
 const createBatchLine = () => ({
@@ -109,6 +107,7 @@ export default function FinancePage({ section = "overview" }) {
   const cachedFinanceState = useMemo(() => getCachedFinanceState(), []);
   const canManageFinance = authUser?.permissions?.includes("manage_finance");
   const canReviewAi = authUser?.permissions?.includes("review_ai_assist");
+  const canApproveReconciliations = authUser?.permissions?.includes("approve_finance_reconciliations");
 
   const [overview, setOverview] = useState(cachedFinanceState?.overview || null);
   const [funds, setFunds] = useState(cachedFinanceState?.funds || []);
@@ -136,6 +135,10 @@ export default function FinancePage({ section = "overview" }) {
   const [pledgeForm, setPledgeForm] = useState(emptyPledgeForm);
   const [budgetForm, setBudgetForm] = useState(emptyBudgetForm);
   const [reconciliationForm, setReconciliationForm] = useState(emptyReconciliationForm);
+  const [reconciliationCandidates, setReconciliationCandidates] = useState([]);
+  const [reconciliationCandidateSearch, setReconciliationCandidateSearch] = useState("");
+  const [reconciliationCandidateLoading, setReconciliationCandidateLoading] = useState(false);
+  const [reconciliationTab, setReconciliationTab] = useState("submissions");
   const [batchForm, setBatchForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     serviceEventRef: "",
@@ -227,7 +230,6 @@ export default function FinancePage({ section = "overview" }) {
     }
     if (options.transactionMethods.length && !transactionForm.method) {
       setTransactionForm((current) => ({ ...current, method: options.transactionMethods[0]._id }));
-      setReconciliationForm((current) => ({ ...current, method: current.method || options.transactionMethods[0]._id }));
       setBatchForm((current) => ({
         ...current,
         lineItems: current.lineItems.map((item) => ({ ...item, method: item.method || options.transactionMethods[0]._id })),
@@ -311,6 +313,66 @@ export default function FinancePage({ section = "overview" }) {
     const accountId = reconciliationForm.depositAccountId;
     return overview?.accountSnapshot?.find((item) => item._id === accountId)?.balance ?? null;
   }, [overview, reconciliationForm.depositAccountId]);
+
+  const filteredReconciliations = useMemo(
+    () =>
+      reconciliations.filter((item) =>
+        [
+          item.depositAccount?.name,
+          item.methodSummary,
+          item.notes,
+          item.initiatedBy?.displayName,
+          item.initiatedBy?.username,
+          item.approvedBy?.displayName,
+          item.approvedBy?.username,
+          item.status,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      ),
+    [reconciliations, search]
+  );
+
+  const reconciliationPendingRows = useMemo(
+    () => filteredReconciliations.filter((item) => item.status === "pending"),
+    [filteredReconciliations]
+  );
+
+  const reconciliationApprovedRows = useMemo(
+    () => filteredReconciliations.filter((item) => item.status === "approved"),
+    [filteredReconciliations]
+  );
+
+  const filteredReconciliationCandidates = useMemo(
+    () =>
+      reconciliationCandidates.filter((item) =>
+        [
+          item.receiptNumber,
+          item.method?.label,
+          item.fundId?.name,
+          item.memberId ? `${item.memberId.firstName} ${item.memberId.lastName}` : "",
+          item.householdId?.familyName,
+          item.notes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(reconciliationCandidateSearch.toLowerCase())
+      ),
+    [reconciliationCandidateSearch, reconciliationCandidates]
+  );
+
+  const selectedReconciliationTransactions = useMemo(() => {
+    const selectedIds = new Set(reconciliationForm.sourceTransactionIds || []);
+    return reconciliationCandidates.filter((item) => selectedIds.has(String(item._id)));
+  }, [reconciliationCandidates, reconciliationForm.sourceTransactionIds]);
+
+  const reconciliationSelectionTotal = useMemo(
+    () => selectedReconciliationTransactions.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    [selectedReconciliationTransactions]
+  );
 
   async function refreshCollections() {
     const [overviewResponse, transactionsResponse, pledgesResponse, expensesResponse, budgetsResponse, reconciliationsResponse] = await Promise.all([
@@ -405,11 +467,54 @@ export default function FinancePage({ section = "overview" }) {
     }
   }
 
+  async function loadReconciliationCandidates() {
+    try {
+      setReconciliationCandidateLoading(true);
+      const rows = await churchApi.getReconciliationCandidates();
+      setReconciliationCandidates(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      notifyError(error.message || "Unable to load unreconciled transactions.");
+    } finally {
+      setReconciliationCandidateLoading(false);
+    }
+  }
+
+  async function openReconciliationModal() {
+    setReconciliationCandidateSearch("");
+    setReconciliationForm((current) => ({
+      ...emptyReconciliationForm,
+      reconciliationDate: current.reconciliationDate || emptyReconciliationForm.reconciliationDate,
+      depositAccountId: current.depositAccountId || options.depositAccounts[0]?._id || "",
+    }));
+    setActiveModal("reconciliation");
+    await loadReconciliationCandidates();
+  }
+
+  function toggleReconciliationTransaction(transactionId) {
+    setReconciliationForm((current) => {
+      const normalizedId = String(transactionId);
+      const currentIds = Array.isArray(current.sourceTransactionIds) ? current.sourceTransactionIds : [];
+      const exists = currentIds.includes(normalizedId);
+      return {
+        ...current,
+        sourceTransactionIds: exists
+          ? currentIds.filter((item) => item !== normalizedId)
+          : [...currentIds, normalizedId],
+      };
+    });
+  }
+
   async function handleReconciliationSubmit(event) {
     event.preventDefault();
     try {
-      await churchApi.createReconciliation(normalizeBlankObject(reconciliationForm));
+      await churchApi.createReconciliation({
+        reconciliationDate: reconciliationForm.reconciliationDate || null,
+        depositAccountId: reconciliationForm.depositAccountId || null,
+        notes: reconciliationForm.notes || "",
+        sourceTransactionIds: reconciliationForm.sourceTransactionIds || [],
+      });
       setReconciliationForm(emptyReconciliationForm);
+      setReconciliationCandidates([]);
       setActiveModal("");
       await refreshCollections();
       notifySuccess("Reconciliation submitted for approval.");
@@ -519,12 +624,16 @@ export default function FinancePage({ section = "overview" }) {
         </article>
       </section>
 
-      {(activeSection === "transactions" || activeSection === "expenses") ? (
+      {(activeSection === "transactions" || activeSection === "expenses" || activeSection === "reconciliation") ? (
         <section className="surface-card data-card">
           <div className="toolbar-row inline-toolbar">
             <div className="search-field">
               <FaSearch />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search finance data" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={activeSection === "reconciliation" ? "Search reconciliations" : "Search finance data"}
+              />
             </div>
           </div>
         </section>
@@ -537,7 +646,7 @@ export default function FinancePage({ section = "overview" }) {
               <h3>Account Balances</h3>
               <div className="toolbar-actions">
                 {canManageFinance ? (
-                  <button type="button" className="primary-button" onClick={() => setActiveModal("reconciliation")}>
+                  <button type="button" className="primary-button" onClick={() => openReconciliationModal()}>
                     <FaPlus />
                     Add Reconciliation
                   </button>
@@ -585,20 +694,20 @@ export default function FinancePage({ section = "overview" }) {
                     <th>Initiator</th>
                     <th>Approver</th>
                     <th>Status</th>
-                    {canManageFinance ? <th>Action</th> : null}
+                    {canApproveReconciliations ? <th>Action</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {reconciliations.map((item) => (
                     <tr key={item._id}>
                       <td>{formatDate(item.reconciliationDate)}</td>
-                      <td>{item.method?.label || "-"}</td>
+                      <td>{item.methodSummary || item.method?.label || "-"}</td>
                       <td>{item.depositAccount?.name || "-"}</td>
                       <td>{formatCurrency(item.amount)}</td>
                       <td>{item.initiatedBy?.displayName || item.initiatedBy?.username || "-"}</td>
                       <td>{item.approvedBy?.displayName || item.approvedBy?.username || "-"}</td>
                       <td><span className={`status-pill ${item.status}`}>{item.status}</span></td>
-                      {canManageFinance ? (
+                      {canApproveReconciliations ? (
                         <td>{item.status === "pending" ? <button type="button" className="ghost-button small" onClick={() => handleApproveReconciliation(item._id)}>Approve</button> : "-"}</td>
                       ) : null}
                     </tr>
@@ -801,6 +910,119 @@ export default function FinancePage({ section = "overview" }) {
             </table>
           </div>
         </section>
+      ) : null}
+
+      {activeSection === "reconciliation" ? (
+        <>
+          <section className="surface-card data-card">
+            <div className="toolbar-row">
+              <div>
+                <h3>Reconciliation</h3>
+                <p>Select posted transactions that are still unreconciled, submit them to an account, and approve them separately.</p>
+              </div>
+              <div className="toolbar-actions">
+                <div className="cell-scroll-row">
+                  <button
+                    type="button"
+                    className={reconciliationTab === "submissions" ? "primary-button small" : "ghost-button small"}
+                    onClick={() => setReconciliationTab("submissions")}
+                  >
+                    Submissions
+                  </button>
+                  {canApproveReconciliations ? (
+                    <button
+                      type="button"
+                      className={reconciliationTab === "approvals" ? "primary-button small" : "ghost-button small"}
+                      onClick={() => setReconciliationTab("approvals")}
+                    >
+                      Approvals
+                    </button>
+                  ) : null}
+                </div>
+                {canManageFinance ? (
+                  <button type="button" className="primary-button" onClick={() => openReconciliationModal()}>
+                    <FaPlus />
+                    Add Reconciliation
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className="compact-stats-grid">
+            <article className="compact-stat-card small purple">
+              <div className="compact-stat-label">Awaiting Approval</div>
+              <div className="compact-stat-value">{formatCurrency(reconciliationPendingRows.reduce((sum, item) => sum + Number(item.amount || 0), 0))}</div>
+            </article>
+            <article className="compact-stat-card small blue">
+              <div className="compact-stat-label">Pending Batches</div>
+              <div className="compact-stat-value">{reconciliationPendingRows.length}</div>
+            </article>
+            <article className="compact-stat-card small orange">
+              <div className="compact-stat-label">Approved Batches</div>
+              <div className="compact-stat-value">{reconciliationApprovedRows.length}</div>
+            </article>
+            <article className="compact-stat-card small pink">
+              <div className="compact-stat-label">Approved Total</div>
+              <div className="compact-stat-value">{formatCurrency(reconciliationApprovedRows.reduce((sum, item) => sum + Number(item.amount || 0), 0))}</div>
+            </article>
+          </section>
+
+          <section className="surface-card data-card">
+            <div className="toolbar-row">
+              <h3>{reconciliationTab === "approvals" ? "Reconciliation Approvals" : "Submitted Reconciliations"}</h3>
+            </div>
+            <div className="table-accent-bar" />
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Transactions</th>
+                    <th>Methods</th>
+                    <th>Account</th>
+                    <th>Amount</th>
+                    <th>Initiator</th>
+                    <th>Approver</th>
+                    <th>Status</th>
+                    {reconciliationTab === "approvals" && canApproveReconciliations ? <th>Action</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(reconciliationTab === "approvals" ? reconciliationPendingRows : filteredReconciliations).length ? (
+                    (reconciliationTab === "approvals" ? reconciliationPendingRows : filteredReconciliations).map((item) => (
+                      <tr key={item._id}>
+                        <td>{formatDate(item.reconciliationDate)}</td>
+                        <td>{item.selectedTransactionCount || item.sourceTransactionIds?.length || 0}</td>
+                        <td>{item.methodSummary || item.method?.label || "-"}</td>
+                        <td>{item.depositAccount?.name || "-"}</td>
+                        <td>{formatCurrency(item.amount)}</td>
+                        <td>{item.initiatedBy?.displayName || item.initiatedBy?.username || "-"}</td>
+                        <td>{item.approvedBy?.displayName || item.approvedBy?.username || "-"}</td>
+                        <td><span className={`status-pill ${item.status}`}>{item.status}</span></td>
+                        {reconciliationTab === "approvals" && canApproveReconciliations ? (
+                          <td>
+                            <button type="button" className="ghost-button small" onClick={() => handleApproveReconciliation(item._id)}>
+                              Approve
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={reconciliationTab === "approvals" && canApproveReconciliations ? 9 : 8} className="empty-table">
+                        {reconciliationTab === "approvals"
+                          ? "No pending reconciliations are waiting for approval."
+                          : "No reconciliations match the current search."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
       ) : null}
 
       {activeSection === "reports" ? (
@@ -1083,22 +1305,21 @@ export default function FinancePage({ section = "overview" }) {
       ) : null}
 
       {activeModal === "reconciliation" ? (
-        <ModalShell title="Reconciliation" subtitle="Submit the deposit that needs to be approved against a church account." onClose={() => setActiveModal("")}>
+        <ModalShell
+          title="Add Reconciliation"
+          subtitle="Only posted transactions that are not already pending or approved for reconciliation are available here."
+          onClose={() => {
+            setActiveModal("");
+            setReconciliationCandidates([]);
+            setReconciliationCandidateSearch("");
+            setReconciliationForm(emptyReconciliationForm);
+          }}
+        >
           <form className="modal-form" onSubmit={handleReconciliationSubmit}>
             <div className="form-grid">
               <label>
                 Reconciliation Date
                 <input type="date" value={reconciliationForm.reconciliationDate} onChange={(event) => setReconciliationForm((current) => ({ ...current, reconciliationDate: event.target.value }))} />
-              </label>
-              <label>
-                Service / Event Ref
-                <input value={reconciliationForm.serviceEventRef} onChange={(event) => setReconciliationForm((current) => ({ ...current, serviceEventRef: event.target.value }))} />
-              </label>
-              <label>
-                Collection Method
-                <select value={reconciliationForm.method} onChange={(event) => setReconciliationForm((current) => ({ ...current, method: event.target.value }))}>
-                  {options.transactionMethods.map((item) => <option key={item._id} value={item._id}>{item.label}</option>)}
-                </select>
               </label>
               <label>
                 Deposit Account
@@ -1110,18 +1331,96 @@ export default function FinancePage({ section = "overview" }) {
                 Current Account Balance
                 <input value={selectedReconciliationAccountBalance == null ? "Select account" : formatCurrency(selectedReconciliationAccountBalance)} readOnly />
               </label>
-              <label>
-                Amount
-                <input value={reconciliationForm.amount} onChange={(event) => setReconciliationForm((current) => ({ ...current, amount: event.target.value }))} />
-              </label>
               <label className="full-width">
                 Notes
                 <textarea rows={3} value={reconciliationForm.notes} onChange={(event) => setReconciliationForm((current) => ({ ...current, notes: event.target.value }))} />
               </label>
             </div>
+            <div className="surface-card info-tile">
+              <div className="toolbar-row inline-toolbar">
+                <div className="search-field">
+                  <FaSearch />
+                  <input
+                    value={reconciliationCandidateSearch}
+                    onChange={(event) => setReconciliationCandidateSearch(event.target.value)}
+                    placeholder="Search unreconciled transactions"
+                  />
+                </div>
+              </div>
+              <div className="compact-stats-grid">
+                <article className="compact-stat-card small blue">
+                  <div className="compact-stat-label">Available</div>
+                  <div className="compact-stat-value">{filteredReconciliationCandidates.length}</div>
+                </article>
+                <article className="compact-stat-card small purple">
+                  <div className="compact-stat-label">Selected</div>
+                  <div className="compact-stat-value">{selectedReconciliationTransactions.length}</div>
+                </article>
+                <article className="compact-stat-card small orange">
+                  <div className="compact-stat-label">Selected Amount</div>
+                  <div className="compact-stat-value">{formatCurrency(reconciliationSelectionTotal)}</div>
+                </article>
+              </div>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Select</th>
+                      <th>Date</th>
+                      <th>Receipt</th>
+                      <th>Method</th>
+                      <th>Fund</th>
+                      <th>Giver</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reconciliationCandidateLoading ? (
+                      <tr>
+                        <td colSpan={7} className="empty-table">Loading unreconciled transactions...</td>
+                      </tr>
+                    ) : filteredReconciliationCandidates.length ? (
+                      filteredReconciliationCandidates.map((item) => {
+                        const isSelected = (reconciliationForm.sourceTransactionIds || []).includes(String(item._id));
+                        return (
+                          <tr key={item._id}>
+                            <td>
+                              <input type="checkbox" checked={isSelected} onChange={() => toggleReconciliationTransaction(item._id)} />
+                            </td>
+                            <td>{formatDate(item.date)}</td>
+                            <td>{item.receiptNumber}</td>
+                            <td>{item.method?.label || "-"}</td>
+                            <td>{item.fundId?.name || "-"}</td>
+                            <td>{item.memberId ? `${item.memberId.firstName} ${item.memberId.lastName}` : item.householdId?.familyName || "Anonymous"}</td>
+                            <td>{formatCurrency(item.amount)}</td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="empty-table">No unreconciled transactions are available for selection.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
             <div className="modal-actions">
-              <button type="button" className="ghost-button" onClick={() => setActiveModal("")}>Cancel</button>
-              <button type="submit" className="primary-button">Submit Reconciliation</button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => {
+                  setActiveModal("");
+                  setReconciliationCandidates([]);
+                  setReconciliationCandidateSearch("");
+                  setReconciliationForm(emptyReconciliationForm);
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={!reconciliationForm.sourceTransactionIds?.length}>
+                Submit Reconciliation
+              </button>
             </div>
           </form>
         </ModalShell>
