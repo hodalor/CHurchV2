@@ -308,14 +308,9 @@ async function previewMembers(rows) {
       errors,
       warnings,
       duplicates: duplicatePreview,
-      preview: {
-        firstName: row.firstName || "",
-        lastName: row.lastName || "",
-        phone: row.phone || "",
-        membershipStatus: row.membershipStatus || "",
-        ministryName: row.ministryName || "",
+      preview: buildImportPreview(row, {
         groupNames: requestedGroups.join(", "),
-      },
+      }),
       row,
     };
   }));
@@ -350,11 +345,7 @@ async function previewHouseholds(rows) {
       rowNumber: row.__rowNumber,
       valid: !errors.length,
       errors,
-      preview: {
-        familyName: row.familyName || "",
-        physicalAddress: row.physicalAddress || "",
-        headOfHouseholdMemberId: row.headOfHouseholdMemberId || "",
-      },
+      preview: buildImportPreview(row),
       row,
     };
   });
@@ -401,11 +392,9 @@ async function previewMinistryMembers(rows) {
       rowNumber: row.__rowNumber,
       valid: !errors.length,
       errors,
-      preview: {
-        ministryName: row.ministryName || "",
-        memberId: row.memberId || "",
+      preview: buildImportPreview(row, {
         assignmentType: row.assignmentType || "member",
-      },
+      }),
       row,
     };
   });
@@ -659,6 +648,18 @@ function requireFields(row, fieldNames, errors) {
       errors.push(`${fieldName} is required.`);
     }
   });
+}
+
+function buildImportPreview(row, overrides = {}) {
+  return Object.entries({
+    ...Object.fromEntries(
+      Object.entries(row || {}).filter(([key]) => key !== "__rowNumber")
+    ),
+    ...overrides,
+  }).reduce((accumulator, [key, value]) => {
+    accumulator[key] = value ?? "";
+    return accumulator;
+  }, {});
 }
 
 function validateIsoDateField(row, fieldName, errors) {

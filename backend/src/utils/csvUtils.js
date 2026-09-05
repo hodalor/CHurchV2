@@ -83,8 +83,8 @@ function normalizeCsvHeader(value = "") {
 function parseSpreadsheet(buffer) {
   const workbook = XLSX.read(buffer, {
     type: "buffer",
-    raw: false,
-    cellDates: false,
+    raw: true,
+    cellDates: true,
   });
   const firstSheetName = workbook.SheetNames[0];
   if (!firstSheetName) {
@@ -94,7 +94,7 @@ function parseSpreadsheet(buffer) {
   const sheet = workbook.Sheets[firstSheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
-    raw: false,
+    raw: true,
     defval: "",
     blankrows: false,
   });
@@ -117,7 +117,7 @@ function rowsToRecords(rows = []) {
         if (!header) {
           return;
         }
-        record[header] = String(values[columnIndex] || "").trim();
+        record[header] = normalizeImportCellValue(values[columnIndex]);
       });
       return record;
     });
@@ -136,6 +136,18 @@ function parseImportFile(buffer, { originalName = "", mimeType = "" } = {}) {
   }
 
   throw new Error("Use a CSV, XLSX, or XLS file for import.");
+}
+
+function normalizeImportCellValue(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return [
+      value.getFullYear(),
+      String(value.getMonth() + 1).padStart(2, "0"),
+      String(value.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
+  return String(value || "").trim();
 }
 
 module.exports = {
