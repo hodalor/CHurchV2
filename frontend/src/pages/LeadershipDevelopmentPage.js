@@ -3,6 +3,7 @@ import { churchApi } from "../apis/churchApi";
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
+import { formatDateDisplay } from "../utils/dateUtils";
 
 function getCachedLeadershipState() {
   const roles = churchApi.peekCached("/leadership/roles");
@@ -804,5 +805,5 @@ function formatDate(value) {
     return "-";
   }
 
-  return new Date(value).toLocaleDateString();
+  return formatDateDisplay(value);
 }

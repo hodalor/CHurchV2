@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatDateDisplay } from "./dateUtils";
 
 function isCompositeCell(value) {
   return Boolean(value && typeof value === "object" && ("primary" in value || "secondary" in value));
@@ -149,7 +150,7 @@ export async function exportRowsToPdf({
     unit: "pt",
     format: "a4",
   });
-  const generatedAt = new Date().toLocaleString();
+  const generatedAt = formatDateDisplay(new Date());
   const logoDataUrl = await loadImageAsDataUrl(branding?.appLogoUrl);
   const pageWidth = doc.internal.pageSize.getWidth();
   let summaryY = 154;

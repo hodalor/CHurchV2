@@ -3,6 +3,7 @@ import { FaPlus } from "react-icons/fa";
 import ModalShell from "../components/common/ModalShell";
 import { churchApi } from "../apis/churchApi";
 import { useAppContext } from "../context/AppContext";
+import { formatDateTimeDisplay } from "../utils/dateUtils";
 
 const emptyCaseForm = {
   memberId: "",
@@ -580,5 +581,5 @@ function normalizeBlankObject(payload) {
 }
 
 function formatDateTime(value) {
-  return value ? new Date(value).toLocaleString() : "-";
+  return value ? formatDateTimeDisplay(value) : "-";
 }

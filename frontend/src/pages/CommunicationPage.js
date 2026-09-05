@@ -3,6 +3,7 @@ import { churchApi } from "../apis/churchApi";
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
+import { formatDateTimeDisplay } from "../utils/dateUtils";
 
 function getCachedCommunicationState() {
   const groups = churchApi.peekCached("/communication/groups");
@@ -669,5 +670,5 @@ function formatDateTime(value) {
     return "-";
   }
 
-  return new Date(value).toLocaleString();
+  return formatDateTimeDisplay(value);
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useAppContext } from "../../context/AppContext";
 import MemberLookupField from "../common/MemberLookupField";
+import { formatDateDisplay } from "../../utils/dateUtils";
 
 const VISITOR_PERMISSIONS = {
   manage: "manage_visitors",
@@ -395,7 +396,7 @@ function formatDate(value) {
     return "";
   }
 
-  return new Date(value).toLocaleDateString();
+  return formatDateDisplay(value);
 }
 
 function getToday() {

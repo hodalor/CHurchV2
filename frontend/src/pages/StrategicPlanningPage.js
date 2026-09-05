@@ -4,6 +4,7 @@ import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import ExportOptionsModal from "../components/common/ExportOptionsModal";
 import ModalShell from "../components/common/ModalShell";
 import { useAppContext } from "../context/AppContext";
+import { formatDateDisplay } from "../utils/dateUtils";
 
 function getCachedStrategicState() {
   const plans = churchApi.peekCached("/strategic/plans");
@@ -1210,7 +1211,7 @@ function formatDate(value) {
     return "-";
   }
 
-  return new Date(value).toLocaleDateString();
+  return formatDateDisplay(value);
 }
 
 function sanitizeFileName(value) {

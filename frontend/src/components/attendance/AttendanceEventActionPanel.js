@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AttendanceParticipantLookupField from "./AttendanceParticipantLookupField";
 import { useAppContext } from "../../context/AppContext";
+import { formatDateTimeDisplay } from "../../utils/dateUtils";
 
 function getDefaultManualMode(options) {
   return options.find((item) => item.key === "manual")?._id || "";
@@ -507,5 +508,5 @@ function formatTimestamp(value) {
     return "-";
   }
 
-  return new Date(value).toLocaleString();
+  return formatDateTimeDisplay(value);
 }

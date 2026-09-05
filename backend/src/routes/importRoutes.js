@@ -262,6 +262,10 @@ async function previewMembers(rows) {
     const errors = [];
     const warnings = [];
     requireFields(row, ["firstName", "lastName", "gender", "phone", "residentialArea", "membershipStatus"], errors);
+    validateIsoDateField(row, "dateOfBirth", errors);
+    validateIsoDateField(row, "membershipDate", errors);
+    validateIsoDateField(row, "dateJoined", errors);
+    validateIsoDateField(row, "baptismDate", errors);
 
     if (row.ministryName && !ministryNames.has(row.ministryName.toLowerCase())) {
       errors.push(`Ministry \"${row.ministryName}\" was not found.`);
@@ -323,6 +327,7 @@ async function previewHouseholds(rows) {
   const previewRows = rows.map((row) => {
     const errors = [];
     requireFields(row, ["familyName", "physicalAddress"], errors);
+    validateIsoDateField(row, "dateLastVisited", errors);
 
     [
       row.primaryContactMemberId,
@@ -436,7 +441,7 @@ async function commitMembers(rows, user, ipAddress) {
       memberType: row.memberType || "Adult",
       gender: row.gender || "Male",
       maritalStatus: row.maritalStatus || "",
-      dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth) : null,
+      dateOfBirth: parseIsoDateValue(row.dateOfBirth),
       phone: row.phone,
       email: row.email || "",
       residentialArea: row.residentialArea,
@@ -447,10 +452,10 @@ async function commitMembers(rows, user, ipAddress) {
       employerOrBusiness: row.employerOrBusiness || "",
       educationOrSkills: row.educationOrSkills || "",
       membershipStatus: row.membershipStatus,
-      membershipDate: row.membershipDate ? new Date(row.membershipDate) : null,
-      dateJoined: row.dateJoined ? new Date(row.dateJoined) : row.membershipDate ? new Date(row.membershipDate) : null,
+      membershipDate: parseIsoDateValue(row.membershipDate),
+      dateJoined: parseIsoDateValue(row.dateJoined) || parseIsoDateValue(row.membershipDate),
       baptismStatus: row.baptismStatus || "Not Baptized",
-      baptismDate: row.baptismDate ? new Date(row.baptismDate) : null,
+      baptismDate: parseIsoDateValue(row.baptismDate),
       placeBaptized: row.placeBaptized || "",
       baptizedBy: row.baptizedBy || "",
       previousCongregation: row.previousCongregation || "",
@@ -540,7 +545,7 @@ async function commitHouseholds(rows, user, ipAddress) {
       children: splitList(row.childrenMemberIds).map((memberId) => buildMemberLookup(memberId, members)).filter(Boolean),
       dependants: splitList(row.dependantsMemberIds).map((memberId) => buildMemberLookup(memberId, members)).filter(Boolean),
       visitationHistory: row.visitationHistory || "",
-      dateLastVisited: row.dateLastVisited ? new Date(row.dateLastVisited) : null,
+      dateLastVisited: parseIsoDateValue(row.dateLastVisited),
       sourceRecordRef: row.sourceRecordRef || "bulk-import",
       dataEntryClerk: user?.displayName || user?.username || "",
       dateCaptured: new Date(),
@@ -653,11 +658,46 @@ function requireFields(row, fieldNames, errors) {
   });
 }
 
+function validateIsoDateField(row, fieldName, errors) {
+  const value = String(row?.[fieldName] || "").trim();
+  if (!value) {
+    return;
+  }
+
+  if (!parseIsoDateValue(value)) {
+    errors.push(`${fieldName} must use YYYY-MM-DD format.`);
+  }
+}
+
 function splitList(value = "") {
   return String(value || "")
     .split(/[;,]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parseIsoDateValue(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return null;
+  }
+
+  const [year, month, day] = normalized.split("-").map((item) => Number(item));
+  const parsed = new Date(`${normalized}T00:00:00.000Z`);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() + 1 !== month ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
 }
 
 async function getNextMemberNumber() {

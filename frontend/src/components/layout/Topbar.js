@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
+import { formatDateDisplay } from "../../utils/dateUtils";
 
 export default function Topbar() {
   const { branding } = useAppContext();
@@ -33,7 +34,7 @@ export default function Topbar() {
       </div>
 
       <div className="topbar-right">
-        <div className="topbar-chip">{new Date().toLocaleDateString()}</div>
+        <div className="topbar-chip">{formatDateDisplay(new Date())}</div>
         <div className="profile-menu-wrap">
           <button type="button" className="topbar-avatar profile-toggle" onClick={() => setMenuOpen((current) => !current)}>
             {initials}

@@ -14,6 +14,7 @@ import {
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import { useAppContext } from "../context/AppContext";
 import { churchApi } from "../apis/churchApi";
+import { formatDateDisplay } from "../utils/dateUtils";
 
 const STATUS_COLORS = ["#4f46e5", "#0ea5e9", "#f59e0b", "#ef476f", "#14b8a6"];
 const WORKLOAD_COLORS = ["#4f46e5", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef476f", "#7c5cff"];
@@ -833,7 +834,7 @@ function formatDate(value) {
     return "";
   }
 
-  return new Date(value).toLocaleDateString();
+  return formatDateDisplay(value);
 }
 
 function formatShortDate(value) {

@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { formatDateDisplay } from "../utils/dateUtils";
 import AiAssistGeneratorCard from "../components/ai/AiAssistGeneratorCard";
 import { useAppContext } from "../context/AppContext";
 import { churchApi } from "../apis/churchApi";
@@ -759,7 +760,7 @@ function formatDate(value) {
     return "";
   }
 
-  return new Date(value).toLocaleDateString();
+  return formatDateDisplay(value);
 }
 
 function isToday(value) {
