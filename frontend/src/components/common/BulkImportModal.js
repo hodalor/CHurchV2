@@ -53,8 +53,8 @@ export default function BulkImportModal({ entity, onClose }) {
 
   const handlePreview = async () => {
     if (!file) {
-      setActionMessage("Choose a CSV file before previewing.");
-      notifyError("Choose a CSV file before previewing.");
+      setActionMessage("Choose a CSV or Excel file before previewing.");
+      notifyError("Choose a CSV or Excel file before previewing.");
       return;
     }
 
@@ -140,10 +140,10 @@ export default function BulkImportModal({ entity, onClose }) {
             Download Template
           </button>
           <label className="ghost-button import-file-button">
-            Choose CSV
+            Choose File
             <input
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               className="upload-input"
               onChange={(event) => {
                 setFile(event.target.files?.[0] || null);

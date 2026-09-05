@@ -1,3 +1,6 @@
+const path = require("path");
+const XLSX = require("xlsx");
+
 function parseCsv(text = "") {
   const rows = [];
   let current = "";
@@ -45,21 +48,7 @@ function parseCsv(text = "") {
     rows.push(row);
   }
 
-  if (!rows.length) {
-    return [];
-  }
-
-  const headers = rows[0].map((header) => normalizeCsvHeader(header));
-  return rows.slice(1).map((values, rowIndex) => {
-    const record = { __rowNumber: rowIndex + 2 };
-    headers.forEach((header, columnIndex) => {
-      if (!header) {
-        return;
-      }
-      record[header] = String(values[columnIndex] || "").trim();
-    });
-    return record;
-  });
+  return rowsToRecords(rows);
 }
 
 function toCsv(rows = []) {
@@ -82,6 +71,7 @@ function escapeCsvValue(value) {
 
 function normalizeCsvHeader(value = "") {
   return String(value)
+    .replace(/^\uFEFF/, "")
     .trim()
     .replace(/^\*/, "")
     .replace(/\(required\)/gi, "")
@@ -90,7 +80,66 @@ function normalizeCsvHeader(value = "") {
     .replace(/^./, (character) => character.toLowerCase());
 }
 
+function parseSpreadsheet(buffer) {
+  const workbook = XLSX.read(buffer, {
+    type: "buffer",
+    raw: false,
+    cellDates: false,
+  });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) {
+    return [];
+  }
+
+  const sheet = workbook.Sheets[firstSheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    raw: false,
+    defval: "",
+    blankrows: false,
+  });
+
+  return rowsToRecords(rows);
+}
+
+function rowsToRecords(rows = []) {
+  if (!rows.length) {
+    return [];
+  }
+
+  const headers = rows[0].map((header) => normalizeCsvHeader(header));
+  return rows
+    .slice(1)
+    .filter((values) => Array.isArray(values) && values.some((value) => String(value || "").trim() !== ""))
+    .map((values, rowIndex) => {
+      const record = { __rowNumber: rowIndex + 2 };
+      headers.forEach((header, columnIndex) => {
+        if (!header) {
+          return;
+        }
+        record[header] = String(values[columnIndex] || "").trim();
+      });
+      return record;
+    });
+}
+
+function parseImportFile(buffer, { originalName = "", mimeType = "" } = {}) {
+  const extension = String(path.extname(originalName || "")).trim().toLowerCase();
+  const normalizedMimeType = String(mimeType || "").toLowerCase();
+
+  if (extension === ".xlsx" || extension === ".xls" || normalizedMimeType.includes("spreadsheetml") || normalizedMimeType.includes("ms-excel")) {
+    return parseSpreadsheet(buffer);
+  }
+
+  if (!extension || extension === ".csv" || extension === ".txt" || normalizedMimeType.includes("csv") || normalizedMimeType.startsWith("text/")) {
+    return parseCsv(buffer.toString("utf8"));
+  }
+
+  throw new Error("Use a CSV, XLSX, or XLS file for import.");
+}
+
 module.exports = {
+  parseImportFile,
   parseCsv,
   toCsv,
   normalizeCsvHeader,

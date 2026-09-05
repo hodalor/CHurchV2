@@ -13,7 +13,7 @@ const {
   upsertDuplicateCandidates,
 } = require("../services/duplicateDetectionService");
 const { assignMemberQr } = require("../services/memberQrService");
-const { parseCsv, toCsv } = require("../utils/csvUtils");
+const { parseImportFile, toCsv } = require("../utils/csvUtils");
 const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
@@ -45,10 +45,13 @@ router.post("/preview/:entity", upload.single("file"), async (req, res) => {
     authorizeEntityAccess(entity, req, "manage");
 
     if (!req.file?.buffer?.length) {
-      return res.status(400).json({ message: "Choose a CSV file to preview." });
+      return res.status(400).json({ message: "Choose a CSV or Excel file to preview." });
     }
 
-    const rows = parseCsv(req.file.buffer.toString("utf8"));
+    const rows = parseImportFile(req.file.buffer, {
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+    });
     const preview = await previewImport(entity, rows);
     return res.json(preview);
   } catch (error) {
