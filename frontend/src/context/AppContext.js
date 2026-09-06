@@ -1860,6 +1860,72 @@ export function AppProvider({ children }) {
     async migrateMemberQrs(limit = 0) {
       return churchApi.migrateMemberQrs(limit);
     },
+    async enrollMemberBiometric(memberId, payload) {
+      const updatedMember = hydrateMemberRecord(await churchApi.enrollMemberBiometric(memberId, payload));
+      setMembers((current) =>
+        updateOrInsert(current, updatedMember, updatedMember._id || updatedMember.memberId, {
+          _id: updatedMember._id,
+          id: updatedMember.id || updatedMember._id,
+        })
+      );
+      setRecordModal((current) => {
+        if (current.type !== "member") {
+          return current;
+        }
+
+        const currentIdentity =
+          current.record?._id ||
+          current.record?.memberId ||
+          current.draft?._id ||
+          current.draft?.memberId;
+        const nextIdentity = updatedMember._id || updatedMember.memberId;
+
+        if (currentIdentity !== nextIdentity) {
+          return current;
+        }
+
+        return {
+          ...current,
+          record: updatedMember,
+          draft: updatedMember,
+        };
+      });
+      notifySuccess("Fingerprint enrolled for member.");
+      return updatedMember;
+    },
+    async clearMemberBiometric(memberId) {
+      const updatedMember = hydrateMemberRecord(await churchApi.clearMemberBiometric(memberId));
+      setMembers((current) =>
+        updateOrInsert(current, updatedMember, updatedMember._id || updatedMember.memberId, {
+          _id: updatedMember._id,
+          id: updatedMember.id || updatedMember._id,
+        })
+      );
+      setRecordModal((current) => {
+        if (current.type !== "member") {
+          return current;
+        }
+
+        const currentIdentity =
+          current.record?._id ||
+          current.record?.memberId ||
+          current.draft?._id ||
+          current.draft?.memberId;
+        const nextIdentity = updatedMember._id || updatedMember.memberId;
+
+        if (currentIdentity !== nextIdentity) {
+          return current;
+        }
+
+        return {
+          ...current,
+          record: updatedMember,
+          draft: updatedMember,
+        };
+      });
+      notifySuccess("Fingerprint cleared for member.");
+      return updatedMember;
+    },
     async recordVisitorChurchVisit(visitorId, payload) {
       try {
         setVisitorApiState((current) => ({ ...current, loading: true, error: "" }));
@@ -1946,6 +2012,18 @@ export function AppProvider({ children }) {
         }));
         throw error;
       }
+    },
+    async enrollVisitorBiometric(visitorId, payload) {
+      const updatedVisitor = hydrateVisitorRecord(await churchApi.enrollVisitorBiometric(visitorId, payload));
+      syncVisitorState(updatedVisitor);
+      notifySuccess("Fingerprint enrolled for visitor.");
+      return updatedVisitor;
+    },
+    async clearVisitorBiometric(visitorId) {
+      const updatedVisitor = hydrateVisitorRecord(await churchApi.clearVisitorBiometric(visitorId));
+      syncVisitorState(updatedVisitor);
+      notifySuccess("Fingerprint cleared for visitor.");
+      return updatedVisitor;
     },
     async assignProspect(prospectId, assignedUserId) {
       try {
@@ -2268,6 +2346,47 @@ export function AppProvider({ children }) {
           ...current,
           loading: false,
           error: error.message || "Unable to check in member with QR.",
+        }));
+        throw error;
+      }
+    },
+    async checkInByBiometric(eventId, payload) {
+      try {
+        setAttendanceApiState((current) => ({ ...current, loading: true, error: "" }));
+        const result = await churchApi.checkInByBiometric(eventId, payload);
+        const refreshedRecords = await churchApi.getAttendanceEventRecords(eventId);
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: "",
+          recordsByEvent: {
+            ...current.recordsByEvent,
+            [eventId]: refreshedRecords,
+          },
+        }));
+        setRecordModal((current) => {
+          if (current.type !== "attendanceEvent" || current.record?._id !== eventId) {
+            return current;
+          }
+
+          const nextDraft = {
+            ...current.draft,
+            attendanceRecords: refreshedRecords,
+          };
+
+          return {
+            ...current,
+            record: nextDraft,
+            draft: nextDraft,
+          };
+        });
+        await Promise.all([refreshAttendanceCollections(), refreshAttendanceReport()]);
+        return result;
+      } catch (error) {
+        setAttendanceApiState((current) => ({
+          ...current,
+          loading: false,
+          error: error.message || "Unable to check in with fingerprint.",
         }));
         throw error;
       }

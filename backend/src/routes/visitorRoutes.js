@@ -20,6 +20,7 @@ const {
   upsertDuplicateCandidates,
 } = require("../services/duplicateDetectionService");
 const { generateDuplicateExplanation } = require("../services/aiService");
+const { clearSubjectBiometric, enrollSubjectBiometric } = require("../services/biometricService");
 const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
@@ -112,6 +113,67 @@ router.put("/:visitorId", authorizePermissions(PERMISSIONS.MANAGE_VISITORS), asy
   });
 
   return res.json(populatedVisitor);
+});
+
+router.post("/:visitorId/biometric", authorizePermissions(PERMISSIONS.MANAGE_VISITORS), async (req, res) => {
+  try {
+    const visitor = await Visitor.findOne({ visitorId: req.params.visitorId });
+    if (!visitor) {
+      return res.status(404).json({ message: "Visitor not found." });
+    }
+
+    const previousValue = visitor.biometric?.toObject ? visitor.biometric.toObject() : visitor.biometric || {};
+    await enrollSubjectBiometric({
+      subjectType: "visitor",
+      subject: visitor,
+      payload: req.body,
+      user: req.user || null,
+    });
+    const populatedVisitor = await getPopulatedVisitor(visitor.visitorId);
+
+    await logAudit({
+      action: "update",
+      module: "Visitor Management",
+      recordType: "Visitor",
+      recordId: visitor.visitorId,
+      previousValue: { biometric: previousValue },
+      newValue: { biometric: visitor.biometric },
+      user: req.user,
+      ipAddress: req.ip,
+    });
+
+    return res.json(populatedVisitor || visitor);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+router.delete("/:visitorId/biometric", authorizePermissions(PERMISSIONS.MANAGE_VISITORS), async (req, res) => {
+  try {
+    const visitor = await Visitor.findOne({ visitorId: req.params.visitorId });
+    if (!visitor) {
+      return res.status(404).json({ message: "Visitor not found." });
+    }
+
+    const previousValue = visitor.biometric?.toObject ? visitor.biometric.toObject() : visitor.biometric || {};
+    await clearSubjectBiometric(visitor);
+    const populatedVisitor = await getPopulatedVisitor(visitor.visitorId);
+
+    await logAudit({
+      action: "update",
+      module: "Visitor Management",
+      recordType: "Visitor",
+      recordId: visitor.visitorId,
+      previousValue: { biometric: previousValue },
+      newValue: { biometric: visitor.biometric },
+      user: req.user,
+      ipAddress: req.ip,
+    });
+
+    return res.json(populatedVisitor || visitor);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 });
 
 router.delete("/:visitorId", authorizePermissions(PERMISSIONS.MANAGE_VISITORS), async (req, res) => {

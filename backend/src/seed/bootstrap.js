@@ -103,7 +103,7 @@ async function seedLookupData() {
       key: "attendance_capture_mode",
       label: "Attendance Capture Mode",
       module: "attendance",
-      values: ["Manual", "Bulk", "QR", "Mobile"],
+      values: ["Manual", "Bulk", "QR", "Mobile", "Biometric"],
     },
     {
       key: "finance_transaction_method",

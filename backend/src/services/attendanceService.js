@@ -1,14 +1,16 @@
 const crypto = require("crypto");
 const AttendanceEvent = require("../models/AttendanceEvent");
 const AttendanceRecord = require("../models/AttendanceRecord");
+const LookupValue = require("../models/LookupValue");
 const Member = require("../models/Member");
 const Ministry = require("../models/Ministry");
 const PendingAction = require("../models/PendingAction");
 const User = require("../models/User");
 const Visitor = require("../models/Visitor");
+const { markBiometricMatch, resolveBiometricSubject } = require("./biometricService");
 const { findMemberByQrToken } = require("./memberQrService");
 const { createPendingAction } = require("./pendingActionService");
-const { getLookupValueByTypeAndKey, listLookupValuesByType } = require("./lookupService");
+const { getLookupTypeByKey, getLookupValueByTypeAndKey, listLookupValuesByType } = require("./lookupService");
 const { createVisitor } = require("./visitorService");
 
 async function createAttendanceEvent(payload, user = null) {
@@ -216,6 +218,28 @@ async function checkInVisitorForEvent(event, payload = {}, user = null) {
   };
 }
 
+async function checkInByBiometricTemplate(event, templateRef, user = null, captureMode = "biometric") {
+  assertCheckInOpen(event);
+  const { subjectType, subject } = await resolveBiometricSubject(templateRef);
+  const record = await captureAttendanceRecord(
+    event,
+    {
+      ...(subjectType === "member" ? { memberId: subject._id } : { visitorId: subject._id }),
+      present: true,
+      capturedVia: captureMode,
+    },
+    user
+  );
+
+  await markBiometricMatch(subject);
+
+  return {
+    subjectType,
+    subject,
+    record,
+  };
+}
+
 async function getAttendanceCheckInDashboard(eventId) {
   const event = await populateAttendanceEventById(eventId);
   if (!event) {
@@ -379,9 +403,36 @@ async function resolveCaptureMode(value) {
   }
 
   const captureModes = await listLookupValuesByType("attendance_capture_mode");
-  return (
-    captureModes.find((item) => String(item._id) === String(value) || item.key === String(value)) || null
-  );
+  const normalizedValue = String(value).trim().toLowerCase();
+  const existing = captureModes.find((item) => String(item._id) === String(value) || item.key === normalizedValue);
+  if (existing) {
+    return existing;
+  }
+
+  if (normalizedValue === "biometric") {
+    const type = await getLookupTypeByKey("attendance_capture_mode");
+    if (!type) {
+      return null;
+    }
+
+    return LookupValue.findOneAndUpdate(
+      { type: type._id, key: "biometric" },
+      {
+        $setOnInsert: {
+          label: "Biometric",
+          sortOrder: 99,
+          isActive: true,
+          metadata: {},
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+  }
+
+  return null;
 }
 
 async function populateAttendanceEventById(id) {
@@ -422,6 +473,7 @@ module.exports = {
   checkInVisitorForEvent,
   captureAttendanceRecord,
   captureBulkAttendance,
+  checkInByBiometricTemplate,
   correctAttendanceRecord,
   createAttendanceEvent,
   getAbsentees,

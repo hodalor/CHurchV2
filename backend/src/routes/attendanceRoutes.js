@@ -5,6 +5,7 @@ const authenticate = require("../middleware/authenticate");
 const { authorizePermissions } = require("../middleware/authorize");
 const { logAudit } = require("../services/auditService");
 const {
+  checkInByBiometricTemplate,
   checkInMemberByQrToken,
   checkInVisitorForEvent,
   captureAttendanceRecord,
@@ -199,11 +200,26 @@ router.post("/events/:eventId/check-in/biometric", authorizePermissions(PERMISSI
     return res.status(404).json({ message: "Attendance event not found." });
   }
 
-  return res.status(501).json({
-    message: "Biometric check-in is not connected yet. Confirm the device or SDK before implementation.",
-    eventId: event._id,
-    biometricMatchToken: req.body.biometricMatchToken || "",
-  });
+  try {
+    const result = await checkInByBiometricTemplate(
+      event,
+      req.body.templateRef || req.body.referenceId || req.body.biometricMatchToken,
+      req.user,
+      req.body.capturedVia || "biometric"
+    );
+    await logAudit({
+      action: "create",
+      module: "Attendance",
+      recordType: "AttendanceRecord",
+      recordId: result.record._id.toString(),
+      newValue: result.record.toObject(),
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 });
 
 router.post("/events/:eventId/check-in/children", authorizePermissions(PERMISSIONS.MANAGE_ATTENDANCE), async (req, res) => {

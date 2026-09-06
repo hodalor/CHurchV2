@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "biometric:bridge": "node src/biometric-bridge/server.js",
     "migrate:member-qr": "node scripts/migrateMemberQRCodes.js",
     "test": "echo \"No tests configured\""
   },

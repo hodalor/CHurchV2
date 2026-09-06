@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import AttendanceParticipantLookupField from "./AttendanceParticipantLookupField";
 import { useAppContext } from "../../context/AppContext";
 import { formatDateTimeDisplay } from "../../utils/dateUtils";
+import {
+  getBiometricBridgeUrl,
+  identifyFingerprint,
+  setBiometricBridgeUrl,
+  testBiometricBridge,
+} from "../../utils/biometricBridge";
 
 function getDefaultManualMode(options) {
   return options.find((item) => item.key === "manual")?._id || "";
@@ -19,6 +25,7 @@ export default function AttendanceEventActionPanel({ event }) {
     toggleAttendanceCheckIn,
     fetchAttendanceCheckInDashboard,
     checkInMemberByQr,
+    checkInByBiometric,
   } = useAppContext();
   const [activePanel, setActivePanel] = useState("");
   const [manualEntry, setManualEntry] = useState({
@@ -29,6 +36,8 @@ export default function AttendanceEventActionPanel({ event }) {
     correctionReason: "",
   });
   const [qrEntry, setQrEntry] = useState("");
+  const [biometricBridgeUrl, setBiometricBridgeUrlState] = useState(getBiometricBridgeUrl());
+  const [biometricStatus, setBiometricStatus] = useState("");
   const [dashboard, setDashboard] = useState({
     counters: { members: 0, visitors: 0, children: 0, online: 0, total: 0 },
     recentCheckIns: [],
@@ -154,6 +163,13 @@ export default function AttendanceEventActionPanel({ event }) {
           <button
             type="button"
             className="ghost-button small"
+            onClick={() => setActivePanel((current) => (current === "biometric" ? "" : "biometric"))}
+          >
+            {activePanel === "biometric" ? "Hide Fingerprint" : "Fingerprint Check-In"}
+          </button>
+          <button
+            type="button"
+            className="ghost-button small"
             onClick={() => setActivePanel((current) => (current === "manual" ? "" : "manual"))}
           >
             {activePanel === "manual" ? "Hide Manual Entry" : "Manual Search"}
@@ -201,6 +217,75 @@ export default function AttendanceEventActionPanel({ event }) {
               }}
             >
               Resolve And Check In
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {activePanel === "biometric" ? (
+        <section className="subsection-card">
+          <div className="section-headline compact">
+            <div>
+              <h3>Fingerprint Check-In</h3>
+              <p>Use the locally connected scanner to identify an enrolled member or visitor and record attendance.</p>
+            </div>
+          </div>
+          <div className="form-grid">
+            <label className="full-width">
+              Fingerprint Bridge URL
+              <input
+                value={biometricBridgeUrl}
+                onChange={(eventValue) => setBiometricBridgeUrlState(eventValue.target.value)}
+                placeholder="http://127.0.0.1:4113"
+              />
+            </label>
+          </div>
+          {biometricStatus ? <div className="empty-note">{biometricStatus}</div> : null}
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="ghost-button small"
+              disabled={attendanceApiState.loading}
+              onClick={async () => {
+                try {
+                  const savedUrl = setBiometricBridgeUrl(biometricBridgeUrl);
+                  setBiometricBridgeUrlState(savedUrl);
+                  const response = await testBiometricBridge();
+                  setBiometricStatus(response.message || "Fingerprint bridge is reachable.");
+                } catch (error) {
+                  setBiometricStatus(error.message || "Unable to reach fingerprint bridge.");
+                }
+              }}
+            >
+              Test Bridge
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              disabled={attendanceApiState.loading}
+              onClick={async () => {
+                try {
+                  const savedUrl = setBiometricBridgeUrl(biometricBridgeUrl);
+                  setBiometricBridgeUrlState(savedUrl);
+                  const match = await identifyFingerprint({
+                    scope: "attendance",
+                    eventId: event._id,
+                  });
+                  await checkInByBiometric(event._id, {
+                    templateRef: match.templateRef || match.referenceId,
+                    provider: match.provider || "zkteco",
+                    deviceName: match.deviceName || match.device || "",
+                    qualityScore: match.qualityScore ?? match.quality ?? null,
+                    capturedVia: "biometric",
+                  });
+                  setBiometricStatus(match.message || "Fingerprint matched and attendance recorded.");
+                  setActivePanel("");
+                } catch (error) {
+                  setBiometricStatus(error.message || "Unable to check in with fingerprint.");
+                }
+              }}
+            >
+              Scan And Check In
             </button>
           </div>
         </section>

@@ -1,5 +1,6 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 const createScopedModel = require("../utils/scopedModel");
+const biometricProfileSchema = require("./biometricProfileSchema");
 
 const visitEntrySchema = new mongoose.Schema(
   {
@@ -110,9 +111,23 @@ const visitorSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    biometric: {
+      type: biometricProfileSchema,
+      default: () => ({}),
+    },
   },
   {
     timestamps: true,
+  }
+);
+
+visitorSchema.index(
+  { "biometric.templateRef": 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      "biometric.templateRef": { $exists: true, $gt: "" },
+    },
   }
 );
 

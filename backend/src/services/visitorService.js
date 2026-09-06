@@ -196,6 +196,7 @@ async function populateVisitorQuery(query = {}) {
     .populate("howHeard", "label key")
     .populate("status", "label key")
     .populate("assignedFollowUpUserId", "displayName username")
+    .populate("biometric.enrolledBy", "displayName username")
     .populate("visitationHistory.visitedBy", "displayName username")
     .sort({ createdAt: -1 });
 }

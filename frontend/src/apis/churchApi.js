@@ -368,6 +368,19 @@ export const churchApi = {
     });
   },
 
+  async enrollMemberBiometric(memberId, payload) {
+    return request(`/members/${memberId}/biometric`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async clearMemberBiometric(memberId) {
+    return request(`/members/${memberId}/biometric`, {
+      method: "DELETE",
+    });
+  },
+
   async migrateMemberQrs(limit = 0) {
     return request("/members/qr/migrate", {
       method: "POST",
@@ -884,6 +897,13 @@ export const churchApi = {
     });
   },
 
+  async checkInByBiometric(eventId, payload) {
+    return request(`/attendance/events/${eventId}/check-in/biometric`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   async captureAttendanceRecord(eventId, payload) {
     return request(`/attendance/events/${eventId}/records`, {
       method: "POST",
@@ -1143,6 +1163,19 @@ export const churchApi = {
     return request(`/visitors/${visitorId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+  },
+
+  async enrollVisitorBiometric(visitorId, payload) {
+    return request(`/visitors/${visitorId}/biometric`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async clearVisitorBiometric(visitorId) {
+    return request(`/visitors/${visitorId}/biometric`, {
+      method: "DELETE",
     });
   },
 

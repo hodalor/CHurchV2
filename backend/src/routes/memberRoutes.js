@@ -8,6 +8,7 @@ const {
   migrateMemberQRCodes,
   regenerateMemberQr,
 } = require("../services/memberQrService");
+const { clearSubjectBiometric, enrollSubjectBiometric } = require("../services/biometricService");
 const {
   evaluateDuplicateCandidatesForRecord,
   upsertDuplicateCandidates,
@@ -171,6 +172,67 @@ router.post("/:memberId/qr/regenerate", authorizePermissions(PERMISSIONS.MANAGE_
   }
 });
 
+router.post("/:memberId/biometric", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
+  try {
+    const member = await Member.findById(req.params.memberId);
+    if (!member) {
+      return res.status(404).json({ message: "Member not found." });
+    }
+
+    const previousValue = member.biometric?.toObject ? member.biometric.toObject() : member.biometric || {};
+    await enrollSubjectBiometric({
+      subjectType: "member",
+      subject: member,
+      payload: req.body,
+      user: req.user || null,
+    });
+    const populatedMember = await populateMemberById(member._id);
+
+    await logAudit({
+      action: "update",
+      module: "Members",
+      recordType: "Member",
+      recordId: member.memberId,
+      previousValue: { biometric: previousValue },
+      newValue: { biometric: member.biometric },
+      user: req.user,
+      ipAddress: req.ip,
+    });
+
+    return res.json(populatedMember);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+router.delete("/:memberId/biometric", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
+  try {
+    const member = await Member.findById(req.params.memberId);
+    if (!member) {
+      return res.status(404).json({ message: "Member not found." });
+    }
+
+    const previousValue = member.biometric?.toObject ? member.biometric.toObject() : member.biometric || {};
+    await clearSubjectBiometric(member);
+    const populatedMember = await populateMemberById(member._id);
+
+    await logAudit({
+      action: "update",
+      module: "Members",
+      recordType: "Member",
+      recordId: member.memberId,
+      previousValue: { biometric: previousValue },
+      newValue: { biometric: member.biometric },
+      user: req.user,
+      ipAddress: req.ip,
+    });
+
+    return res.json(populatedMember);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
 router.put("/:memberId", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
   try {
     const member = await Member.findById(req.params.memberId);
@@ -246,13 +308,15 @@ async function populateMembersQuery() {
   return Member.find()
     .populate("ministry", "name color")
     .populate("qrRegeneratedBy", "displayName username")
+    .populate("biometric.enrolledBy", "displayName username")
     .sort({ createdAt: -1 });
 }
 
 async function populateMemberById(memberId) {
   return Member.findById(memberId)
     .populate("ministry", "name color")
-    .populate("qrRegeneratedBy", "displayName username");
+    .populate("qrRegeneratedBy", "displayName username")
+    .populate("biometric.enrolledBy", "displayName username");
 }
 
 function normalizeMemberPayload(payload = {}) {

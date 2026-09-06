@@ -1,3 +1,4 @@
+import { useState } from "react";
 import ModalShell from "./ModalShell";
 import DetailGrid from "./DetailGrid";
 import { useAppContext } from "../../context/AppContext";
@@ -15,6 +16,12 @@ import AppConfigFields from "../setup/AppConfigFields";
 import UserAccountFields from "../users/UserAccountFields";
 import VisitorActionPanel from "../visitors/VisitorActionPanel";
 import VisitorRecordFields from "../visitors/VisitorRecordFields";
+import {
+  enrollFingerprint,
+  getBiometricBridgeUrl,
+  setBiometricBridgeUrl,
+  testBiometricBridge,
+} from "../../utils/biometricBridge";
 
 export default function RecordDetailModal() {
   const {
@@ -42,6 +49,10 @@ export default function RecordDetailModal() {
     ministries,
     formatCurrency,
     regenerateMemberQr,
+    enrollMemberBiometric,
+    clearMemberBiometric,
+    enrollVisitorBiometric,
+    clearVisitorBiometric,
     mediaUploadState,
   } = useAppContext();
 
@@ -90,6 +101,12 @@ export default function RecordDetailModal() {
             </div>
           </div>
           <MemberDetailSections draft={draft} groups={groups} ministries={ministries} />
+          <BiometricEnrollmentSection
+            subjectType="member"
+            record={draft}
+            onEnroll={async (payload) => enrollMemberBiometric(draft._id, payload)}
+            onClear={async () => clearMemberBiometric(draft._id)}
+          />
 
           <RecordModalActions
             isEditing={false}
@@ -136,6 +153,12 @@ export default function RecordDetailModal() {
             users={users}
           />
           <VisitorActionPanel visitor={draft} />
+          <BiometricEnrollmentSection
+            subjectType="visitor"
+            record={draft}
+            onEnroll={async (payload) => enrollVisitorBiometric(draft.visitorId, payload)}
+            onClear={async () => clearVisitorBiometric(draft.visitorId)}
+          />
           <RecordModalActions
             isEditing={isEditing}
             closeRecordModal={closeRecordModal}
@@ -379,6 +402,130 @@ export default function RecordDetailModal() {
         </div>
       )}
     </ModalShell>
+  );
+}
+
+function BiometricEnrollmentSection({ subjectType, record, onEnroll, onClear }) {
+  const [bridgeUrl, setBridgeUrlState] = useState(getBiometricBridgeUrl());
+  const [busy, setBusy] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const biometric = record?.biometric || {};
+  const enrolledBy = biometric.enrolledBy?.displayName || biometric.enrolledBy?.username || "";
+  const subjectLabel =
+    subjectType === "member"
+      ? `${record?.memberId || ""} ${record?.firstName || ""} ${record?.lastName || ""}`.trim()
+      : `${record?.visitorId || ""} ${record?.firstName || ""} ${record?.surname || ""}`.trim();
+  const hasIdentity = subjectType === "member" ? Boolean(record?._id) : Boolean(record?.visitorId);
+
+  if (!hasIdentity) {
+    return null;
+  }
+
+  const handleSaveBridgeUrl = () => {
+    const nextValue = setBiometricBridgeUrl(bridgeUrl);
+    setBridgeUrlState(nextValue);
+    setStatusMessage("Fingerprint bridge URL saved on this machine.");
+  };
+
+  const handleTestBridge = async () => {
+    try {
+      setBusy(true);
+      setBiometricBridgeUrl(bridgeUrl);
+      const result = await testBiometricBridge();
+      setStatusMessage(result.message || "Fingerprint bridge is reachable.");
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to reach fingerprint bridge.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleEnroll = async () => {
+    try {
+      setBusy(true);
+      setBiometricBridgeUrl(bridgeUrl);
+      const capture = await enrollFingerprint({
+        subjectType,
+        subjectId: record?._id || record?.visitorId || record?.memberId || "",
+        label: subjectLabel,
+      });
+      await onEnroll({
+        templateRef: capture.templateRef || capture.referenceId,
+        provider: capture.provider || "zkteco",
+        deviceName: capture.deviceName || capture.device || "",
+        qualityScore: capture.qualityScore ?? capture.quality ?? null,
+      });
+      setStatusMessage("Fingerprint enrolled successfully.");
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to enroll fingerprint.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleClear = async () => {
+    try {
+      setBusy(true);
+      await onClear();
+      setStatusMessage("Fingerprint removed from this account.");
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to clear fingerprint.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="subsection-card">
+      <div className="section-headline compact">
+        <div>
+          <h3>Fingerprint</h3>
+          <p>Enroll this {subjectType} for scanner-based check-in.</p>
+        </div>
+      </div>
+      <DetailGrid
+        items={[
+          { label: "Status", value: biometric.enabled && biometric.templateRef ? "Enrolled" : "Not enrolled" },
+          { label: "Provider", value: biometric.provider || "zkteco" },
+          { label: "Device", value: biometric.deviceName || "" },
+          { label: "Quality", value: biometric.qualityScore ?? "" },
+          { label: "Template Ref", value: biometric.templateRef || "", wide: true },
+          { label: "Enrolled At", value: formatDisplayDate(biometric.enrolledAt) },
+          { label: "Enrolled By", value: enrolledBy },
+          { label: "Last Matched", value: formatDisplayDate(biometric.lastMatchedAt) },
+        ]}
+      />
+      <div className="form-grid">
+        <label className="full-width">
+          Fingerprint Bridge URL
+          <input
+            value={bridgeUrl}
+            onChange={(event) => setBridgeUrlState(event.target.value)}
+            placeholder="http://127.0.0.1:4113"
+          />
+        </label>
+      </div>
+      {statusMessage ? <div className="empty-note">{statusMessage}</div> : null}
+      <div className="modal-actions">
+        <button type="button" className="ghost-button small" disabled={busy} onClick={handleSaveBridgeUrl}>
+          Save Bridge URL
+        </button>
+        <button type="button" className="ghost-button small" disabled={busy} onClick={handleTestBridge}>
+          Test Bridge
+        </button>
+        <button type="button" className="primary-button" disabled={busy} onClick={handleEnroll}>
+          Capture Fingerprint
+        </button>
+        <button
+          type="button"
+          className="ghost-button small"
+          disabled={busy || !(biometric.enabled && biometric.templateRef)}
+          onClick={handleClear}
+        >
+          Clear Fingerprint
+        </button>
+      </div>
+    </section>
   );
 }
 
