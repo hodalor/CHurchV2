@@ -71,7 +71,12 @@ router.post("/", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, r
     const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("member", req.body, {
       minimumScore: 55,
     });
-    const member = await Member.create(normalizeMemberPayload(req.body));
+    const createPayload = normalizeMemberPayload(req.body);
+    if (!String(createPayload.memberId || "").trim()) {
+      createPayload.memberId = await generateNextMemberIdValue();
+    }
+
+    const member = await Member.create(createPayload);
     await assignMemberQr(member, req.user || null);
     if (duplicateCandidates.length) {
       const enrichedCandidates = await Promise.all(
@@ -240,7 +245,12 @@ router.put("/:memberId", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async
       return res.status(404).json({ message: "Member not found." });
     }
 
-    Object.assign(member, normalizeMemberPayload(req.body));
+    const updatePayload = normalizeMemberPayload(req.body);
+    if (!String(updatePayload.memberId || "").trim()) {
+      delete updatePayload.memberId;
+    }
+
+    Object.assign(member, updatePayload);
     await member.save();
     const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("member", {
       ...member.toObject(),
@@ -317,6 +327,17 @@ async function populateMemberById(memberId) {
     .populate("ministry", "name color")
     .populate("qrRegeneratedBy", "displayName username")
     .populate("biometric.enrolledBy", "displayName username");
+}
+
+async function generateNextMemberIdValue() {
+  const members = await Member.find({}, { memberId: 1 }).lean();
+  const nextNumber =
+    members.reduce((maxValue, item) => {
+      const numericPart = Number(String(item.memberId || "").replace("M", ""));
+      return Number.isNaN(numericPart) ? maxValue : Math.max(maxValue, numericPart);
+    }, 0) + 1;
+
+  return `M${String(nextNumber).padStart(6, "0")}`;
 }
 
 function normalizeMemberPayload(payload = {}) {

@@ -1,4 +1,6 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
 const ChurchProfile = require("../models/ChurchProfile");
 const authenticate = require("../middleware/authenticate");
 const { authorizePermissions } = require("../middleware/authorize");
@@ -50,6 +52,19 @@ router.get("/app-config", authenticate, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/biometric-helper/guide", async (req, res) => {
+  try {
+    const guidePath = path.resolve(__dirname, "..", "..", "..", "docs", "biometric-bridge.md");
+    if (!fs.existsSync(guidePath)) {
+      return res.status(404).json({ message: "Biometric helper guide was not found." });
+    }
+
+    return res.type("text/plain").send(fs.readFileSync(guidePath, "utf8"));
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 });
 

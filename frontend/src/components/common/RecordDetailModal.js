@@ -19,6 +19,7 @@ import VisitorRecordFields from "../visitors/VisitorRecordFields";
 import {
   enrollFingerprint,
   getBiometricBridgeUrl,
+  getBiometricHelperGuideUrl,
   setBiometricBridgeUrl,
   testBiometricBridge,
 } from "../../utils/biometricBridge";
@@ -409,6 +410,8 @@ function BiometricEnrollmentSection({ subjectType, record, onEnroll, onClear }) 
   const [bridgeUrl, setBridgeUrlState] = useState(getBiometricBridgeUrl());
   const [busy, setBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [statusTone, setStatusTone] = useState("info");
+  const [previewImage, setPreviewImage] = useState("");
   const biometric = record?.biometric || {};
   const enrolledBy = biometric.enrolledBy?.displayName || biometric.enrolledBy?.username || "";
   const subjectLabel =
@@ -425,30 +428,45 @@ function BiometricEnrollmentSection({ subjectType, record, onEnroll, onClear }) 
     const nextValue = setBiometricBridgeUrl(bridgeUrl);
     setBridgeUrlState(nextValue);
     setStatusMessage("Fingerprint bridge URL saved on this machine.");
+    setStatusTone("info");
   };
 
   const handleTestBridge = async () => {
     try {
       setBusy(true);
+      setStatusMessage("Checking local fingerprint helper on this machine...");
+      setStatusTone("info");
       setBiometricBridgeUrl(bridgeUrl);
       const result = await testBiometricBridge();
       setStatusMessage(result.message || "Fingerprint bridge is reachable.");
+      setStatusTone("success");
     } catch (error) {
       setStatusMessage(error.message || "Unable to reach fingerprint bridge.");
+      setStatusTone("error");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleOpenGuide = () => {
+    if (typeof window !== "undefined") {
+      window.open(getBiometricHelperGuideUrl(), "_blank", "noopener,noreferrer");
     }
   };
 
   const handleEnroll = async () => {
     try {
       setBusy(true);
+      setStatusMessage("Place the same finger on the scanner 3 times. Wait for the light to blink between scans.");
+      setStatusTone("info");
+      setPreviewImage("");
       setBiometricBridgeUrl(bridgeUrl);
       const capture = await enrollFingerprint({
         subjectType,
         subjectId: record?._id || record?.visitorId || record?.memberId || "",
         label: subjectLabel,
       });
+      setPreviewImage(capture.previewImage || "");
       await onEnroll({
         templateRef: capture.templateRef || capture.referenceId,
         provider: capture.provider || "zkteco",
@@ -456,8 +474,10 @@ function BiometricEnrollmentSection({ subjectType, record, onEnroll, onClear }) 
         qualityScore: capture.qualityScore ?? capture.quality ?? null,
       });
       setStatusMessage("Fingerprint enrolled successfully.");
+      setStatusTone("success");
     } catch (error) {
       setStatusMessage(error.message || "Unable to enroll fingerprint.");
+      setStatusTone("error");
     } finally {
       setBusy(false);
     }
@@ -467,9 +487,12 @@ function BiometricEnrollmentSection({ subjectType, record, onEnroll, onClear }) 
     try {
       setBusy(true);
       await onClear();
+      setPreviewImage("");
       setStatusMessage("Fingerprint removed from this account.");
+      setStatusTone("success");
     } catch (error) {
       setStatusMessage(error.message || "Unable to clear fingerprint.");
+      setStatusTone("error");
     } finally {
       setBusy(false);
     }
@@ -505,8 +528,20 @@ function BiometricEnrollmentSection({ subjectType, record, onEnroll, onClear }) 
           />
         </label>
       </div>
-      {statusMessage ? <div className="empty-note">{statusMessage}</div> : null}
+      {statusMessage ? <div className={`empty-note ${statusTone}`}>{statusMessage}</div> : null}
+      {previewImage ? (
+        <div className="fingerprint-preview-card">
+          <div>
+            <strong>Captured fingerprint preview</strong>
+            <p>This confirms the scanner returned an image to the app.</p>
+          </div>
+          <img src={previewImage} alt="Captured fingerprint preview" className="fingerprint-preview-image" />
+        </div>
+      ) : null}
       <div className="modal-actions">
+        <button type="button" className="ghost-button small" disabled={busy} onClick={handleOpenGuide}>
+          Install / Configure Bridge
+        </button>
         <button type="button" className="ghost-button small" disabled={busy} onClick={handleSaveBridgeUrl}>
           Save Bridge URL
         </button>

@@ -1,6 +1,35 @@
 const BIOMETRIC_BRIDGE_STORAGE_KEY = "churchv2_biometric_bridge_url";
 const DEFAULT_BIOMETRIC_BRIDGE_URL = "http://127.0.0.1:4113";
 
+function normalizeUrl(value = "") {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function resolveAppApiBaseUrl() {
+  const configuredUrl = normalizeUrl(process.env.REACT_APP_API_URL);
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  if (typeof window !== "undefined") {
+    const { hostname, origin } = window.location;
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]" ||
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname);
+
+    if (isLocalHost) {
+      return "http://127.0.0.1:5100/api";
+    }
+
+    return `${origin}/api`;
+  }
+
+  return "http://127.0.0.1:5100/api";
+}
+
 export function getBiometricBridgeUrl() {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
     return DEFAULT_BIOMETRIC_BRIDGE_URL;
@@ -15,6 +44,10 @@ export function setBiometricBridgeUrl(value) {
     window.localStorage.setItem(BIOMETRIC_BRIDGE_STORAGE_KEY, normalized);
   }
   return normalized;
+}
+
+export function getBiometricHelperGuideUrl() {
+  return `${resolveAppApiBaseUrl()}/setup/biometric-helper/guide`;
 }
 
 export async function testBiometricBridge() {

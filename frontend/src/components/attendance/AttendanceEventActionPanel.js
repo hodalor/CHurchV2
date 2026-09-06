@@ -4,6 +4,7 @@ import { useAppContext } from "../../context/AppContext";
 import { formatDateTimeDisplay } from "../../utils/dateUtils";
 import {
   getBiometricBridgeUrl,
+  getBiometricHelperGuideUrl,
   identifyFingerprint,
   setBiometricBridgeUrl,
   testBiometricBridge,
@@ -38,6 +39,7 @@ export default function AttendanceEventActionPanel({ event }) {
   const [qrEntry, setQrEntry] = useState("");
   const [biometricBridgeUrl, setBiometricBridgeUrlState] = useState(getBiometricBridgeUrl());
   const [biometricStatus, setBiometricStatus] = useState("");
+  const [biometricStatusTone, setBiometricStatusTone] = useState("info");
   const [dashboard, setDashboard] = useState({
     counters: { members: 0, visitors: 0, children: 0, online: 0, total: 0 },
     recentCheckIns: [],
@@ -240,20 +242,36 @@ export default function AttendanceEventActionPanel({ event }) {
               />
             </label>
           </div>
-          {biometricStatus ? <div className="empty-note">{biometricStatus}</div> : null}
+          {biometricStatus ? <div className={`empty-note ${biometricStatusTone}`}>{biometricStatus}</div> : null}
           <div className="modal-actions">
+            <button
+              type="button"
+              className="ghost-button small"
+              disabled={attendanceApiState.loading}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.open(getBiometricHelperGuideUrl(), "_blank", "noopener,noreferrer");
+                }
+              }}
+            >
+              Install / Configure Bridge
+            </button>
             <button
               type="button"
               className="ghost-button small"
               disabled={attendanceApiState.loading}
               onClick={async () => {
                 try {
+                  setBiometricStatus("Checking local fingerprint helper on this machine...");
+                  setBiometricStatusTone("info");
                   const savedUrl = setBiometricBridgeUrl(biometricBridgeUrl);
                   setBiometricBridgeUrlState(savedUrl);
                   const response = await testBiometricBridge();
                   setBiometricStatus(response.message || "Fingerprint bridge is reachable.");
+                  setBiometricStatusTone("success");
                 } catch (error) {
                   setBiometricStatus(error.message || "Unable to reach fingerprint bridge.");
+                  setBiometricStatusTone("error");
                 }
               }}
             >
@@ -265,23 +283,36 @@ export default function AttendanceEventActionPanel({ event }) {
               disabled={attendanceApiState.loading}
               onClick={async () => {
                 try {
+                  setBiometricStatus("Waiting for finger on scanner. Keep the finger steady until the scanner finishes.");
+                  setBiometricStatusTone("info");
                   const savedUrl = setBiometricBridgeUrl(biometricBridgeUrl);
                   setBiometricBridgeUrlState(savedUrl);
                   const match = await identifyFingerprint({
                     scope: "attendance",
                     eventId: event._id,
                   });
-                  await checkInByBiometric(event._id, {
+                  const result = await checkInByBiometric(event._id, {
                     templateRef: match.templateRef || match.referenceId,
                     provider: match.provider || "zkteco",
                     deviceName: match.deviceName || match.device || "",
                     qualityScore: match.qualityScore ?? match.quality ?? null,
                     capturedVia: "biometric",
                   });
-                  setBiometricStatus(match.message || "Fingerprint matched and attendance recorded.");
-                  setActivePanel("");
+                  const matchedPerson =
+                    result?.memberId
+                      ? `${result.memberId.memberId || ""} ${result.memberId.firstName || ""} ${result.memberId.lastName || ""}`.trim()
+                      : result?.visitorId
+                        ? `${result.visitorId.visitorId || ""} ${result.visitorId.firstName || ""} ${result.visitorId.surname || ""}`.trim()
+                        : match.label || "";
+                  setBiometricStatus(
+                    matchedPerson
+                      ? `${matchedPerson} checked in successfully by fingerprint.`
+                      : match.message || "Fingerprint matched and attendance recorded."
+                  );
+                  setBiometricStatusTone("success");
                 } catch (error) {
-                  setBiometricStatus(error.message || "Unable to check in with fingerprint.");
+                  setBiometricStatus(formatBiometricErrorMessage(error));
+                  setBiometricStatusTone("error");
                 }
               }}
             >
@@ -594,4 +625,17 @@ function formatTimestamp(value) {
   }
 
   return formatDateTimeDisplay(value);
+}
+
+function formatBiometricErrorMessage(error) {
+  const message = String(error?.message || "").trim();
+  if (/no enrolled match was found/i.test(message) || /does not match/i.test(message)) {
+    return "Fingerprint does not match. Try again.";
+  }
+
+  if (/timed out/i.test(message)) {
+    return "Fingerprint capture timed out. Try again.";
+  }
+
+  return message || "Unable to check in with fingerprint.";
 }

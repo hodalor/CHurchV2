@@ -1204,6 +1204,7 @@ export function AppProvider({ children }) {
         ...current,
         error: memberValidationError,
       }));
+      notifyError(memberValidationError, "Required Field");
       return;
     }
 
@@ -1255,7 +1256,12 @@ export function AppProvider({ children }) {
       try {
         const memberValidationError = getRequiredMemberError(draft);
         if (memberValidationError) {
-          throw new Error(memberValidationError);
+          setMediaUploadState((current) => ({
+            ...current,
+            error: memberValidationError,
+          }));
+          notifyError(memberValidationError, "Required Field");
+          return;
         }
 
         const payload = normalizeMemberDraft(draft, authUser);
