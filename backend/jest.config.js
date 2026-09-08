@@ -3,6 +3,7 @@ module.exports = {
     "src/app.js",
     "src/middleware/*.js",
     "src/services/*AccessService.js",
+    "src/services/financialCorrectionService.js",
     "src/services/financePolicyService.js",
     "src/services/varianceService.js",
     "src/utils/tokenUtils.js",
