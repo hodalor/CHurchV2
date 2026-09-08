@@ -50,6 +50,10 @@ export function getBiometricHelperGuideUrl() {
   return `${resolveAppApiBaseUrl()}/setup/biometric-helper/guide`;
 }
 
+export function getBiometricHelperInstallerUrl() {
+  return `${resolveAppApiBaseUrl()}/setup/biometric-helper/windows/download`;
+}
+
 export async function testBiometricBridge() {
   return callBiometricBridge("/health", { method: "GET" });
 }

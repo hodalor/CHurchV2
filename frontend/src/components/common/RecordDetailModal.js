@@ -19,7 +19,7 @@ import VisitorRecordFields from "../visitors/VisitorRecordFields";
 import {
   enrollFingerprint,
   getBiometricBridgeUrl,
-  getBiometricHelperGuideUrl,
+  getBiometricHelperInstallerUrl,
   setBiometricBridgeUrl,
   testBiometricBridge,
 } from "../../utils/biometricBridge";
@@ -448,9 +448,16 @@ function BiometricEnrollmentSection({ subjectType, record, onEnroll, onClear }) 
     }
   };
 
-  const handleOpenGuide = () => {
+  const handleDownloadInstaller = () => {
     if (typeof window !== "undefined") {
-      window.open(getBiometricHelperGuideUrl(), "_blank", "noopener,noreferrer");
+      const link = window.document.createElement("a");
+      link.href = getBiometricHelperInstallerUrl();
+      link.rel = "noopener noreferrer";
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setStatusMessage("Installer download started. Open the downloaded ChurchV2-Biometric-Setup.cmd file on this Windows machine.");
+      setStatusTone("info");
     }
   };
 
@@ -539,8 +546,8 @@ function BiometricEnrollmentSection({ subjectType, record, onEnroll, onClear }) 
         </div>
       ) : null}
       <div className="modal-actions">
-        <button type="button" className="ghost-button small" disabled={busy} onClick={handleOpenGuide}>
-          Install / Configure Bridge
+        <button type="button" className="ghost-button small" disabled={busy} onClick={handleDownloadInstaller}>
+          Download Windows Installer
         </button>
         <button type="button" className="ghost-button small" disabled={busy} onClick={handleSaveBridgeUrl}>
           Save Bridge URL

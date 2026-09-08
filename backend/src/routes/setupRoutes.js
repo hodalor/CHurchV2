@@ -9,6 +9,34 @@ const { PERMISSIONS } = require("../utils/permissions");
 
 const router = express.Router();
 const DEFAULT_CURRENCIES = [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }];
+const WINDOWS_BIOMETRIC_HELPER_FILE_MAP = {
+  "scripts/setup-zkteco-biometric.ps1": path.resolve(__dirname, "..", "..", "scripts", "setup-zkteco-biometric.ps1"),
+  "scripts/start-biometric-station.ps1": path.resolve(__dirname, "..", "..", "scripts", "start-biometric-station.ps1"),
+  "scripts/start-biometric-station.vbs": path.resolve(__dirname, "..", "..", "scripts", "start-biometric-station.vbs"),
+  "scripts/install-biometric-station.ps1": path.resolve(__dirname, "..", "..", "scripts", "install-biometric-station.ps1"),
+  "src/biometric-bridge/server.js": path.resolve(__dirname, "..", "biometric-bridge", "server.js"),
+  "src/biometric-bridge/windowsDiagnostics.js": path.resolve(__dirname, "..", "biometric-bridge", "windowsDiagnostics.js"),
+  "src/biometric-bridge/python_bridge.py": path.resolve(__dirname, "..", "biometric-bridge", "python_bridge.py"),
+  "src/biometric-bridge/providers/index.js": path.resolve(__dirname, "..", "biometric-bridge", "providers", "index.js"),
+  "src/biometric-bridge/providers/operatorConsoleProvider.js": path.resolve(
+    __dirname,
+    "..",
+    "biometric-bridge",
+    "providers",
+    "operatorConsoleProvider.js"
+  ),
+  "src/biometric-bridge/providers/zktecoSdkProvider.js": path.resolve(
+    __dirname,
+    "..",
+    "biometric-bridge",
+    "providers",
+    "zktecoSdkProvider.js"
+  ),
+};
+const WINDOWS_BIOMETRIC_HELPER_FILES = [
+  "package.json",
+  ...Object.keys(WINDOWS_BIOMETRIC_HELPER_FILE_MAP),
+];
 
 function normalizeCurrencies(currencies = []) {
   const normalized = Array.isArray(currencies)
@@ -26,6 +54,163 @@ function normalizeCurrencies(currencies = []) {
   );
 
   return uniqueByCode.length ? uniqueByCode : DEFAULT_CURRENCIES;
+}
+
+function getRequestOrigin(req) {
+  const forwardedProtocol = String(req.headers["x-forwarded-proto"] || req.protocol || "https")
+    .split(",")[0]
+    .trim();
+  const forwardedHost = String(req.headers["x-forwarded-host"] || req.get("host") || "")
+    .split(",")[0]
+    .trim();
+
+  return `${forwardedProtocol || "https"}://${forwardedHost}`;
+}
+
+function normalizeHelperAssetPath(value = "") {
+  return String(value || "")
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
+    .trim();
+}
+
+function getWindowsHelperPackageJson() {
+  return JSON.stringify(
+    {
+      name: "churchv2-biometric-bridge",
+      version: "1.0.0",
+      private: true,
+      description: "Portable ChurchV2 biometric bridge helper",
+      main: "src/biometric-bridge/server.js",
+      scripts: {
+        "biometric:bridge": "node src/biometric-bridge/server.js",
+      },
+      dependencies: {
+        cors: "^2.8.6",
+        express: "^5.2.1",
+      },
+    },
+    null,
+    2
+  );
+}
+
+function getWindowsHelperAsset(normalizedPath = "") {
+  if (normalizedPath === "package.json") {
+    return {
+      content: `${getWindowsHelperPackageJson()}\n`,
+      contentType: "application/json; charset=utf-8",
+    };
+  }
+
+  const filePath = WINDOWS_BIOMETRIC_HELPER_FILE_MAP[normalizedPath];
+  if (!filePath || !fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const extension = path.extname(filePath).toLowerCase();
+  const contentType =
+    extension === ".json"
+      ? "application/json; charset=utf-8"
+      : extension === ".py"
+        ? "text/x-python; charset=utf-8"
+        : "text/plain; charset=utf-8";
+
+  return {
+    content: fs.readFileSync(filePath, "utf8"),
+    contentType,
+  };
+}
+
+function buildWindowsBootstrapScript(req) {
+  const baseUrl = `${getRequestOrigin(req)}/api/setup/biometric-helper/windows`;
+  const downloadList = WINDOWS_BIOMETRIC_HELPER_FILES.map((item) => `'${item}'`).join(",\n  ");
+
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    "$ProgressPreference = 'SilentlyContinue'",
+    `$baseUrl = '${baseUrl}'`,
+    "$installDir = Join-Path $env:LOCALAPPDATA 'ChurchV2BiometricBridge'",
+    "$files = @(",
+    `  ${downloadList}`,
+    ")",
+    "",
+    "function Save-HelperFile {",
+    "  param(",
+    "    [string]$RelativePath",
+    "  )",
+    "",
+    "  $targetPath = Join-Path $installDir ($RelativePath -replace '/', '\\')",
+    "  $targetDirectory = Split-Path -Parent $targetPath",
+    "  if ($targetDirectory -and -not (Test-Path $targetDirectory)) {",
+    "    New-Item -ItemType Directory -Force -Path $targetDirectory | Out-Null",
+    "  }",
+    "",
+    "  $encodedPath = [System.Uri]::EscapeDataString($RelativePath)",
+    "  Invoke-WebRequest -UseBasicParsing -Uri \"$baseUrl/file?path=$encodedPath\" -OutFile $targetPath",
+    "}",
+    "",
+    "Write-Host ''",
+    "Write-Host 'ChurchV2 Fingerprint Bridge Installer'",
+    "Write-Host '-----------------------------------'",
+    "Write-Host \"Install folder: $installDir\"",
+    "New-Item -ItemType Directory -Force -Path $installDir | Out-Null",
+    "",
+    "foreach ($file in $files) {",
+    "  Write-Host \"Downloading $file\"",
+    "  Save-HelperFile -RelativePath $file",
+    "}",
+    "",
+    "$setupScript = Join-Path $installDir 'scripts\\setup-zkteco-biometric.ps1'",
+    "$shortcutScript = Join-Path $installDir 'scripts\\install-biometric-station.ps1'",
+    "$startScript = Join-Path $installDir 'scripts\\start-biometric-station.ps1'",
+    "",
+    "Write-Host ''",
+    "Write-Host 'Running helper setup...'",
+    "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript",
+    "if ($LASTEXITCODE -ne 0) {",
+    "  throw 'ChurchV2 fingerprint helper setup failed.'",
+    "}",
+    "",
+    "Write-Host ''",
+    "Write-Host 'Creating desktop and startup shortcuts...'",
+    "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $shortcutScript -InstallStartup",
+    "if ($LASTEXITCODE -ne 0) {",
+    "  throw 'ChurchV2 fingerprint helper shortcut setup failed.'",
+    "}",
+    "",
+    "Write-Host ''",
+    "Write-Host 'Starting fingerprint helper...'",
+    "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startScript -OpenHealth",
+    "if ($LASTEXITCODE -ne 0) {",
+    "  throw 'ChurchV2 fingerprint helper did not start correctly.'",
+    "}",
+    "",
+    "Write-Host ''",
+    "Write-Host 'Done. You can now use fingerprint enrollment and attendance check-in from the browser on this machine.'",
+    "Write-Host 'A desktop shortcut named ChurchV2 Fingerprint Bridge was created for this Windows user.'",
+    "Write-Host ''",
+    "Read-Host 'Press Enter to close this installer'",
+  ].join("\r\n");
+}
+
+function buildWindowsInstallerCommand(req) {
+  const bootstrapUrl = `${getRequestOrigin(req)}/api/setup/biometric-helper/windows/bootstrap.ps1`;
+  return [
+    "@echo off",
+    "setlocal",
+    "title ChurchV2 Fingerprint Bridge Installer",
+    "echo.",
+    "echo Starting ChurchV2 fingerprint installer...",
+    `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; $script = Invoke-WebRequest -UseBasicParsing -Uri '${bootstrapUrl}'; Invoke-Expression $script.Content"`,
+    "if errorlevel 1 (",
+    "  echo.",
+    "  echo ChurchV2 fingerprint installer did not finish successfully.",
+    "  pause",
+    "  exit /b 1",
+    ")",
+    "exit /b 0",
+  ].join("\r\n");
 }
 
 router.get("/branding", async (req, res) => {
@@ -66,6 +251,29 @@ router.get("/biometric-helper/guide", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
+});
+
+router.get("/biometric-helper/windows/download", async (req, res) => {
+  res.setHeader("Content-Disposition", 'attachment; filename="ChurchV2-Biometric-Setup.cmd"');
+  res.type("application/octet-stream");
+  res.send(buildWindowsInstallerCommand(req));
+});
+
+router.get("/biometric-helper/windows/bootstrap.ps1", async (req, res) => {
+  res.type("text/plain");
+  res.send(buildWindowsBootstrapScript(req));
+});
+
+router.get("/biometric-helper/windows/file", async (req, res) => {
+  const normalizedPath = normalizeHelperAssetPath(req.query.path);
+  const asset = getWindowsHelperAsset(normalizedPath);
+
+  if (!asset) {
+    return res.status(404).json({ message: "Biometric helper file was not found." });
+  }
+
+  res.type(asset.contentType);
+  return res.send(asset.content);
 });
 
 router.put("/branding", authenticate, authorizePermissions(PERMISSIONS.MANAGE_SYSTEM), async (req, res) => {

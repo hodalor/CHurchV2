@@ -4,7 +4,7 @@ import { useAppContext } from "../../context/AppContext";
 import { formatDateTimeDisplay } from "../../utils/dateUtils";
 import {
   getBiometricBridgeUrl,
-  getBiometricHelperGuideUrl,
+  getBiometricHelperInstallerUrl,
   identifyFingerprint,
   setBiometricBridgeUrl,
   testBiometricBridge,
@@ -250,11 +250,18 @@ export default function AttendanceEventActionPanel({ event }) {
               disabled={attendanceApiState.loading}
               onClick={() => {
                 if (typeof window !== "undefined") {
-                  window.open(getBiometricHelperGuideUrl(), "_blank", "noopener,noreferrer");
+                  const link = window.document.createElement("a");
+                  link.href = getBiometricHelperInstallerUrl();
+                  link.rel = "noopener noreferrer";
+                  window.document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  setBiometricStatus("Installer download started. Open the downloaded ChurchV2-Biometric-Setup.cmd file on this Windows machine.");
+                  setBiometricStatusTone("info");
                 }
               }}
             >
-              Install / Configure Bridge
+              Download Windows Installer
             </button>
             <button
               type="button"
