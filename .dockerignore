@@ -1,0 +1,10 @@
+.git
+.github
+**/node_modules
+**/coverage
+**/.venv-biometric
+**/__pycache__
+backend/vendor
+backend/.biometric-registry.json
+frontend/build
+frontend/node_modules
