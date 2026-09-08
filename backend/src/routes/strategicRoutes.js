@@ -81,92 +81,129 @@ registerCrud({
   managePermission: PERMISSIONS.MANAGE_STRATEGIC_PLANNING,
   moduleName: "Strategic Planning",
   recordType: "KPITarget",
-  populateQuery: (query) => query.populate("kpiId", "name unit").sort({ period: -1, createdAt: -1 }),
+  populateQuery: (query) =>
+    query.populate("kpiId", "name unit").sort({ period: -1, createdAt: -1 }),
 });
 
-router.get("/actuals", authorizePermissions(PERMISSIONS.VIEW_STRATEGIC_PLANNING), async (req, res) => {
-  const actuals = await KPIActual.find()
-    .populate("kpiId", "name unit")
-    .populate("capturedBy", "displayName username")
-    .populate("ragStatus", "label key")
-    .sort({ period: -1, createdAt: -1 });
-  res.json(actuals);
-});
-
-router.post("/actuals", authorizePermissions(PERMISSIONS.MANAGE_STRATEGIC_PLANNING), async (req, res) => {
-  try {
-    const computed = await computeKpiActualFields(req.body.kpiId, req.body.period, req.body.actualValue);
-    const actual = await KPIActual.findOneAndUpdate(
-      { kpiId: req.body.kpiId, period: req.body.period },
-      {
-        $set: {
-          ...req.body,
-          capturedBy: req.user?._id || null,
-          capturedDate: new Date(),
-          variance: computed.variance,
-          ragStatus: computed.ragStatus?._id || null,
-        },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    )
+router.get(
+  "/actuals",
+  authorizePermissions(PERMISSIONS.VIEW_STRATEGIC_PLANNING),
+  async (req, res) => {
+    const actuals = await KPIActual.find()
       .populate("kpiId", "name unit")
       .populate("capturedBy", "displayName username")
-      .populate("ragStatus", "label key");
-    res.status(201).json(actual);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+      .populate("ragStatus", "label key")
+      .sort({ period: -1, createdAt: -1 });
+    res.json(actuals);
   }
-});
+);
 
-router.delete("/actuals/:id", authorizePermissions(PERMISSIONS.MANAGE_STRATEGIC_PLANNING), async (req, res) => {
-  const actual = await KPIActual.findById(req.params.id);
-  if (!actual) {
-    return res.status(404).json({ message: "KPI actual not found." });
+router.post(
+  "/actuals",
+  authorizePermissions(PERMISSIONS.MANAGE_STRATEGIC_PLANNING),
+  async (req, res) => {
+    try {
+      const computed = await computeKpiActualFields(
+        req.body.kpiId,
+        req.body.period,
+        req.body.actualValue
+      );
+      const actual = await KPIActual.findOneAndUpdate(
+        { kpiId: req.body.kpiId, period: req.body.period },
+        {
+          $set: {
+            ...req.body,
+            capturedBy: req.user?._id || null,
+            capturedDate: new Date(),
+            variance: computed.variance,
+            ragStatus: computed.ragStatus?._id || null,
+          },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      )
+        .populate("kpiId", "name unit")
+        .populate("capturedBy", "displayName username")
+        .populate("ragStatus", "label key");
+      res.status(201).json(actual);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
+);
 
-  const previousValue = actual.toObject();
-  await KPIActual.deleteOne({ _id: actual._id });
-  await logAudit({
-    action: "delete",
-    module: "Strategic Planning",
-    recordType: "KPIActual",
-    recordId: String(actual._id),
-    previousValue,
-    user: req.user,
-    ipAddress: req.ip,
-  });
-  return res.json({ success: true });
-});
+router.delete(
+  "/actuals/:id",
+  authorizePermissions(PERMISSIONS.MANAGE_STRATEGIC_PLANNING),
+  async (req, res) => {
+    const actual = await KPIActual.findById(req.params.id);
+    if (!actual) {
+      return res.status(404).json({ message: "KPI actual not found." });
+    }
 
-router.get("/scorecards/ministry/:ministryId", authorizePermissions(PERMISSIONS.VIEW_STRATEGIC_PLANNING), async (req, res) => {
-  try {
-    const scorecard = await getStrategicScorecard({ ministryId: req.params.ministryId });
-    res.json(scorecard);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+    const previousValue = actual.toObject();
+    await KPIActual.deleteOne({ _id: actual._id });
+    await logAudit({
+      action: "delete",
+      module: "Strategic Planning",
+      recordType: "KPIActual",
+      recordId: String(actual._id),
+      previousValue,
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.json({ success: true });
   }
-});
+);
 
-router.get("/scorecards/church", authorizePermissions(PERMISSIONS.VIEW_STRATEGIC_PLANNING), async (req, res) => {
-  try {
-    const scorecard = await getStrategicScorecard({});
-    res.json(scorecard);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.get(
+  "/scorecards/ministry/:ministryId",
+  authorizePermissions(PERMISSIONS.VIEW_STRATEGIC_PLANNING),
+  async (req, res) => {
+    try {
+      const scorecard = await getStrategicScorecard({ ministryId: req.params.ministryId });
+      res.json(scorecard);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
-function registerCrud({ path, Model, viewPermission, managePermission, moduleName, recordType, populateQuery }) {
+router.get(
+  "/scorecards/church",
+  authorizePermissions(PERMISSIONS.VIEW_STRATEGIC_PLANNING),
+  async (req, res) => {
+    try {
+      const scorecard = await getStrategicScorecard({});
+      res.json(scorecard);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+);
+
+function registerCrud({
+  path,
+  Model,
+  viewPermission,
+  managePermission,
+  moduleName,
+  recordType,
+  populateQuery,
+}) {
   router.get(path, authorizePermissions(viewPermission), async (req, res) => {
     const query = Model.find();
-    const records = populateQuery ? await populateQuery(query) : await query.sort({ createdAt: -1 });
+    const records = populateQuery
+      ? await populateQuery(query)
+      : await query.sort({ createdAt: -1 });
     res.json(records);
   });
 
   router.post(path, authorizePermissions(managePermission), async (req, res) => {
     try {
       const record = await Model.create(req.body);
-      const hydratedRecord = populateQuery ? await populateQuery(Model.find({ _id: record._id })) : [record];
+      const hydratedRecord = populateQuery
+        ? await populateQuery(Model.find({ _id: record._id }))
+        : [record];
       await logAudit({
         action: "create",
         module: moduleName,
@@ -201,7 +238,9 @@ function registerCrud({ path, Model, viewPermission, managePermission, moduleNam
       user: req.user,
       ipAddress: req.ip,
     });
-    const hydratedRecord = populateQuery ? await populateQuery(Model.find({ _id: record._id })) : [record];
+    const hydratedRecord = populateQuery
+      ? await populateQuery(Model.find({ _id: record._id }))
+      : [record];
     return res.json(Array.isArray(hydratedRecord) ? hydratedRecord[0] : hydratedRecord);
   });
 

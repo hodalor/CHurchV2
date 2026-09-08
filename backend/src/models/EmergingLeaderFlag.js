@@ -32,5 +32,3 @@ const emergingLeaderFlagSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("EmergingLeaderFlag", emergingLeaderFlagSchema);
-
-

@@ -116,5 +116,3 @@ const evangelismProspectSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("EvangelismProspect", evangelismProspectSchema);
-
-

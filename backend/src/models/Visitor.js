@@ -132,5 +132,3 @@ visitorSchema.index(
 );
 
 module.exports = createScopedModel("Visitor", visitorSchema);
-
-

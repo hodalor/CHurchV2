@@ -30,5 +30,3 @@ const roleSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("Role", roleSchema);
-
-

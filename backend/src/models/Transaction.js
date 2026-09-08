@@ -146,5 +146,3 @@ const transactionSchema = new mongoose.Schema(
 transactionSchema.index({ date: -1, createdAt: -1 });
 
 module.exports = createScopedModel("Transaction", transactionSchema);
-
-

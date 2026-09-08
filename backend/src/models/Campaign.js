@@ -28,5 +28,3 @@ const campaignSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("Campaign", campaignSchema);
-
-

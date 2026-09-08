@@ -116,7 +116,10 @@ router.post("/", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, r
 
 router.get("/:memberId/qr", authorizePermissions(PERMISSIONS.VIEW_MEMBERS), async (req, res) => {
   try {
-    const member = await Member.findById(req.params.memberId).populate("qrRegeneratedBy", "displayName username");
+    const member = await Member.findById(req.params.memberId).populate(
+      "qrRegeneratedBy",
+      "displayName username"
+    );
     if (!member) {
       return res.status(404).json({ message: "Member not found." });
     }
@@ -136,107 +139,123 @@ router.get("/:memberId/qr", authorizePermissions(PERMISSIONS.VIEW_MEMBERS), asyn
   }
 });
 
-router.post("/:memberId/qr/regenerate", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
-  try {
-    const member = await Member.findById(req.params.memberId);
-    if (!member) {
-      return res.status(404).json({ message: "Member not found." });
-    }
+router.post(
+  "/:memberId/qr/regenerate",
+  authorizePermissions(PERMISSIONS.MANAGE_MEMBERS),
+  async (req, res) => {
+    try {
+      const member = await Member.findById(req.params.memberId);
+      if (!member) {
+        return res.status(404).json({ message: "Member not found." });
+      }
 
-    const previousValue = {
-      qrToken: member.qrToken,
-      qrCodeImageUrl: member.qrCodeImageUrl,
-      qrGeneratedAt: member.qrGeneratedAt,
-      qrRegeneratedAt: member.qrRegeneratedAt,
-      qrActive: member.qrActive,
-    };
-
-    await regenerateMemberQr(member, req.user || null);
-    const populatedMember = await populateMemberById(member._id);
-
-    await logAudit({
-      action: "update",
-      module: "Members",
-      recordType: "Member",
-      recordId: member.memberId,
-      previousValue,
-      newValue: {
+      const previousValue = {
         qrToken: member.qrToken,
         qrCodeImageUrl: member.qrCodeImageUrl,
         qrGeneratedAt: member.qrGeneratedAt,
         qrRegeneratedAt: member.qrRegeneratedAt,
         qrActive: member.qrActive,
-      },
-      user: req.user,
-      ipAddress: req.ip,
-    });
+      };
 
-    return res.json(populatedMember);
-  } catch (error) {
-    return res.status(400).json({ message: error.message });
-  }
-});
+      await regenerateMemberQr(member, req.user || null);
+      const populatedMember = await populateMemberById(member._id);
 
-router.post("/:memberId/biometric", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
-  try {
-    const member = await Member.findById(req.params.memberId);
-    if (!member) {
-      return res.status(404).json({ message: "Member not found." });
+      await logAudit({
+        action: "update",
+        module: "Members",
+        recordType: "Member",
+        recordId: member.memberId,
+        previousValue,
+        newValue: {
+          qrToken: member.qrToken,
+          qrCodeImageUrl: member.qrCodeImageUrl,
+          qrGeneratedAt: member.qrGeneratedAt,
+          qrRegeneratedAt: member.qrRegeneratedAt,
+          qrActive: member.qrActive,
+        },
+        user: req.user,
+        ipAddress: req.ip,
+      });
+
+      return res.json(populatedMember);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-
-    const previousValue = member.biometric?.toObject ? member.biometric.toObject() : member.biometric || {};
-    await enrollSubjectBiometric({
-      subjectType: "member",
-      subject: member,
-      payload: req.body,
-      user: req.user || null,
-    });
-    const populatedMember = await populateMemberById(member._id);
-
-    await logAudit({
-      action: "update",
-      module: "Members",
-      recordType: "Member",
-      recordId: member.memberId,
-      previousValue: { biometric: previousValue },
-      newValue: { biometric: member.biometric },
-      user: req.user,
-      ipAddress: req.ip,
-    });
-
-    return res.json(populatedMember);
-  } catch (error) {
-    return res.status(400).json({ message: error.message });
   }
-});
+);
 
-router.delete("/:memberId/biometric", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
-  try {
-    const member = await Member.findById(req.params.memberId);
-    if (!member) {
-      return res.status(404).json({ message: "Member not found." });
+router.post(
+  "/:memberId/biometric",
+  authorizePermissions(PERMISSIONS.MANAGE_MEMBERS),
+  async (req, res) => {
+    try {
+      const member = await Member.findById(req.params.memberId);
+      if (!member) {
+        return res.status(404).json({ message: "Member not found." });
+      }
+
+      const previousValue = member.biometric?.toObject
+        ? member.biometric.toObject()
+        : member.biometric || {};
+      await enrollSubjectBiometric({
+        subjectType: "member",
+        subject: member,
+        payload: req.body,
+        user: req.user || null,
+      });
+      const populatedMember = await populateMemberById(member._id);
+
+      await logAudit({
+        action: "update",
+        module: "Members",
+        recordType: "Member",
+        recordId: member.memberId,
+        previousValue: { biometric: previousValue },
+        newValue: { biometric: member.biometric },
+        user: req.user,
+        ipAddress: req.ip,
+      });
+
+      return res.json(populatedMember);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-
-    const previousValue = member.biometric?.toObject ? member.biometric.toObject() : member.biometric || {};
-    await clearSubjectBiometric(member);
-    const populatedMember = await populateMemberById(member._id);
-
-    await logAudit({
-      action: "update",
-      module: "Members",
-      recordType: "Member",
-      recordId: member.memberId,
-      previousValue: { biometric: previousValue },
-      newValue: { biometric: member.biometric },
-      user: req.user,
-      ipAddress: req.ip,
-    });
-
-    return res.json(populatedMember);
-  } catch (error) {
-    return res.status(400).json({ message: error.message });
   }
-});
+);
+
+router.delete(
+  "/:memberId/biometric",
+  authorizePermissions(PERMISSIONS.MANAGE_MEMBERS),
+  async (req, res) => {
+    try {
+      const member = await Member.findById(req.params.memberId);
+      if (!member) {
+        return res.status(404).json({ message: "Member not found." });
+      }
+
+      const previousValue = member.biometric?.toObject
+        ? member.biometric.toObject()
+        : member.biometric || {};
+      await clearSubjectBiometric(member);
+      const populatedMember = await populateMemberById(member._id);
+
+      await logAudit({
+        action: "update",
+        module: "Members",
+        recordType: "Member",
+        recordId: member.memberId,
+        previousValue: { biometric: previousValue },
+        newValue: { biometric: member.biometric },
+        user: req.user,
+        ipAddress: req.ip,
+      });
+
+      return res.json(populatedMember);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+  }
+);
 
 router.put("/:memberId", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async (req, res) => {
   try {
@@ -252,12 +271,16 @@ router.put("/:memberId", authorizePermissions(PERMISSIONS.MANAGE_MEMBERS), async
 
     Object.assign(member, updatePayload);
     await member.save();
-    const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("member", {
-      ...member.toObject(),
-      familyId: member.familyId,
-    }, {
-      minimumScore: 55,
-    });
+    const duplicateCandidates = await evaluateDuplicateCandidatesForRecord(
+      "member",
+      {
+        ...member.toObject(),
+        familyId: member.familyId,
+      },
+      {
+        minimumScore: 55,
+      }
+    );
     if (duplicateCandidates.length) {
       const enrichedCandidates = await Promise.all(
         duplicateCandidates

@@ -86,5 +86,3 @@ const bibleStudySchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("BibleStudy", bibleStudySchema);
-
-

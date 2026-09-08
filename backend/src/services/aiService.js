@@ -113,7 +113,13 @@ async function upsertAiSuggestion({
   return existing;
 }
 
-async function reviewAiSuggestion({ suggestionId, status, reviewer, reviewNotes = "", ipAddress = "" }) {
+async function reviewAiSuggestion({
+  suggestionId,
+  status,
+  reviewer,
+  reviewNotes = "",
+  ipAddress = "",
+}) {
   const suggestion = await AiSuggestion.findById(suggestionId);
   if (!suggestion) {
     throw new Error("AI suggestion not found.");
@@ -140,7 +146,13 @@ async function reviewAiSuggestion({ suggestionId, status, reviewer, reviewNotes 
   return suggestion;
 }
 
-async function reviewDuplicateCandidate({ candidateId, status, reviewer, reviewNotes = "", ipAddress = "" }) {
+async function reviewDuplicateCandidate({
+  candidateId,
+  status,
+  reviewer,
+  reviewNotes = "",
+  ipAddress = "",
+}) {
   const candidate = await DuplicateCandidate.findById(candidateId);
   if (!candidate) {
     throw new Error("Duplicate candidate not found.");
@@ -170,7 +182,12 @@ async function reviewDuplicateCandidate({ candidateId, status, reviewer, reviewN
   return candidate;
 }
 
-async function generateDuplicateExplanation({ recordType, incomingLabel, candidateLabel, reasons = [] }) {
+async function generateDuplicateExplanation({
+  recordType,
+  incomingLabel,
+  candidateLabel,
+  reasons = [],
+}) {
   if (!hasClaudeConfig()) {
     return {
       text: reasons.join(". "),

@@ -51,5 +51,3 @@ const auditLogSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("AuditLog", auditLogSchema);
-
-

@@ -11,7 +11,9 @@ function canAccessCareNote(note, user) {
   const tier = note?.confidentialityTier || "Standard";
   const userId = String(user?._id || "");
   const roles = new Set(user?.roles || []);
-  const overrideIds = new Set((note?.visibleToOverride || []).map((value) => String(value?._id || value)));
+  const overrideIds = new Set(
+    (note?.visibleToOverride || []).map((value) => String(value?._id || value))
+  );
 
   if (overrideIds.has(userId)) {
     return true;
@@ -22,10 +24,17 @@ function canAccessCareNote(note, user) {
   }
 
   if (tier === "Restricted") {
-    return roles.has(ROLES.ELDERS) || roles.has(ROLES.DEACONS) || roles.has(ROLES.CHURCH_ADMINISTRATOR);
+    return (
+      roles.has(ROLES.ELDERS) || roles.has(ROLES.DEACONS) || roles.has(ROLES.CHURCH_ADMINISTRATOR)
+    );
   }
 
-  return roles.has(ROLES.ELDERS) || roles.has(ROLES.DEACONS) || roles.has(ROLES.CHURCH_ADMINISTRATOR) || roles.has(ROLES.MINISTRY_LEADERS);
+  return (
+    roles.has(ROLES.ELDERS) ||
+    roles.has(ROLES.DEACONS) ||
+    roles.has(ROLES.CHURCH_ADMINISTRATOR) ||
+    roles.has(ROLES.MINISTRY_LEADERS)
+  );
 }
 
 function getHighestCareTier(notes = []) {

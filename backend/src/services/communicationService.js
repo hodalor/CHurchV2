@@ -66,26 +66,35 @@ async function enforceCommunicationPreferences(audience, channelId) {
   }).lean();
 
   const optedOutMembers = new Set(
-    preferences.filter((item) => item.memberId && item.optedIn === false).map((item) => String(item.memberId))
+    preferences
+      .filter((item) => item.memberId && item.optedIn === false)
+      .map((item) => String(item.memberId))
   );
   const optedOutVisitors = new Set(
-    preferences.filter((item) => item.visitorId && item.optedIn === false).map((item) => String(item.visitorId))
+    preferences
+      .filter((item) => item.visitorId && item.optedIn === false)
+      .map((item) => String(item.visitorId))
   );
 
   return {
     members: audience.members.filter(
       (member) =>
-        !optedOutMembers.has(String(member._id)) && String(member.membershipStatus || "").toLowerCase() !== "inactive"
+        !optedOutMembers.has(String(member._id)) &&
+        String(member.membershipStatus || "").toLowerCase() !== "inactive"
     ),
     visitors: audience.visitors.filter(
-      (visitor) => !optedOutVisitors.has(String(visitor._id)) && String(visitor.status?.label || "").toLowerCase() !== "lapsed"
+      (visitor) =>
+        !optedOutVisitors.has(String(visitor._id)) &&
+        String(visitor.status?.label || "").toLowerCase() !== "lapsed"
     ),
   };
 }
 
 async function resolveMembers(filterCriteria = {}, group = null) {
   if (group?.frozen && Array.isArray(group.frozenMembers) && group.frozenMembers.length) {
-    return Member.find({ _id: { $in: group.frozenMembers } }).populate("ministry", "name color").lean();
+    return Member.find({ _id: { $in: group.frozenMembers } })
+      .populate("ministry", "name color")
+      .lean();
   }
 
   const query = {};
@@ -107,7 +116,9 @@ async function resolveMembers(filterCriteria = {}, group = null) {
 
 async function resolveVisitors(filterCriteria = {}, group = null) {
   if (group?.frozen && Array.isArray(group.frozenVisitors) && group.frozenVisitors.length) {
-    return Visitor.find({ _id: { $in: group.frozenVisitors } }).populate("status", "label key").lean();
+    return Visitor.find({ _id: { $in: group.frozenVisitors } })
+      .populate("status", "label key")
+      .lean();
   }
 
   const query = {};

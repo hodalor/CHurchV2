@@ -24,5 +24,3 @@ const kpiTargetSchema = new mongoose.Schema(
 kpiTargetSchema.index({ kpiId: 1, period: 1 }, { unique: true });
 
 module.exports = createScopedModel("KPITarget", kpiTargetSchema);
-
-

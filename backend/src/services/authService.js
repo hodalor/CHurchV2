@@ -3,15 +3,18 @@ const Church = require("../models/Church");
 const User = require("../models/User");
 const RefreshTokenSession = require("../models/RefreshTokenSession");
 const { setRequestContext } = require("../lib/requestContext");
-const { createAccessToken, createRefreshToken, hashToken, verifyRefreshToken } = require("../utils/tokenUtils");
-const { buildTenantAdminPermissions, ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
+const {
+  createAccessToken,
+  createRefreshToken,
+  hashToken,
+  verifyRefreshToken,
+} = require("../utils/tokenUtils");
+const { buildTenantAdminPermissions, ROLES } = require("../utils/permissions");
 
 function getEffectivePermissions(user) {
   const rolePermissions = user.roles.flatMap((role) => role.permissions || []);
   const configuredPermissions = Array.isArray(user.permissions) ? user.permissions : [];
-  return [
-    ...new Set(user.permissionsConfigured ? configuredPermissions : rolePermissions),
-  ];
+  return [...new Set(user.permissionsConfigured ? configuredPermissions : rolePermissions)];
 }
 
 async function syncDefaultTenantAdminPermissions(user, church) {
@@ -20,7 +23,9 @@ async function syncDefaultTenantAdminPermissions(user, church) {
   }
 
   const isChurchAdministrator = user.roles.some((role) => role.name === ROLES.CHURCH_ADMINISTRATOR);
-  const expectedUsername = String(church.createdAdmin?.username || "").trim().toLowerCase();
+  const expectedUsername = String(church.createdAdmin?.username || "")
+    .trim()
+    .toLowerCase();
   const isDefaultTenantAdmin = expectedUsername && user.username === expectedUsername;
 
   if (!isChurchAdministrator || !isDefaultTenantAdmin) {
@@ -50,7 +55,9 @@ async function authenticateWithUsernameAndPin({ username, pin, ipAddress = "", u
     tenantDbName: "",
   });
 
-  const user = await User.findOne({ username: String(username || "").toLowerCase() }).populate("roles");
+  const user = await User.findOne({ username: String(username || "").toLowerCase() }).populate(
+    "roles"
+  );
 
   if (!user || user.status !== "Active") {
     throw new Error("Invalid username or PIN.");
@@ -82,7 +89,9 @@ async function authenticateWithChurchIdUsernameAndPin({
   ipAddress = "",
   userAgent = "",
 }) {
-  const normalizedChurchId = String(churchId || "").trim().toLowerCase();
+  const normalizedChurchId = String(churchId || "")
+    .trim()
+    .toLowerCase();
   if (!normalizedChurchId) {
     throw new Error("Church ID is required.");
   }
@@ -98,7 +107,9 @@ async function authenticateWithChurchIdUsernameAndPin({
     tenantDbName: church.dbName,
   });
 
-  const user = await User.findOne({ username: String(username || "").toLowerCase() }).populate("roles");
+  const user = await User.findOne({ username: String(username || "").toLowerCase() }).populate(
+    "roles"
+  );
 
   if (!user || user.status !== "Active") {
     throw new Error("Invalid church ID, username, or PIN.");
@@ -204,7 +215,10 @@ async function revokeSession({ refreshToken, ipAddress = "" }) {
   }
 }
 
-async function issueTokensForUser(user, { ipAddress = "", userAgent = "", existingSession = null }) {
+async function issueTokensForUser(
+  user,
+  { ipAddress = "", userAgent = "", existingSession = null }
+) {
   const uniquePermissions = getEffectivePermissions(user);
   const roleNames = user.roles.map((role) => role.name);
   const scope = arguments[1]?.scope || "master";

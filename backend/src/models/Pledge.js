@@ -77,5 +77,3 @@ const pledgeSchema = new mongoose.Schema(
 pledgeSchema.index({ startDate: -1, createdAt: -1 });
 
 module.exports = createScopedModel("Pledge", pledgeSchema);
-
-

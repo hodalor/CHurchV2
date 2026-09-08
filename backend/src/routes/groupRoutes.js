@@ -95,12 +95,13 @@ async function normalizeGroupPayload(payload = {}, currentGroupId = null) {
 }
 
 async function generateGroupCode(name, currentGroupId = null) {
-  const baseCode = String(name)
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 18) || "GROUP";
+  const baseCode =
+    String(name)
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 18) || "GROUP";
 
   let code = baseCode;
   let suffix = 1;

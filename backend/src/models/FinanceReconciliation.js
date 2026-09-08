@@ -81,5 +81,3 @@ const financeReconciliationSchema = new mongoose.Schema(
 financeReconciliationSchema.index({ reconciliationDate: -1, createdAt: -1 });
 
 module.exports = createScopedModel("FinanceReconciliation", financeReconciliationSchema);
-
-

@@ -92,5 +92,3 @@ const aiSuggestionSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("AiSuggestion", aiSuggestionSchema);
-
-

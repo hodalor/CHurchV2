@@ -28,5 +28,3 @@ const strategicObjectiveSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("StrategicObjective", strategicObjectiveSchema);
-
-

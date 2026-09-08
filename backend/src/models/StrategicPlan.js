@@ -26,5 +26,3 @@ const strategicPlanSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("StrategicPlan", strategicPlanSchema);
-
-

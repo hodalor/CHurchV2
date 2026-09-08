@@ -127,8 +127,12 @@ router.put("/:userId", authorizePermissions(PERMISSIONS.MANAGE_USERS), async (re
     user.memberId = req.body.memberId || "";
     user.roles = roleIds;
     user.status = req.body.status || user.status || "Active";
-    user.permissions = Array.isArray(req.body.permissions) ? req.body.permissions : user.permissions || [];
-    user.permissionsConfigured = Array.isArray(req.body.permissions) ? true : user.permissionsConfigured;
+    user.permissions = Array.isArray(req.body.permissions)
+      ? req.body.permissions
+      : user.permissions || [];
+    user.permissionsConfigured = Array.isArray(req.body.permissions)
+      ? true
+      : user.permissionsConfigured;
 
     if (String(req.body.pin || "").trim()) {
       user.pinHash = await hashPin(req.body.pin);

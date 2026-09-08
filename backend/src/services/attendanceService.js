@@ -5,12 +5,15 @@ const LookupValue = require("../models/LookupValue");
 const Member = require("../models/Member");
 const Ministry = require("../models/Ministry");
 const PendingAction = require("../models/PendingAction");
-const User = require("../models/User");
 const Visitor = require("../models/Visitor");
 const { markBiometricMatch, resolveBiometricSubject } = require("./biometricService");
 const { findMemberByQrToken } = require("./memberQrService");
 const { createPendingAction } = require("./pendingActionService");
-const { getLookupTypeByKey, getLookupValueByTypeAndKey, listLookupValuesByType } = require("./lookupService");
+const {
+  getLookupTypeByKey,
+  getLookupValueByTypeAndKey,
+  listLookupValuesByType,
+} = require("./lookupService");
 const { createVisitor } = require("./visitorService");
 
 async function createAttendanceEvent(payload, user = null) {
@@ -218,7 +221,12 @@ async function checkInVisitorForEvent(event, payload = {}, user = null) {
   };
 }
 
-async function checkInByBiometricTemplate(event, templateRef, user = null, captureMode = "biometric") {
+async function checkInByBiometricTemplate(
+  event,
+  templateRef,
+  user = null,
+  captureMode = "biometric"
+) {
   assertCheckInOpen(event);
   const { subjectType, subject } = await resolveBiometricSubject(templateRef);
   const record = await captureAttendanceRecord(
@@ -393,7 +401,8 @@ async function resolveEventType(value) {
 
   const eventTypes = await listLookupValuesByType("attendance_event_type");
   return (
-    eventTypes.find((item) => String(item._id) === String(value) || item.key === String(value)) || null
+    eventTypes.find((item) => String(item._id) === String(value) || item.key === String(value)) ||
+    null
   );
 }
 
@@ -404,7 +413,9 @@ async function resolveCaptureMode(value) {
 
   const captureModes = await listLookupValuesByType("attendance_capture_mode");
   const normalizedValue = String(value).trim().toLowerCase();
-  const existing = captureModes.find((item) => String(item._id) === String(value) || item.key === normalizedValue);
+  const existing = captureModes.find(
+    (item) => String(item._id) === String(value) || item.key === normalizedValue
+  );
   if (existing) {
     return existing;
   }

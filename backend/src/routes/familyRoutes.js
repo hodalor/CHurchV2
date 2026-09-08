@@ -85,7 +85,9 @@ module.exports = router;
 
 async function generateNextFamilyId() {
   const latestFamily = await Family.findOne().sort({ familyId: -1 }).lean();
-  const latestNumericPart = latestFamily ? Number(String(latestFamily.familyId).replace("HH", "")) : 0;
+  const latestNumericPart = latestFamily
+    ? Number(String(latestFamily.familyId).replace("HH", ""))
+    : 0;
   return `HH${String((Number.isNaN(latestNumericPart) ? 0 : latestNumericPart) + 1).padStart(6, "0")}`;
 }
 
@@ -142,9 +144,7 @@ function normalizeLookupArray(value) {
     return [];
   }
 
-  return value
-    .map((item) => normalizeLookup(item))
-    .filter(Boolean);
+  return value.map((item) => normalizeLookup(item)).filter(Boolean);
 }
 
 function normalizeHouseholdMembers(value) {
@@ -182,10 +182,16 @@ async function syncMembersToFamily(family) {
 }
 
 async function createHouseholdDuplicateCandidates(family, user = null, ipAddress = "") {
-  const duplicateCandidates = await evaluateDuplicateCandidatesForRecord("household", family.toObject(), {
-    minimumScore: 55,
-  });
-  const filteredCandidates = duplicateCandidates.filter((candidate) => candidate.recordId !== family.familyId).slice(0, 5);
+  const duplicateCandidates = await evaluateDuplicateCandidatesForRecord(
+    "household",
+    family.toObject(),
+    {
+      minimumScore: 55,
+    }
+  );
+  const filteredCandidates = duplicateCandidates
+    .filter((candidate) => candidate.recordId !== family.familyId)
+    .slice(0, 5);
   if (!filteredCandidates.length) {
     return;
   }

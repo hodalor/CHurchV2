@@ -10,14 +10,54 @@ const { PERMISSIONS } = require("../utils/permissions");
 const router = express.Router();
 const DEFAULT_CURRENCIES = [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }];
 const WINDOWS_BIOMETRIC_HELPER_FILE_MAP = {
-  "scripts/setup-zkteco-biometric.ps1": path.resolve(__dirname, "..", "..", "scripts", "setup-zkteco-biometric.ps1"),
-  "scripts/start-biometric-station.ps1": path.resolve(__dirname, "..", "..", "scripts", "start-biometric-station.ps1"),
-  "scripts/start-biometric-station.vbs": path.resolve(__dirname, "..", "..", "scripts", "start-biometric-station.vbs"),
-  "scripts/install-biometric-station.ps1": path.resolve(__dirname, "..", "..", "scripts", "install-biometric-station.ps1"),
+  "scripts/setup-zkteco-biometric.ps1": path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "scripts",
+    "setup-zkteco-biometric.ps1"
+  ),
+  "scripts/start-biometric-station.ps1": path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "scripts",
+    "start-biometric-station.ps1"
+  ),
+  "scripts/start-biometric-station.vbs": path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "scripts",
+    "start-biometric-station.vbs"
+  ),
+  "scripts/install-biometric-station.ps1": path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "scripts",
+    "install-biometric-station.ps1"
+  ),
   "src/biometric-bridge/server.js": path.resolve(__dirname, "..", "biometric-bridge", "server.js"),
-  "src/biometric-bridge/windowsDiagnostics.js": path.resolve(__dirname, "..", "biometric-bridge", "windowsDiagnostics.js"),
-  "src/biometric-bridge/python_bridge.py": path.resolve(__dirname, "..", "biometric-bridge", "python_bridge.py"),
-  "src/biometric-bridge/providers/index.js": path.resolve(__dirname, "..", "biometric-bridge", "providers", "index.js"),
+  "src/biometric-bridge/windowsDiagnostics.js": path.resolve(
+    __dirname,
+    "..",
+    "biometric-bridge",
+    "windowsDiagnostics.js"
+  ),
+  "src/biometric-bridge/python_bridge.py": path.resolve(
+    __dirname,
+    "..",
+    "biometric-bridge",
+    "python_bridge.py"
+  ),
+  "src/biometric-bridge/providers/index.js": path.resolve(
+    __dirname,
+    "..",
+    "biometric-bridge",
+    "providers",
+    "index.js"
+  ),
   "src/biometric-bridge/providers/operatorConsoleProvider.js": path.resolve(
     __dirname,
     "..",
@@ -42,7 +82,9 @@ function normalizeCurrencies(currencies = []) {
   const normalized = Array.isArray(currencies)
     ? currencies
         .map((item) => ({
-          code: String(item?.code || "").trim().toUpperCase(),
+          code: String(item?.code || "")
+            .trim()
+            .toUpperCase(),
           name: String(item?.name || "").trim(),
           symbol: String(item?.symbol || "").trim(),
         }))
@@ -147,17 +189,17 @@ function buildWindowsBootstrapScript(req) {
     "  }",
     "",
     "  $encodedPath = [System.Uri]::EscapeDataString($RelativePath)",
-    "  Invoke-WebRequest -UseBasicParsing -Uri \"$baseUrl/file?path=$encodedPath\" -OutFile $targetPath",
+    '  Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/file?path=$encodedPath" -OutFile $targetPath',
     "}",
     "",
     "Write-Host ''",
     "Write-Host 'ChurchV2 Fingerprint Bridge Installer'",
     "Write-Host '-----------------------------------'",
-    "Write-Host \"Install folder: $installDir\"",
+    'Write-Host "Install folder: $installDir"',
     "New-Item -ItemType Directory -Force -Path $installDir | Out-Null",
     "",
     "foreach ($file in $files) {",
-    "  Write-Host \"Downloading $file\"",
+    '  Write-Host "Downloading $file"',
     "  Save-HelperFile -RelativePath $file",
     "}",
     "",
@@ -276,89 +318,124 @@ router.get("/biometric-helper/windows/file", async (req, res) => {
   return res.send(asset.content);
 });
 
-router.put("/branding", authenticate, authorizePermissions(PERMISSIONS.MANAGE_SYSTEM), async (req, res) => {
-  try {
-    const existingProfile = await ChurchProfile.findOne();
-    const brandingPayload = {
-      churchName: req.body.churchName,
-      address: req.body.address || "",
-      phone: req.body.phone || "",
-      email: req.body.email || "",
-      website: req.body.website || "",
-    };
+router.put(
+  "/branding",
+  authenticate,
+  authorizePermissions(PERMISSIONS.MANAGE_SYSTEM),
+  async (req, res) => {
+    try {
+      const existingProfile = await ChurchProfile.findOne();
+      const brandingPayload = {
+        churchName: req.body.churchName,
+        address: req.body.address || "",
+        phone: req.body.phone || "",
+        email: req.body.email || "",
+        website: req.body.website || "",
+      };
 
-    if (!existingProfile) {
-      const createdProfile = await ChurchProfile.create(brandingPayload);
-      return res.status(201).json(createdProfile);
+      if (!existingProfile) {
+        const createdProfile = await ChurchProfile.create(brandingPayload);
+        return res.status(201).json(createdProfile);
+      }
+
+      Object.assign(existingProfile, brandingPayload);
+      await existingProfile.save();
+      return res.json(existingProfile);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-
-    Object.assign(existingProfile, brandingPayload);
-    await existingProfile.save();
-    return res.json(existingProfile);
-  } catch (error) {
-    return res.status(400).json({ message: error.message });
   }
-});
+);
 
-router.put("/app-config", authenticate, authorizePermissions(PERMISSIONS.MANAGE_SETTINGS), async (req, res) => {
-  try {
-    const existingProfile = await ChurchProfile.findOne();
-    const currencies = normalizeCurrencies(req.body.currencies);
-    const requestedDefault = String(req.body.defaultCurrencyCode || "").trim().toUpperCase();
-    const appConfigPayload = {
-      appName: req.body.appName || "ChurchSuite Pro",
-      appLogoUrl: req.body.appLogoUrl || "",
-      currencies,
-      defaultCurrencyCode:
-        currencies.find((item) => item.code === requestedDefault)?.code || currencies[0]?.code || DEFAULT_CURRENCIES[0].code,
-      depositAccounts: Array.isArray(req.body.depositAccounts) ? req.body.depositAccounts : existingProfile?.depositAccounts || [],
-    };
+router.put(
+  "/app-config",
+  authenticate,
+  authorizePermissions(PERMISSIONS.MANAGE_SETTINGS),
+  async (req, res) => {
+    try {
+      const existingProfile = await ChurchProfile.findOne();
+      const currencies = normalizeCurrencies(req.body.currencies);
+      const requestedDefault = String(req.body.defaultCurrencyCode || "")
+        .trim()
+        .toUpperCase();
+      const appConfigPayload = {
+        appName: req.body.appName || "ChurchSuite Pro",
+        appLogoUrl: req.body.appLogoUrl || "",
+        currencies,
+        defaultCurrencyCode:
+          currencies.find((item) => item.code === requestedDefault)?.code ||
+          currencies[0]?.code ||
+          DEFAULT_CURRENCIES[0].code,
+        depositAccounts: Array.isArray(req.body.depositAccounts)
+          ? req.body.depositAccounts
+          : existingProfile?.depositAccounts || [],
+      };
 
-    if (!existingProfile) {
-      const createdProfile = await ChurchProfile.create({
-        churchName: "ChurchFlow Central",
-        ...appConfigPayload,
+      if (!existingProfile) {
+        const createdProfile = await ChurchProfile.create({
+          churchName: "ChurchFlow Central",
+          ...appConfigPayload,
+        });
+        return res.status(201).json(createdProfile);
+      }
+
+      Object.assign(existingProfile, appConfigPayload);
+      await existingProfile.save();
+      return res.json(existingProfile);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+  }
+);
+
+router.get(
+  "/deposit-accounts",
+  authenticate,
+  authorizePermissions(PERMISSIONS.VIEW_SETUP),
+  async (req, res) => {
+    try {
+      res.json(await listDepositAccounts());
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+router.post(
+  "/deposit-accounts",
+  authenticate,
+  authorizePermissions(PERMISSIONS.MANAGE_SETTINGS),
+  async (req, res) => {
+    try {
+      const accounts = await saveDepositAccount({
+        payload: req.body,
+        user: req.user,
+        ipAddress: req.ip,
       });
-      return res.status(201).json(createdProfile);
+      res.status(201).json(accounts);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
     }
-
-    Object.assign(existingProfile, appConfigPayload);
-    await existingProfile.save();
-    return res.json(existingProfile);
-  } catch (error) {
-    return res.status(400).json({ message: error.message });
   }
-});
+);
 
-router.get("/deposit-accounts", authenticate, authorizePermissions(PERMISSIONS.VIEW_SETUP), async (req, res) => {
-  try {
-    res.json(await listDepositAccounts());
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+router.put(
+  "/deposit-accounts/:accountId",
+  authenticate,
+  authorizePermissions(PERMISSIONS.MANAGE_SETTINGS),
+  async (req, res) => {
+    try {
+      const accounts = await saveDepositAccount({
+        accountId: req.params.accountId,
+        payload: req.body,
+        user: req.user,
+        ipAddress: req.ip,
+      });
+      res.json(accounts);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
-
-router.post("/deposit-accounts", authenticate, authorizePermissions(PERMISSIONS.MANAGE_SETTINGS), async (req, res) => {
-  try {
-    const accounts = await saveDepositAccount({ payload: req.body, user: req.user, ipAddress: req.ip });
-    res.status(201).json(accounts);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
-
-router.put("/deposit-accounts/:accountId", authenticate, authorizePermissions(PERMISSIONS.MANAGE_SETTINGS), async (req, res) => {
-  try {
-    const accounts = await saveDepositAccount({
-      accountId: req.params.accountId,
-      payload: req.body,
-      user: req.user,
-      ipAddress: req.ip,
-    });
-    res.json(accounts);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+);
 
 module.exports = router;

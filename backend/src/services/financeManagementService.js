@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Budget = require("../models/Budget");
-const ChurchProfile = require("../models/ChurchProfile");
 const Expense = require("../models/Expense");
 const FinanceReconciliation = require("../models/FinanceReconciliation");
 const Fund = require("../models/Fund");
@@ -163,7 +162,8 @@ async function voidTransaction({ transactionId, reason, user, ipAddress = "" }) 
       recordedBy: user?._id,
       approvedBy: user?._id,
       approvedAt: new Date(),
-      notes: `Reversal for receipt ${transaction.receiptNumber}. ${String(reason || "").trim()}`.trim(),
+      notes:
+        `Reversal for receipt ${transaction.receiptNumber}. ${String(reason || "").trim()}`.trim(),
       linkedPledgeId: transaction.linkedPledgeId || null,
       status: "posted",
       reversalOf: transaction._id,
@@ -197,11 +197,16 @@ async function listPledges({ user, filters = {} } = {}) {
     { $match: { linkedPledgeId: { $in: pledgeIds }, status: "posted" } },
     { $group: { _id: "$linkedPledgeId", fulfilledAmount: { $sum: "$amount" } } },
   ]);
-  const paymentMap = new Map(payments.map((item) => [String(item._id), Number(item.fulfilledAmount || 0)]));
+  const paymentMap = new Map(
+    payments.map((item) => [String(item._id), Number(item.fulfilledAmount || 0)])
+  );
 
   return pledges.map((pledge) => {
     const fulfilledAmount = paymentMap.get(String(pledge._id)) || 0;
-    const fulfillmentPercent = Number(pledge.pledgedAmount || 0) === 0 ? 0 : (fulfilledAmount / Number(pledge.pledgedAmount || 0)) * 100;
+    const fulfillmentPercent =
+      Number(pledge.pledgedAmount || 0) === 0
+        ? 0
+        : (fulfilledAmount / Number(pledge.pledgedAmount || 0)) * 100;
     return {
       ...pledge.toObject(),
       fulfilledAmount,
@@ -337,14 +342,20 @@ async function createReconciliation({ payload, user, ipAddress = "" }) {
     throw new Error("Deposit account is required.");
   }
   const sourceTransactionIds = Array.isArray(payload.sourceTransactionIds)
-    ? [...new Set(payload.sourceTransactionIds.map((item) => String(item || "").trim()).filter(Boolean))]
+    ? [
+        ...new Set(
+          payload.sourceTransactionIds.map((item) => String(item || "").trim()).filter(Boolean)
+        ),
+      ]
     : [];
   if (!sourceTransactionIds.length) {
     throw new Error("Select at least one unreconciled transaction.");
   }
 
   const reservedTransactionIds = await getReservedTransactionIds();
-  const conflictingTransactionId = sourceTransactionIds.find((transactionId) => reservedTransactionIds.has(transactionId));
+  const conflictingTransactionId = sourceTransactionIds.find((transactionId) =>
+    reservedTransactionIds.has(transactionId)
+  );
   if (conflictingTransactionId) {
     throw new Error("One or more selected transactions are already in reconciliation.");
   }
@@ -365,8 +376,16 @@ async function createReconciliation({ payload, user, ipAddress = "" }) {
     throw new Error("Selected transactions must add up to a positive amount.");
   }
 
-  const uniqueMethodIds = [...new Set(sourceTransactions.map((item) => String(item.method?._id || item.method || "")).filter(Boolean))];
-  const uniqueMethodLabels = [...new Set(sourceTransactions.map((item) => item.method?.label || "").filter(Boolean))];
+  const uniqueMethodIds = [
+    ...new Set(
+      sourceTransactions
+        .map((item) => String(item.method?._id || item.method || ""))
+        .filter(Boolean)
+    ),
+  ];
+  const uniqueMethodLabels = [
+    ...new Set(sourceTransactions.map((item) => item.method?.label || "").filter(Boolean)),
+  ];
   const reconciliation = await FinanceReconciliation.create({
     reconciliationDate: new Date(payload.reconciliationDate),
     serviceEventRef: String(payload.serviceEventRef || "").trim(),
@@ -393,7 +412,12 @@ async function createReconciliation({ payload, user, ipAddress = "" }) {
   return reconciliation;
 }
 
-async function approveReconciliation({ reconciliationId, user, ipAddress = "", approvalNotes = "" }) {
+async function approveReconciliation({
+  reconciliationId,
+  user,
+  ipAddress = "",
+  approvalNotes = "",
+}) {
   const reconciliation = await FinanceReconciliation.findById(reconciliationId);
   if (!reconciliation) {
     throw new Error("Reconciliation not found.");
@@ -434,7 +458,12 @@ async function approveExpense({ expenseId, user, ipAddress = "" }) {
   if (!canApproveExpense(user, expense.amount)) {
     throw new Error("You are not allowed to approve this expense.");
   }
-  if (expense.amount > (await computeAvailableAccountBalance(expense.sourceAccountId, { excludeExpenseId: expense._id }))) {
+  if (
+    expense.amount >
+    (await computeAvailableAccountBalance(expense.sourceAccountId, {
+      excludeExpenseId: expense._id,
+    }))
+  ) {
     throw new Error("This expense is above the available account balance.");
   }
 
@@ -493,7 +522,12 @@ async function payExpense({ expenseId, paymentMethod, paymentDate, user, ipAddre
   if (!expense) {
     throw new Error("Expense not found.");
   }
-  if (expense.amount > (await computeAvailableAccountBalance(expense.sourceAccountId, { excludeExpenseId: expense._id }))) {
+  if (
+    expense.amount >
+    (await computeAvailableAccountBalance(expense.sourceAccountId, {
+      excludeExpenseId: expense._id,
+    }))
+  ) {
     throw new Error("This expense is above the available account balance.");
   }
 
@@ -603,14 +637,15 @@ async function createBudget({ payload, user, ipAddress = "" }) {
 }
 
 async function getFinanceOverview({ user }) {
-  const [transactions, expenses, pledges, budgets, reconciliations, depositAccounts] = await Promise.all([
-    listTransactions({ user }),
-    listExpenses({}),
-    listPledges({ user }),
-    listBudgets({}),
-    listReconciliations({}),
-    listDepositAccounts(),
-  ]);
+  const [transactions, expenses, pledges, budgets, reconciliations, depositAccounts] =
+    await Promise.all([
+      listTransactions({ user }),
+      listExpenses({}),
+      listPledges({ user }),
+      listBudgets({}),
+      listReconciliations({}),
+      listDepositAccounts(),
+    ]);
 
   const currentIncome = transactions
     .filter((item) => item.status === "posted")
@@ -618,8 +653,12 @@ async function getFinanceOverview({ user }) {
   const currentExpenses = expenses
     .filter((item) => ["approved", "paid", "requested"].includes(item.status))
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const pledgeBehind = pledges.filter((item) => item.status === "active" && item.fulfillmentPercent < 100).length;
-  const overBudgetLines = budgets.filter((item) => Number(item.actualValue || 0) > Number(item.targetValue || item.budgetedAmount || 0)).length;
+  const pledgeBehind = pledges.filter(
+    (item) => item.status === "active" && item.fulfillmentPercent < 100
+  ).length;
+  const overBudgetLines = budgets.filter(
+    (item) => Number(item.actualValue || 0) > Number(item.targetValue || item.budgetedAmount || 0)
+  ).length;
 
   return {
     totals: {
@@ -632,12 +671,16 @@ async function getFinanceOverview({ user }) {
     pledgeSnapshot: {
       totalPledges: pledges.length,
       behindSchedule: pledgeBehind,
-      fulfilled: pledges.filter((item) => item.status === "fulfilled" || item.fulfillmentPercent >= 100).length,
+      fulfilled: pledges.filter(
+        (item) => item.status === "fulfilled" || item.fulfillmentPercent >= 100
+      ).length,
     },
     budgetSnapshot: {
       totalLines: budgets.length,
       overBudgetLines,
-      nearBudgetLines: budgets.filter((item) => Number(item.variancePercent || 0) >= -10 && Number(item.variancePercent || 0) < 0).length,
+      nearBudgetLines: budgets.filter(
+        (item) => Number(item.variancePercent || 0) >= -10 && Number(item.variancePercent || 0) < 0
+      ).length,
     },
     accountSnapshot: await Promise.all(
       depositAccounts.map(async (account) => ({
@@ -691,8 +734,14 @@ async function getIncomeStatementReport({ user, filters = {} }) {
 
 async function getExpenseReport({ filters = {} }) {
   const expenses = await listExpenses({ filters });
-  const byCategory = groupTotals(expenses.filter((item) => item.status !== "voided"), (item) => item.category?.label || "Unassigned Category");
-  const byMinistry = groupTotals(expenses.filter((item) => item.status !== "voided"), (item) => item.ministryId?.name || "General");
+  const byCategory = groupTotals(
+    expenses.filter((item) => item.status !== "voided"),
+    (item) => item.category?.label || "Unassigned Category"
+  );
+  const byMinistry = groupTotals(
+    expenses.filter((item) => item.status !== "voided"),
+    (item) => item.ministryId?.name || "General"
+  );
 
   return {
     byCategory,
@@ -703,7 +752,12 @@ async function getExpenseReport({ filters = {} }) {
 
 async function getPledgeFulfillmentReport({ user, filters = {} }) {
   const pledges = await listPledges({ user, filters });
-  const byFund = groupTotals(pledges, (item) => item.fundId?.name || "Unassigned Fund", "pledgedAmount", "fulfilledAmount");
+  const byFund = groupTotals(
+    pledges,
+    (item) => item.fundId?.name || "Unassigned Fund",
+    "pledgedAmount",
+    "fulfilledAmount"
+  );
 
   return {
     byFund,
@@ -932,7 +986,9 @@ async function computeAvailableAccountBalance(accountId, { excludeExpenseId = ""
   }
 
   const approvedReconciliations = await FinanceReconciliation.aggregate([
-    { $match: { depositAccountId: normalizeObjectIdLike(normalizedAccountId), status: "approved" } },
+    {
+      $match: { depositAccountId: normalizeObjectIdLike(normalizedAccountId), status: "approved" },
+    },
     { $group: { _id: null, total: { $sum: "$amount" } } },
   ]);
   const committedExpenses = await Expense.aggregate([
@@ -945,7 +1001,9 @@ async function computeAvailableAccountBalance(accountId, { excludeExpenseId = ""
 
 async function decorateExpensesWithAccounts(expenses = []) {
   const accounts = await listDepositAccounts();
-  const accountMap = new Map(accounts.map((account) => [String(account._id), { ...account.toObject?.() || account }]));
+  const accountMap = new Map(
+    accounts.map((account) => [String(account._id), { ...(account.toObject?.() || account) }])
+  );
 
   return expenses.map((expense) => {
     const plain = expense.toObject();
@@ -958,7 +1016,9 @@ async function decorateExpensesWithAccounts(expenses = []) {
 
 async function decorateReconciliations(reconciliations = []) {
   const accounts = await listDepositAccounts();
-  const accountMap = new Map(accounts.map((account) => [String(account._id), { ...account.toObject?.() || account }]));
+  const accountMap = new Map(
+    accounts.map((account) => [String(account._id), { ...(account.toObject?.() || account) }])
+  );
 
   return reconciliations.map((row) => {
     const plain = row.toObject();
@@ -966,7 +1026,8 @@ async function decorateReconciliations(reconciliations = []) {
       ...plain,
       depositAccount: accountMap.get(String(plain.depositAccountId || "")) || null,
       selectedTransactionCount:
-        Number(plain.selectedTransactionCount || 0) || (Array.isArray(plain.sourceTransactionIds) ? plain.sourceTransactionIds.length : 0),
+        Number(plain.selectedTransactionCount || 0) ||
+        (Array.isArray(plain.sourceTransactionIds) ? plain.sourceTransactionIds.length : 0),
       methodSummary: plain.method?.label || plain.methodSummary || "Mixed",
     };
   });
@@ -980,7 +1041,9 @@ async function getReservedTransactionIds() {
 
   return new Set(
     reconciliations.flatMap((item) =>
-      Array.isArray(item.sourceTransactionIds) ? item.sourceTransactionIds.map((value) => String(value)) : []
+      Array.isArray(item.sourceTransactionIds)
+        ? item.sourceTransactionIds.map((value) => String(value))
+        : []
     )
   );
 }
@@ -989,7 +1052,9 @@ function normalizeObjectIdLike(value) {
   if (!value) {
     return value;
   }
-  return mongoose.Types.ObjectId.isValid(String(value)) ? new mongoose.Types.ObjectId(String(value)) : value;
+  return mongoose.Types.ObjectId.isValid(String(value))
+    ? new mongoose.Types.ObjectId(String(value))
+    : value;
 }
 
 function buildDateQuery(filters = {}) {

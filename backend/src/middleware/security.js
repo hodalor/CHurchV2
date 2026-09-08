@@ -16,7 +16,11 @@ function applySecurityHeaders(req, res, next) {
 
 function createRateLimiter({ keyPrefix, windowMs, maxRequests, message }) {
   return (req, res, next) => {
-    const requestKey = `${keyPrefix}:${req.ip}:${String(req.body?.churchId || "").trim().toLowerCase()}:${String(req.body?.username || "").trim().toLowerCase()}`;
+    const requestKey = `${keyPrefix}:${req.ip}:${String(req.body?.churchId || "")
+      .trim()
+      .toLowerCase()}:${String(req.body?.username || "")
+      .trim()
+      .toLowerCase()}`;
     const now = Date.now();
     const existing = rateLimitState.get(requestKey);
 

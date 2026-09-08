@@ -58,5 +58,7 @@ app.post("/fingerprints/identify", async (req, res) => {
 
 app.listen(port, host, () => {
   console.log(`[biometric-bridge] listening on http://${host}:${port}`);
-  console.log(`[biometric-bridge] provider=${String(process.env.BIOMETRIC_BRIDGE_PROVIDER || "operator_console")}`);
+  console.log(
+    `[biometric-bridge] provider=${String(process.env.BIOMETRIC_BRIDGE_PROVIDER || "operator_console")}`
+  );
 });

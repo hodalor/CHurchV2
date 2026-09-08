@@ -28,7 +28,10 @@ function hasPermission(user, permission) {
 }
 
 function canViewIndividualGiving(user) {
-  return hasRole(user, CONFIDENTIAL_FINANCE_ROLES) || hasPermission(user, PERMISSIONS.VIEW_FINANCE_CONFIDENTIAL);
+  return (
+    hasRole(user, CONFIDENTIAL_FINANCE_ROLES) ||
+    hasPermission(user, PERMISSIONS.VIEW_FINANCE_CONFIDENTIAL)
+  );
 }
 
 function canVoidFinancialRecords(user) {
@@ -49,16 +52,28 @@ function canApproveExpense(user, amount) {
     return true;
   }
 
-  if (!hasPermission(user, PERMISSIONS.APPROVE_FINANCE_EXPENSES) && !hasRole(user, [ROLES.FINANCE_MANAGER, ROLES.CHURCH_ADMINISTRATOR, ROLES.ELDERS])) {
+  if (
+    !hasPermission(user, PERMISSIONS.APPROVE_FINANCE_EXPENSES) &&
+    !hasRole(user, [ROLES.FINANCE_MANAGER, ROLES.CHURCH_ADMINISTRATOR, ROLES.ELDERS])
+  ) {
     return false;
   }
 
   if (!requiresHigherExpenseApproval(amount)) {
-    return hasRole(user, [ROLES.FINANCE_MANAGER, ROLES.CHURCH_ACCOUNTANT, ROLES.CHURCH_ADMINISTRATOR, ROLES.ELDERS]) ||
-      hasPermission(user, PERMISSIONS.APPROVE_FINANCE_EXPENSES);
+    return (
+      hasRole(user, [
+        ROLES.FINANCE_MANAGER,
+        ROLES.CHURCH_ACCOUNTANT,
+        ROLES.CHURCH_ADMINISTRATOR,
+        ROLES.ELDERS,
+      ]) || hasPermission(user, PERMISSIONS.APPROVE_FINANCE_EXPENSES)
+    );
   }
 
-  return hasRole(user, [ROLES.ELDERS, ROLES.CHURCH_ADMINISTRATOR]) || hasPermission(user, PERMISSIONS.APPROVE_FINANCE_HIGH_VALUE_EXPENSES);
+  return (
+    hasRole(user, [ROLES.ELDERS, ROLES.CHURCH_ADMINISTRATOR]) ||
+    hasPermission(user, PERMISSIONS.APPROVE_FINANCE_HIGH_VALUE_EXPENSES)
+  );
 }
 
 module.exports = {

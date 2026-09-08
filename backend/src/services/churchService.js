@@ -8,12 +8,11 @@ const {
   seedLookupData,
   seedMinistries,
   seedRoles,
-  seedStrategicPlanningData,
 } = require("../seed/bootstrap");
 const { logAudit } = require("./auditService");
 const { hashPin } = require("./authService");
 const { getTenantConnection } = require("../config/db");
-const { buildTenantAdminPermissions, ROLE_PERMISSION_MAP, ROLES } = require("../utils/permissions");
+const { buildTenantAdminPermissions, ROLES } = require("../utils/permissions");
 
 function slugify(value = "") {
   return String(value || "")
@@ -36,22 +35,10 @@ function normalizeEnabledNavigation(value = []) {
     : [];
 }
 
-async function ensureTenantRole(roleName) {
-  const existingRole = await Role.findOne({ name: roleName });
-  if (existingRole) {
-    return existingRole;
-  }
-
-  return Role.create({
-    name: roleName,
-    description: `${roleName} role`,
-    permissions: ROLE_PERMISSION_MAP[roleName] || [],
-    isSystem: true,
-  });
-}
-
 function normalizeCurrencyCode(value = "", currencies = []) {
-  const requested = String(value || "").trim().toUpperCase();
+  const requested = String(value || "")
+    .trim()
+    .toUpperCase();
   return currencies.find((item) => item.code === requested)?.code || currencies[0]?.code || "GHS";
 }
 
@@ -59,19 +46,24 @@ function normalizeCurrencies(currencies = []) {
   const normalized = Array.isArray(currencies)
     ? currencies
         .map((item) => ({
-          code: String(item?.code || "").trim().toUpperCase(),
+          code: String(item?.code || "")
+            .trim()
+            .toUpperCase(),
           name: String(item?.name || "").trim(),
           symbol: String(item?.symbol || "").trim(),
         }))
         .filter((item) => item.code && item.name)
     : [];
 
-  return normalized.length
-    ? normalized
-    : [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }];
+  return normalized.length ? normalized : [{ code: "GHS", name: "Ghana Cedi", symbol: "GH¢" }];
 }
 
-async function seedTenantBaseData({ churchName, adminPayload, appConfig = {}, enabledNavigation = [] }) {
+async function seedTenantBaseData({
+  churchName,
+  adminPayload,
+  appConfig = {},
+  enabledNavigation = [],
+}) {
   await Promise.all([
     seedRoles(),
     seedLookupData(),
@@ -164,7 +156,9 @@ async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
   const name = String(payload.name || "").trim();
   const churchId = normalizeChurchId(payload.churchId || name);
   const slug = slugify(name || churchId);
-  const adminUsername = String(payload.adminUsername || "").trim().toLowerCase();
+  const adminUsername = String(payload.adminUsername || "")
+    .trim()
+    .toLowerCase();
   const adminPin = String(payload.adminPin || "").trim();
   const adminDisplayName = String(payload.adminDisplayName || "").trim();
 
@@ -203,7 +197,9 @@ async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
     createdAdmin: {
       displayName: adminDisplayName,
       username: adminUsername,
-      email: String(payload.adminEmail || "").trim().toLowerCase(),
+      email: String(payload.adminEmail || "")
+        .trim()
+        .toLowerCase(),
     },
   });
 
@@ -214,7 +210,9 @@ async function createChurch({ payload = {}, user = null, ipAddress = "" }) {
         username: adminUsername,
         pin: adminPin,
         displayName: adminDisplayName,
-        email: String(payload.adminEmail || "").trim().toLowerCase(),
+        email: String(payload.adminEmail || "")
+          .trim()
+          .toLowerCase(),
       },
       appConfig: {
         ...masterAppConfig,
@@ -247,7 +245,9 @@ async function updateChurch({ churchId = "", payload = {}, user = null, ipAddres
   const masterAppConfig = await getMasterAppConfig();
   const normalizedName = String(payload.name || existingChurch.name || "").trim();
   const normalizedEnabledNavigation = normalizeEnabledNavigation(
-    Array.isArray(payload.enabledNavigation) ? payload.enabledNavigation : existingChurch.enabledNavigation
+    Array.isArray(payload.enabledNavigation)
+      ? payload.enabledNavigation
+      : existingChurch.enabledNavigation
   );
   const normalizedCurrencyCode = normalizeCurrencyCode(
     payload.currencyCode || existingChurch.currencyCode,
@@ -260,9 +260,15 @@ async function updateChurch({ churchId = "", payload = {}, user = null, ipAddres
   existingChurch.currencyCode = normalizedCurrencyCode;
   existingChurch.enabledNavigation = normalizedEnabledNavigation;
   existingChurch.createdAdmin = {
-    displayName: String(payload.adminDisplayName || existingChurch.createdAdmin?.displayName || "").trim(),
-    username: String(payload.adminUsername || existingChurch.createdAdmin?.username || "").trim().toLowerCase(),
-    email: String(payload.adminEmail || existingChurch.createdAdmin?.email || "").trim().toLowerCase(),
+    displayName: String(
+      payload.adminDisplayName || existingChurch.createdAdmin?.displayName || ""
+    ).trim(),
+    username: String(payload.adminUsername || existingChurch.createdAdmin?.username || "")
+      .trim()
+      .toLowerCase(),
+    email: String(payload.adminEmail || existingChurch.createdAdmin?.email || "")
+      .trim()
+      .toLowerCase(),
   };
   await existingChurch.save();
 
@@ -278,13 +284,16 @@ async function updateChurch({ churchId = "", payload = {}, user = null, ipAddres
     }
 
     if (payload.adminDisplayName || payload.adminEmail || payload.adminUsername) {
-      const previousAdminUsername = String(previousValue?.createdAdmin?.username || "").trim().toLowerCase();
+      const previousAdminUsername = String(previousValue?.createdAdmin?.username || "")
+        .trim()
+        .toLowerCase();
       const tenantAdmin = await User.findOne({
         username: previousAdminUsername || existingChurch.createdAdmin.username,
       });
       if (tenantAdmin) {
         tenantAdmin.username = existingChurch.createdAdmin.username || tenantAdmin.username;
-        tenantAdmin.displayName = existingChurch.createdAdmin.displayName || tenantAdmin.displayName;
+        tenantAdmin.displayName =
+          existingChurch.createdAdmin.displayName || tenantAdmin.displayName;
         tenantAdmin.email = existingChurch.createdAdmin.email || tenantAdmin.email || "";
         tenantAdmin.permissions = buildTenantAdminPermissions(existingChurch.enabledNavigation);
         tenantAdmin.permissionsConfigured = true;

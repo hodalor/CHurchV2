@@ -140,7 +140,9 @@ async function convertVisitorToProspect(visitor, user) {
   const prospect = await createProspectFromVisitor(visitor, user);
 
   visitor.convertedToProspectId = prospect.prospectId;
-  visitor.status = (await getLookupValueByTypeAndKey("visitor_status", "converted_to_prospect"))?._id || visitor.status;
+  visitor.status =
+    (await getLookupValueByTypeAndKey("visitor_status", "converted_to_prospect"))?._id ||
+    visitor.status;
   await visitor.save();
 
   return prospect;
@@ -157,7 +159,9 @@ async function convertVisitorToMember(visitor, payload = {}) {
   });
 
   visitor.convertedToMemberId = member.memberId;
-  visitor.status = (await getLookupValueByTypeAndKey("visitor_status", "converted_to_member"))?._id || visitor.status;
+  visitor.status =
+    (await getLookupValueByTypeAndKey("visitor_status", "converted_to_member"))?._id ||
+    visitor.status;
   await visitor.save();
 
   return member;
@@ -181,7 +185,9 @@ async function getRetentionMetrics({ windowDays = 30 }) {
     return diffDays <= windowDays;
   });
 
-  const retentionRate = visitors.length ? Math.round((returningVisitors.length / visitors.length) * 100) : 0;
+  const retentionRate = visitors.length
+    ? Math.round((returningVisitors.length / visitors.length) * 100)
+    : 0;
 
   return {
     windowDays,

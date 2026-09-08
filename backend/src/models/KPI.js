@@ -40,5 +40,3 @@ const kpiSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("KPI", kpiSchema);
-
-

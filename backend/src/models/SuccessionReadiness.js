@@ -37,5 +37,3 @@ const successionReadinessSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("SuccessionReadiness", successionReadinessSchema);
-
-

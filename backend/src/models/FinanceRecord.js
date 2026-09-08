@@ -39,5 +39,3 @@ const financeRecordSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("FinanceRecord", financeRecordSchema);
-
-

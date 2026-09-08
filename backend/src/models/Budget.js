@@ -65,5 +65,3 @@ const budgetSchema = new mongoose.Schema(
 budgetSchema.index({ period: 1, ministryId: 1, category: 1, fundId: 1, lineType: 1 });
 
 module.exports = createScopedModel("Budget", budgetSchema);
-
-

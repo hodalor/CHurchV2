@@ -62,5 +62,3 @@ const spiritualHealthAlertSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("SpiritualHealthAlert", spiritualHealthAlertSchema);
-
-

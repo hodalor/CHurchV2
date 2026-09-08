@@ -58,5 +58,3 @@ const refreshTokenSessionSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("RefreshTokenSession", refreshTokenSessionSchema);
-
-

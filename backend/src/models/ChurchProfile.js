@@ -108,5 +108,3 @@ const churchProfileSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("ChurchProfile", churchProfileSchema);
-
-

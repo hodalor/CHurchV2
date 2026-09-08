@@ -59,5 +59,3 @@ const userSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("User", userSchema);
-
-

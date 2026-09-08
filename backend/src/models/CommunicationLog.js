@@ -51,5 +51,3 @@ const communicationLogSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("CommunicationLog", communicationLogSchema);
-
-

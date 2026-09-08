@@ -336,19 +336,13 @@ const TENANT_NAVIGATION_PERMISSION_MAP = {
     PERMISSIONS.MANAGE_COMMUNICATION,
     PERMISSIONS.EXPORT_CONTACTS,
   ],
-  "spiritual-health": [
-    PERMISSIONS.VIEW_SPIRITUAL_HEALTH,
-    PERMISSIONS.MANAGE_SPIRITUAL_HEALTH,
-  ],
+  "spiritual-health": [PERMISSIONS.VIEW_SPIRITUAL_HEALTH, PERMISSIONS.MANAGE_SPIRITUAL_HEALTH],
   leadership: [
     PERMISSIONS.VIEW_LEADERSHIP,
     PERMISSIONS.MANAGE_LEADERSHIP,
     PERMISSIONS.VIEW_SUCCESSION_SENSITIVE,
   ],
-  strategic: [
-    PERMISSIONS.VIEW_STRATEGIC_PLANNING,
-    PERMISSIONS.MANAGE_STRATEGIC_PLANNING,
-  ],
+  strategic: [PERMISSIONS.VIEW_STRATEGIC_PLANNING, PERMISSIONS.MANAGE_STRATEGIC_PLANNING],
   "ai-assist": [PERMISSIONS.VIEW_AI_ASSIST, PERMISSIONS.REVIEW_AI_ASSIST],
   users: [PERMISSIONS.MANAGE_USERS],
   settings: [PERMISSIONS.MANAGE_SETTINGS],
@@ -364,11 +358,7 @@ function buildTenantAdminPermissions(enabledNavigation = []) {
   }
 
   const parentKeys = [...new Set(normalizedKeys.map((key) => key.split(".")[0]))];
-  return [
-    ...new Set(
-      parentKeys.flatMap((key) => TENANT_NAVIGATION_PERMISSION_MAP[key] || [])
-    ),
-  ];
+  return [...new Set(parentKeys.flatMap((key) => TENANT_NAVIGATION_PERMISSION_MAP[key] || []))];
 }
 
 module.exports = {

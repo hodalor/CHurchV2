@@ -35,5 +35,3 @@ const triggerRuleSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("TriggerRule", triggerRuleSchema);
-
-

@@ -32,5 +32,3 @@ communicationPreferenceSchema.index(
 );
 
 module.exports = createScopedModel("CommunicationPreference", communicationPreferenceSchema);
-
-

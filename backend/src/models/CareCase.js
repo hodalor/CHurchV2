@@ -59,5 +59,3 @@ const careCaseSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("CareCase", careCaseSchema);
-
-

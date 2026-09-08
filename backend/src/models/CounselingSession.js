@@ -38,5 +38,3 @@ const counselingSessionSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("CounselingSession", counselingSessionSchema);
-
-

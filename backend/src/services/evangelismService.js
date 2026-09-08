@@ -33,8 +33,16 @@ async function generateNextBibleStudyId() {
 }
 
 async function createProspect(payload, user = null) {
-  if (!payload.firstName || !payload.surname || !payload.gender || !payload.phone || !payload.residentialArea) {
-    throw new Error("First name, surname, gender, primary mobile, and residential area are required.");
+  if (
+    !payload.firstName ||
+    !payload.surname ||
+    !payload.gender ||
+    !payload.phone ||
+    !payload.residentialArea
+  ) {
+    throw new Error(
+      "First name, surname, gender, primary mobile, and residential area are required."
+    );
   }
 
   const contactStage = await getLookupValueByTypeAndKey("evangelism_pipeline_stage", "contact");
@@ -106,16 +114,23 @@ async function updateProspect(prospect, payload) {
   prospect.gender = payload.gender ?? prospect.gender;
   prospect.source = payload.source ?? prospect.source;
   prospect.assignedEvangelistId = payload.assignedEvangelistId ?? prospect.assignedEvangelistId;
-  prospect.assignedEvangelistMemberId = payload.assignedEvangelistMemberId ?? prospect.assignedEvangelistMemberId;
+  prospect.assignedEvangelistMemberId =
+    payload.assignedEvangelistMemberId ?? prospect.assignedEvangelistMemberId;
   prospect.campaignId = payload.campaignId ?? prospect.campaignId;
   prospect.currentStage = payload.currentStage ?? prospect.currentStage;
-  prospect.dateFirstContact = payload.dateFirstContact ? new Date(payload.dateFirstContact) : prospect.dateFirstContact;
-  prospect.nextFollowUpDate = payload.nextFollowUpDate ? new Date(payload.nextFollowUpDate) : prospect.nextFollowUpDate;
+  prospect.dateFirstContact = payload.dateFirstContact
+    ? new Date(payload.dateFirstContact)
+    : prospect.dateFirstContact;
+  prospect.nextFollowUpDate = payload.nextFollowUpDate
+    ? new Date(payload.nextFollowUpDate)
+    : prospect.nextFollowUpDate;
   prospect.baptismDate = payload.baptismDate ? new Date(payload.baptismDate) : prospect.baptismDate;
   prospect.convertedMemberId = payload.convertedMemberId ?? prospect.convertedMemberId;
   prospect.notesSummary = payload.notesSummary ?? prospect.notesSummary;
   prospect.dataEntryClerk = payload.dataEntryClerk ?? prospect.dataEntryClerk;
-  prospect.dateCaptured = payload.dateCaptured ? new Date(payload.dateCaptured) : prospect.dateCaptured;
+  prospect.dateCaptured = payload.dateCaptured
+    ? new Date(payload.dateCaptured)
+    : prospect.dateCaptured;
   await prospect.save();
 
   return populateProspectById(prospect._id);
@@ -384,7 +399,10 @@ async function convertProspectToMember(prospect, payload = {}, user = null) {
     mentorId: prospect.assignedEvangelistId || null,
   });
 
-  const discipleshipStage = await getLookupValueByTypeAndKey("evangelism_pipeline_stage", "discipleship");
+  const discipleshipStage = await getLookupValueByTypeAndKey(
+    "evangelism_pipeline_stage",
+    "discipleship"
+  );
   if (discipleshipStage) {
     await moveProspectStage(prospect, discipleshipStage._id, user);
   }

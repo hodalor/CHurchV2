@@ -64,5 +64,3 @@ attendanceRecordSchema.index(
 );
 
 module.exports = createScopedModel("AttendanceRecord", attendanceRecordSchema);
-
-

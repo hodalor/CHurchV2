@@ -35,5 +35,3 @@ const lookupTypeSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("LookupType", lookupTypeSchema);
-
-

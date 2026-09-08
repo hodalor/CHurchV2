@@ -56,5 +56,3 @@ const kpiActualSchema = new mongoose.Schema(
 kpiActualSchema.index({ kpiId: 1, period: 1 }, { unique: true });
 
 module.exports = createScopedModel("KPIActual", kpiActualSchema);
-
-

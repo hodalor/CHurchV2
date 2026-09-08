@@ -21,5 +21,3 @@ const successionRequirementSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("SuccessionRequirement", successionRequirementSchema);
-
-

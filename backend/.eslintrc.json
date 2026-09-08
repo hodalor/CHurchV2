@@ -1,0 +1,34 @@
+{
+  "root": true,
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "extends": ["eslint:recommended", "prettier"],
+  "parserOptions": {
+    "ecmaVersion": "latest"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "coverage/",
+    "vendor/",
+    ".venv-biometric/",
+    "src/biometric-bridge/__pycache__/",
+    "*.json"
+  ],
+  "rules": {
+    "curly": ["error", "all"],
+    "eqeqeq": ["error", "always"],
+    "no-console": "off",
+    "no-var": "error",
+    "object-shorthand": ["error", "always"],
+    "prefer-const": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ]
+  }
+}

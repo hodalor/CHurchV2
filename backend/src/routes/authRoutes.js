@@ -32,13 +32,16 @@ router.post("/login", loginRateLimiter, async (req, res) => {
       ipAddress: req.ip,
       userAgent: req.get("user-agent") || "",
     };
-    const normalizedChurchId = String(req.body.churchId || "").trim().toLowerCase();
-    const result = normalizedChurchId && normalizedChurchId !== "master"
-      ? await authenticateWithChurchIdUsernameAndPin({
-          churchId: normalizedChurchId,
-          ...loginPayload,
-        })
-      : await authenticateWithUsernameAndPin(loginPayload);
+    const normalizedChurchId = String(req.body.churchId || "")
+      .trim()
+      .toLowerCase();
+    const result =
+      normalizedChurchId && normalizedChurchId !== "master"
+        ? await authenticateWithChurchIdUsernameAndPin({
+            churchId: normalizedChurchId,
+            ...loginPayload,
+          })
+        : await authenticateWithUsernameAndPin(loginPayload);
 
     res.json(result);
   } catch (error) {

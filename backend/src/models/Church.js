@@ -65,4 +65,3 @@ const churchSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("Church", churchSchema, { scope: "master" });
-

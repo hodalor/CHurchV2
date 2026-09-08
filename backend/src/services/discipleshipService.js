@@ -7,7 +7,9 @@ const { createPendingAction } = require("./pendingActionService");
 const { getLookupValueByTypeAndKey } = require("./lookupService");
 
 async function ensureDefaultProgramme() {
-  const existingProgramme = await DiscipleshipProgramme.findOne({ isActive: true }).sort({ createdAt: 1 });
+  const existingProgramme = await DiscipleshipProgramme.findOne({ isActive: true }).sort({
+    createdAt: 1,
+  });
   if (existingProgramme) {
     return existingProgramme;
   }
@@ -46,7 +48,8 @@ async function updateProgramme(programme, payload) {
     payload.expectedDurationDays !== undefined
       ? Number(payload.expectedDurationDays) || programme.expectedDurationDays
       : programme.expectedDurationDays;
-  programme.isActive = payload.isActive !== undefined ? Boolean(payload.isActive) : programme.isActive;
+  programme.isActive =
+    payload.isActive !== undefined ? Boolean(payload.isActive) : programme.isActive;
   if (payload.modules) {
     programme.modules = normalizeProgrammeModules(payload.modules);
   }
@@ -183,14 +186,22 @@ async function addEnrollmentSession(enrollment, payload = {}) {
 }
 
 async function completeEnrollment(enrollment, payload = {}) {
-  const completedStatus = payload.status || (await getLookupValueByTypeAndKey("discipleship_enrollment_status", "completed"))?._id;
+  const completedStatus =
+    payload.status ||
+    (await getLookupValueByTypeAndKey("discipleship_enrollment_status", "completed"))?._id;
   enrollment.status = completedStatus || enrollment.status;
-  enrollment.completionDate = payload.completionDate ? new Date(payload.completionDate) : new Date();
+  enrollment.completionDate = payload.completionDate
+    ? new Date(payload.completionDate)
+    : new Date();
   await enrollment.save();
   return populateEnrollmentById(enrollment._id);
 }
 
-async function createEnrollmentFromConversion({ memberId, sourceProspectId = "", mentorId = null }) {
+async function createEnrollmentFromConversion({
+  memberId,
+  sourceProspectId = "",
+  mentorId = null,
+}) {
   const defaultProgramme = await ensureDefaultProgramme();
   return createEnrollment({
     memberId,
@@ -212,8 +223,9 @@ async function getOverdueEnrollments({ windowDays = 14 } = {}) {
   const overdueItems = [];
 
   for (const enrollment of enrollments) {
-    const latestSession = [...(enrollment.sessionsCompleted || [])]
-      .sort((left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime())[0];
+    const latestSession = [...(enrollment.sessionsCompleted || [])].sort(
+      (left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime()
+    )[0];
     const lastTouch = latestSession?.completedAt || enrollment.enrollmentDate;
 
     if (!lastTouch || new Date(lastTouch).getTime() > overdueCutoff) {
@@ -243,7 +255,8 @@ async function getOverdueEnrollments({ windowDays = 14 } = {}) {
         sourceRecordId: enrollment._id.toString(),
         priority: "High",
         metadata: {
-          memberName: `${enrollment.memberId?.firstName || ""} ${enrollment.memberId?.lastName || ""}`.trim(),
+          memberName:
+            `${enrollment.memberId?.firstName || ""} ${enrollment.memberId?.lastName || ""}`.trim(),
           programmeName: enrollment.programmeId?.name || "",
           windowDays: Number(windowDays),
         },
@@ -285,8 +298,10 @@ async function getDashboardMetrics({ mentorWindowDays = 7, overdueWindowDays = 1
     }
 
     return (
-      new Date(enrollment.mentorAssignedAt).getTime() - new Date(enrollment.enrollmentDate).getTime()
-    ) <= mentorWindowMs;
+      new Date(enrollment.mentorAssignedAt).getTime() -
+        new Date(enrollment.enrollmentDate).getTime() <=
+      mentorWindowMs
+    );
   }).length;
 
   const coverageRate = enrollments.length

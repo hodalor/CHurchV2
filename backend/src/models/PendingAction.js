@@ -63,5 +63,3 @@ const pendingActionSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("PendingAction", pendingActionSchema);
-
-

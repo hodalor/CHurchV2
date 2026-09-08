@@ -136,5 +136,3 @@ const expenseSchema = new mongoose.Schema(
 expenseSchema.index({ date: -1, createdAt: -1 });
 
 module.exports = createScopedModel("Expense", expenseSchema);
-
-

@@ -23,5 +23,3 @@ const skillTalentSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("SkillTalent", skillTalentSchema);
-
-

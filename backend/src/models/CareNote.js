@@ -84,5 +84,3 @@ const careNoteSchema = new mongoose.Schema(
 careNoteSchema.index({ dateTime: -1, createdAt: -1 });
 
 module.exports = createScopedModel("CareNote", careNoteSchema);
-
-

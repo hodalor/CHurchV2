@@ -12,7 +12,9 @@ router.use(authenticate);
 
 router.get("/", async (req, res) => {
   const types = await LookupType.find().sort({ module: 1, label: 1 });
-  const values = await LookupValue.find().populate("type", "key label module").sort({ sortOrder: 1, label: 1 });
+  const values = await LookupValue.find()
+    .populate("type", "key label module")
+    .sort({ sortOrder: 1, label: 1 });
   res.json({ types, values });
 });
 

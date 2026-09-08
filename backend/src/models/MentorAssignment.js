@@ -32,5 +32,3 @@ const mentorAssignmentSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("MentorAssignment", mentorAssignmentSchema);
-
-

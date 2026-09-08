@@ -69,7 +69,14 @@ router.get("/next-record-no", authorizePermissions(PERMISSIONS.VIEW_FINANCE), as
 
 router.get("/options", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
-    const [funds, transactionMethods, expensePaymentMethods, transactionTypes, expenseCategories, depositAccounts] = await Promise.all([
+    const [
+      funds,
+      transactionMethods,
+      expensePaymentMethods,
+      transactionTypes,
+      expenseCategories,
+      depositAccounts,
+    ] = await Promise.all([
       listFunds(),
       listLookupValuesByType("finance_transaction_method"),
       listLookupValuesByType("finance_expense_payment_method"),
@@ -141,35 +148,51 @@ router.get("/transactions", authorizePermissions(PERMISSIONS.VIEW_FINANCE), asyn
 
 router.post("/transactions", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
-    const transaction = await createTransaction({ payload: req.body, user: req.user, ipAddress: req.ip });
+    const transaction = await createTransaction({
+      payload: req.body,
+      user: req.user,
+      ipAddress: req.ip,
+    });
     res.status(201).json(transaction);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
 
-router.post("/transactions/batch", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
-  try {
-    const items = await createTransactionBatch({ payload: req.body, user: req.user, ipAddress: req.ip });
-    res.status(201).json({ createdCount: items.length, items });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.post(
+  "/transactions/batch",
+  authorizePermissions(PERMISSIONS.MANAGE_FINANCE),
+  async (req, res) => {
+    try {
+      const items = await createTransactionBatch({
+        payload: req.body,
+        user: req.user,
+        ipAddress: req.ip,
+      });
+      res.status(201).json({ createdCount: items.length, items });
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
-router.post("/transactions/:transactionId/void", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
-  try {
-    const result = await voidTransaction({
-      transactionId: req.params.transactionId,
-      reason: req.body.reason || "",
-      user: req.user,
-      ipAddress: req.ip,
-    });
-    res.json(result);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.post(
+  "/transactions/:transactionId/void",
+  authorizePermissions(PERMISSIONS.MANAGE_FINANCE),
+  async (req, res) => {
+    try {
+      const result = await voidTransaction({
+        transactionId: req.params.transactionId,
+        reason: req.body.reason || "",
+        user: req.user,
+        ipAddress: req.ip,
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
 router.get("/pledges", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
@@ -188,19 +211,23 @@ router.post("/pledges", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async 
   }
 });
 
-router.post("/pledges/:pledgeId/payments", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
-  try {
-    const transaction = await recordPledgePayment({
-      pledgeId: req.params.pledgeId,
-      payload: req.body,
-      user: req.user,
-      ipAddress: req.ip,
-    });
-    res.status(201).json(transaction);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.post(
+  "/pledges/:pledgeId/payments",
+  authorizePermissions(PERMISSIONS.MANAGE_FINANCE),
+  async (req, res) => {
+    try {
+      const transaction = await recordPledgePayment({
+        pledgeId: req.params.pledgeId,
+        payload: req.body,
+        user: req.user,
+        ipAddress: req.ip,
+      });
+      res.status(201).json(transaction);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
 router.get("/expenses", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
@@ -218,39 +245,50 @@ router.get("/reconciliations", authorizePermissions(PERMISSIONS.VIEW_FINANCE), a
   }
 });
 
-router.get("/reconciliations/candidates", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
-  try {
-    res.json(await listReconciliationCandidates({ user: req.user, filters: req.query }));
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+router.get(
+  "/reconciliations/candidates",
+  authorizePermissions(PERMISSIONS.VIEW_FINANCE),
+  async (req, res) => {
+    try {
+      res.json(await listReconciliationCandidates({ user: req.user, filters: req.query }));
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
   }
-});
+);
 
-router.post("/reconciliations", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
-  try {
-    res.status(201).json(await createReconciliation({ payload: req.body, user: req.user, ipAddress: req.ip }));
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.post(
+  "/reconciliations",
+  authorizePermissions(PERMISSIONS.MANAGE_FINANCE),
+  async (req, res) => {
+    try {
+      res
+        .status(201)
+        .json(await createReconciliation({ payload: req.body, user: req.user, ipAddress: req.ip }));
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
 router.post(
   "/reconciliations/:reconciliationId/approve",
   authorizePermissions(PERMISSIONS.APPROVE_FINANCE_RECONCILIATIONS),
   async (req, res) => {
-  try {
-    res.json(
-      await approveReconciliation({
-        reconciliationId: req.params.reconciliationId,
-        approvalNotes: req.body.approvalNotes || "",
-        user: req.user,
-        ipAddress: req.ip,
-      })
-    );
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+    try {
+      res.json(
+        await approveReconciliation({
+          reconciliationId: req.params.reconciliationId,
+          approvalNotes: req.body.approvalNotes || "",
+          user: req.user,
+          ipAddress: req.ip,
+        })
+      );
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
 router.post("/expenses", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
@@ -261,59 +299,77 @@ router.post("/expenses", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async
   }
 });
 
-router.post("/expenses/:expenseId/approve", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
-  try {
-    res.json(await approveExpense({ expenseId: req.params.expenseId, user: req.user, ipAddress: req.ip }));
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.post(
+  "/expenses/:expenseId/approve",
+  authorizePermissions(PERMISSIONS.MANAGE_FINANCE),
+  async (req, res) => {
+    try {
+      res.json(
+        await approveExpense({ expenseId: req.params.expenseId, user: req.user, ipAddress: req.ip })
+      );
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
-router.post("/expenses/:expenseId/reject", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
-  try {
-    res.json(
-      await rejectExpense({
-        expenseId: req.params.expenseId,
-        reason: req.body.reason || "",
-        user: req.user,
-        ipAddress: req.ip,
-      })
-    );
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.post(
+  "/expenses/:expenseId/reject",
+  authorizePermissions(PERMISSIONS.MANAGE_FINANCE),
+  async (req, res) => {
+    try {
+      res.json(
+        await rejectExpense({
+          expenseId: req.params.expenseId,
+          reason: req.body.reason || "",
+          user: req.user,
+          ipAddress: req.ip,
+        })
+      );
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
-router.post("/expenses/:expenseId/pay", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
-  try {
-    res.json(
-      await payExpense({
-        expenseId: req.params.expenseId,
-        paymentMethod: req.body.paymentMethod || null,
-        paymentDate: req.body.paymentDate || null,
-        user: req.user,
-        ipAddress: req.ip,
-      })
-    );
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.post(
+  "/expenses/:expenseId/pay",
+  authorizePermissions(PERMISSIONS.MANAGE_FINANCE),
+  async (req, res) => {
+    try {
+      res.json(
+        await payExpense({
+          expenseId: req.params.expenseId,
+          paymentMethod: req.body.paymentMethod || null,
+          paymentDate: req.body.paymentDate || null,
+          user: req.user,
+          ipAddress: req.ip,
+        })
+      );
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
-router.post("/expenses/:expenseId/void", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
-  try {
-    res.json(
-      await voidExpense({
-        expenseId: req.params.expenseId,
-        reason: req.body.reason || "",
-        user: req.user,
-        ipAddress: req.ip,
-      })
-    );
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+router.post(
+  "/expenses/:expenseId/void",
+  authorizePermissions(PERMISSIONS.MANAGE_FINANCE),
+  async (req, res) => {
+    try {
+      res.json(
+        await voidExpense({
+          expenseId: req.params.expenseId,
+          reason: req.body.reason || "",
+          user: req.user,
+          ipAddress: req.ip,
+        })
+      );
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
 router.get("/budgets", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
   try {
@@ -325,38 +381,54 @@ router.get("/budgets", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (re
 
 router.post("/budgets", authorizePermissions(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
-    res.status(201).json(await createBudget({ payload: req.body, user: req.user, ipAddress: req.ip }));
+    res
+      .status(201)
+      .json(await createBudget({ payload: req.body, user: req.user, ipAddress: req.ip }));
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
 
-router.get("/reports/:reportType", authorizePermissions(PERMISSIONS.VIEW_FINANCE), async (req, res) => {
-  try {
-    const report = await getFinanceReports({ user: req.user, reportType: req.params.reportType, filters: req.query });
-    if (String(req.query.format || "").toLowerCase() === "csv") {
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="${req.params.reportType}.csv"`);
-      return res.send(convertReportToCsv(report));
+router.get(
+  "/reports/:reportType",
+  authorizePermissions(PERMISSIONS.VIEW_FINANCE),
+  async (req, res) => {
+    try {
+      const report = await getFinanceReports({
+        user: req.user,
+        reportType: req.params.reportType,
+        filters: req.query,
+      });
+      if (String(req.query.format || "").toLowerCase() === "csv") {
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${req.params.reportType}.csv"`);
+        return res.send(convertReportToCsv(report));
+      }
+      res.json(report);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
     }
-    res.json(report);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
   }
-});
+);
 
 function convertReportToCsv(report) {
   const rows = [];
 
   if (Array.isArray(report?.rows)) {
     rows.push(["name", "amount"]);
-    report.rows.forEach((item) => rows.push([item.name || item.label || "", item.amount || item.total || 0]));
+    report.rows.forEach((item) =>
+      rows.push([item.name || item.label || "", item.amount || item.total || 0])
+    );
   } else if (Array.isArray(report?.byCategory)) {
     rows.push(["category", "amount", "count"]);
-    report.byCategory.forEach((item) => rows.push([item.name || "", item.amount || 0, item.count || 0]));
+    report.byCategory.forEach((item) =>
+      rows.push([item.name || "", item.amount || 0, item.count || 0])
+    );
   } else if (Array.isArray(report?.byFund)) {
     rows.push(["fund", "pledged", "fulfilled", "count"]);
-    report.byFund.forEach((item) => rows.push([item.name || "", item.amount || 0, item.secondaryAmount || 0, item.count || 0]));
+    report.byFund.forEach((item) =>
+      rows.push([item.name || "", item.amount || 0, item.secondaryAmount || 0, item.count || 0])
+    );
   } else if (Array.isArray(report?.lines)) {
     rows.push(["line", "budgetedAmount", "actualAmount", "variance", "variancePercent"]);
     report.lines.forEach((item) =>
@@ -373,11 +445,7 @@ function convertReportToCsv(report) {
   }
 
   return rows
-    .map((row) =>
-      row
-        .map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`)
-        .join(",")
-    )
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");
 }
 

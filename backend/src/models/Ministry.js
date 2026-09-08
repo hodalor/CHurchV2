@@ -54,5 +54,3 @@ const ministrySchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("Ministry", ministrySchema);
-
-

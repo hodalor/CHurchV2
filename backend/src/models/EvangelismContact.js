@@ -33,5 +33,3 @@ const evangelismContactSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("EvangelismContact", evangelismContactSchema);
-
-

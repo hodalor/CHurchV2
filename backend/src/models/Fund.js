@@ -25,5 +25,3 @@ const fundSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("Fund", fundSchema);
-
-

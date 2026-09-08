@@ -85,20 +85,23 @@ async function evaluateDuplicateCandidatesForRecord(recordType, payload, options
 }
 
 async function evaluateMemberCandidates(payload = {}, options = {}) {
-  const records = await Member.find({}, {
-    memberId: 1,
-    firstName: 1,
-    lastName: 1,
-    otherName: 1,
-    preferredName: 1,
-    phone: 1,
-    email: 1,
-    dateOfBirth: 1,
-    residentialArea: 1,
-    address: 1,
-    familyId: 1,
-    familyName: 1,
-  }).lean();
+  const records = await Member.find(
+    {},
+    {
+      memberId: 1,
+      firstName: 1,
+      lastName: 1,
+      otherName: 1,
+      preferredName: 1,
+      phone: 1,
+      email: 1,
+      dateOfBirth: 1,
+      residentialArea: 1,
+      address: 1,
+      familyId: 1,
+      familyName: 1,
+    }
+  ).lean();
 
   const incoming = buildComparableMember(payload);
   return buildDuplicateResults({
@@ -113,13 +116,16 @@ async function evaluateMemberCandidates(payload = {}, options = {}) {
 }
 
 async function evaluateHouseholdCandidates(payload = {}, options = {}) {
-  const records = await Family.find({}, {
-    familyId: 1,
-    familyName: 1,
-    physicalAddress: 1,
-    residentialArea: 1,
-    householdMembers: 1,
-  }).lean();
+  const records = await Family.find(
+    {},
+    {
+      familyId: 1,
+      familyName: 1,
+      physicalAddress: 1,
+      residentialArea: 1,
+      householdMembers: 1,
+    }
+  ).lean();
 
   const incoming = buildComparableHousehold(payload);
   return buildDuplicateResults({
@@ -134,15 +140,18 @@ async function evaluateHouseholdCandidates(payload = {}, options = {}) {
 }
 
 async function evaluateVisitorCandidates(payload = {}, options = {}) {
-  const records = await Visitor.find({}, {
-    visitorId: 1,
-    firstName: 1,
-    surname: 1,
-    phone: 1,
-    email: 1,
-    residentialArea: 1,
-    firstVisitDate: 1,
-  }).lean();
+  const records = await Visitor.find(
+    {},
+    {
+      visitorId: 1,
+      firstName: 1,
+      surname: 1,
+      phone: 1,
+      email: 1,
+      residentialArea: 1,
+      firstVisitDate: 1,
+    }
+  ).lean();
 
   const incoming = buildComparableVisitor(payload);
   return buildDuplicateResults({
@@ -207,12 +216,20 @@ function compareComparableRecords(recordType, incoming, existing) {
     score += 18;
   }
 
-  if (incoming.dateOfBirth && existing.dateOfBirth && incoming.dateOfBirth === existing.dateOfBirth) {
+  if (
+    incoming.dateOfBirth &&
+    existing.dateOfBirth &&
+    incoming.dateOfBirth === existing.dateOfBirth
+  ) {
     reasons.push("Same date of birth");
     score += 18;
   }
 
-  if (incoming.residentialArea && existing.residentialArea && incoming.residentialArea === existing.residentialArea) {
+  if (
+    incoming.residentialArea &&
+    existing.residentialArea &&
+    incoming.residentialArea === existing.residentialArea
+  ) {
     reasons.push("Same residential area");
     score += 8;
   }
@@ -222,13 +239,20 @@ function compareComparableRecords(recordType, incoming, existing) {
     score += 12;
   }
 
-  if (recordType === "member" && incoming.familyId && existing.familyId && incoming.familyId === existing.familyId) {
+  if (
+    recordType === "member" &&
+    incoming.familyId &&
+    existing.familyId &&
+    incoming.familyId === existing.familyId
+  ) {
     reasons.push("Same household reference");
     score += 12;
   }
 
   if (recordType === "household") {
-    const overlappingMembers = incoming.memberIds.filter((memberId) => existing.memberIds.includes(memberId));
+    const overlappingMembers = incoming.memberIds.filter((memberId) =>
+      existing.memberIds.includes(memberId)
+    );
     if (overlappingMembers.length) {
       reasons.push(`Overlapping household members (${overlappingMembers.join(", ")})`);
       score += Math.min(30, overlappingMembers.length * 12);
@@ -245,10 +269,15 @@ function compareComparableRecords(recordType, incoming, existing) {
 
 function buildComparableMember(payload = {}) {
   return {
-    fullName: `${payload.firstName || ""} ${payload.otherName || payload.preferredName || ""} ${payload.lastName || payload.surname || ""}`.replace(/\s+/g, " ").trim(),
+    fullName:
+      `${payload.firstName || ""} ${payload.otherName || payload.preferredName || ""} ${payload.lastName || payload.surname || ""}`
+        .replace(/\s+/g, " ")
+        .trim(),
     phone: normalizePhone(payload.phone || payload.primaryMobile),
     email: normalizeText(payload.email),
-    dateOfBirth: payload.dateOfBirth ? new Date(payload.dateOfBirth).toISOString().slice(0, 10) : "",
+    dateOfBirth: payload.dateOfBirth
+      ? new Date(payload.dateOfBirth).toISOString().slice(0, 10)
+      : "",
     residentialArea: normalizeText(payload.residentialArea),
     address: normalizeText(payload.address || payload.physicalAddress),
     familyId: payload.familyId || "",
@@ -262,7 +291,9 @@ function buildComparableHousehold(payload = {}) {
         payload.headOfHousehold?.memberId,
         payload.spouse?.memberId,
         ...(Array.isArray(payload.children) ? payload.children.map((item) => item.memberId) : []),
-        ...(Array.isArray(payload.dependants) ? payload.dependants.map((item) => item.memberId) : []),
+        ...(Array.isArray(payload.dependants)
+          ? payload.dependants.map((item) => item.memberId)
+          : []),
       ].filter(Boolean);
 
   return {
@@ -279,10 +310,14 @@ function buildComparableHousehold(payload = {}) {
 
 function buildComparableVisitor(payload = {}) {
   return {
-    fullName: `${payload.firstName || ""} ${payload.surname || payload.lastName || ""}`.replace(/\s+/g, " ").trim(),
+    fullName: `${payload.firstName || ""} ${payload.surname || payload.lastName || ""}`
+      .replace(/\s+/g, " ")
+      .trim(),
     phone: normalizePhone(payload.phone || payload.primaryMobile),
     email: normalizeText(payload.email),
-    dateOfBirth: payload.dateOfBirth ? new Date(payload.dateOfBirth).toISOString().slice(0, 10) : "",
+    dateOfBirth: payload.dateOfBirth
+      ? new Date(payload.dateOfBirth).toISOString().slice(0, 10)
+      : "",
     residentialArea: normalizeText(payload.residentialArea),
     address: "",
     familyId: payload.familyId || "",

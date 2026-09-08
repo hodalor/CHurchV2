@@ -24,11 +24,7 @@ class ZkTecoSdkProvider {
   }
 
   async identify(payload = {}) {
-    return this.runBridgeCommand([
-      "identify",
-      "--timeout",
-      String(Number(payload.timeout || 20)),
-    ]);
+    return this.runBridgeCommand(["identify", "--timeout", String(Number(payload.timeout || 20))]);
   }
 
   async runBridgeCommand(args = []) {

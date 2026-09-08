@@ -1,4 +1,3 @@
-const AttendanceEvent = require("../models/AttendanceEvent");
 const AttendanceRecord = require("../models/AttendanceRecord");
 const DiscipleshipEnrollment = require("../models/DiscipleshipEnrollment");
 const EvangelismProspect = require("../models/EvangelismProspect");
@@ -118,7 +117,13 @@ async function evaluateAttendanceRule(rule, amberDays, redDays) {
   const lastAttendanceByMember = await AttendanceRecord.aggregate([
     { $match: { memberId: { $ne: null }, present: true } },
     { $sort: { createdAt: -1 } },
-    { $group: { _id: "$memberId", lastAttendanceAt: { $first: "$createdAt" }, eventId: { $first: "$eventId" } } },
+    {
+      $group: {
+        _id: "$memberId",
+        lastAttendanceAt: { $first: "$createdAt" },
+        eventId: { $first: "$eventId" },
+      },
+    },
   ]);
   const attendanceMap = new Map(lastAttendanceByMember.map((item) => [String(item._id), item]));
 
@@ -135,7 +140,9 @@ async function evaluateAttendanceRule(rule, amberDays, redDays) {
         memberId: member._id,
         status: daysSince >= redDays ? "Red" : "Amber",
         reason: `${member.firstName} ${member.lastName} has no recorded attendance in the last ${daysSince} days.`,
-        sourceRecordRef: activity?.eventId ? `AttendanceEvent:${activity.eventId}` : `Member:${member.memberId}`,
+        sourceRecordRef: activity?.eventId
+          ? `AttendanceEvent:${activity.eventId}`
+          : `Member:${member.memberId}`,
       };
     })
     .filter(Boolean);
@@ -166,7 +173,9 @@ async function evaluateVisitorRule(rule, amberDays, redDays) {
 }
 
 async function evaluateDiscipleshipRule(rule, amberDays, redDays) {
-  const enrollments = await DiscipleshipEnrollment.find().populate("memberId", "memberId firstName lastName").lean();
+  const enrollments = await DiscipleshipEnrollment.find()
+    .populate("memberId", "memberId firstName lastName")
+    .lean();
   return enrollments
     .map((enrollment) => {
       const lastSessionDate = enrollment.sessionsCompleted?.length
@@ -179,7 +188,8 @@ async function evaluateDiscipleshipRule(rule, amberDays, redDays) {
         return null;
       }
 
-      const status = noMentor && daysSince >= redDays ? "Red" : daysSince >= redDays ? "Red" : "Amber";
+      const status =
+        noMentor && daysSince >= redDays ? "Red" : daysSince >= redDays ? "Red" : "Amber";
       const reason = noMentor
         ? `${enrollment.memberId?.firstName || "Member"} has no discipleship mentor assigned after ${daysSince} days.`
         : `${enrollment.memberId?.firstName || "Member"} has no recent discipleship session in ${daysSince} days.`;
@@ -198,7 +208,8 @@ async function evaluateProspectRule(rule, amberDays, redDays) {
   const prospects = await EvangelismProspect.find().lean();
   return prospects
     .map((prospect) => {
-      const anchorDate = prospect.nextFollowUpDate || prospect.dateFirstContact || prospect.createdAt;
+      const anchorDate =
+        prospect.nextFollowUpDate || prospect.dateFirstContact || prospect.createdAt;
       const daysSince = diffDays(anchorDate, new Date());
       if (daysSince < amberDays) {
         return null;
@@ -216,7 +227,10 @@ async function evaluateProspectRule(rule, amberDays, redDays) {
 
 function diffDays(fromDate, toDate) {
   const start = new Date(fromDate || toDate);
-  return Math.max(0, Math.floor((new Date(toDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  return Math.max(
+    0,
+    Math.floor((new Date(toDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+  );
 }
 
 module.exports = {

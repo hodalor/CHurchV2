@@ -7,7 +7,10 @@ function getStorageSettings() {
   const publicBaseUrl =
     process.env.GOOGLE_CLOUD_STORAGE_PUBLIC_BASE_URL ||
     (bucketName ? `https://storage.googleapis.com/${bucketName}` : "");
-  const objectPrefix = String(process.env.GOOGLE_CLOUD_STORAGE_PREFIX || "churchflow").replace(/^\/+|\/+$/g, "");
+  const objectPrefix = String(process.env.GOOGLE_CLOUD_STORAGE_PREFIX || "churchflow").replace(
+    /^\/+|\/+$/g,
+    ""
+  );
 
   return {
     bucketName,
@@ -22,7 +25,9 @@ function isStorageConfigured() {
 
 function createStorageClient() {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || undefined;
-  const credentialPayload = parseCredentialPayload(process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY || "");
+  const credentialPayload = parseCredentialPayload(
+    process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY || ""
+  );
 
   if (credentialPayload) {
     return new Storage({
@@ -34,9 +39,16 @@ function createStorageClient() {
   return new Storage({ projectId });
 }
 
-async function uploadBufferToGoogleStorage({ buffer, originalName = "", mimeType = "", folder = "general" }) {
+async function uploadBufferToGoogleStorage({
+  buffer,
+  originalName = "",
+  mimeType = "",
+  folder = "general",
+}) {
   if (!isStorageConfigured()) {
-    throw new Error("Google Cloud Storage is not configured. Add GOOGLE_CLOUD_STORAGE_BUCKET first.");
+    throw new Error(
+      "Google Cloud Storage is not configured. Add GOOGLE_CLOUD_STORAGE_BUCKET first."
+    );
   }
 
   if (!buffer?.length) {
@@ -44,7 +56,9 @@ async function uploadBufferToGoogleStorage({ buffer, originalName = "", mimeType
   }
 
   const { bucketName, publicBaseUrl, objectPrefix } = getStorageSettings();
-  const safeFolder = String(folder || "general").replace(/[^a-z0-9/_-]/gi, "-").replace(/^\/+|\/+$/g, "");
+  const safeFolder = String(folder || "general")
+    .replace(/[^a-z0-9/_-]/gi, "-")
+    .replace(/^\/+|\/+$/g, "");
   const extension = path.extname(originalName || "").toLowerCase();
   const fileName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${extension}`;
   const objectName = [objectPrefix, safeFolder, fileName].filter(Boolean).join("/");
@@ -80,7 +94,9 @@ function parseCredentialPayload(rawValue) {
     try {
       return JSON.parse(Buffer.from(rawValue, "base64").toString("utf8"));
     } catch (nestedError) {
-      throw new Error("GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY must be valid JSON or base64-encoded JSON.");
+      throw new Error(
+        "GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY must be valid JSON or base64-encoded JSON."
+      );
     }
   }
 }

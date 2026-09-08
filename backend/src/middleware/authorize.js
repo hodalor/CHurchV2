@@ -1,10 +1,14 @@
 function authorizePermissions(...requiredPermissions) {
   return (req, res, next) => {
     const grantedPermissions = req.user?.permissions || [];
-    const hasPermission = requiredPermissions.every((permission) => grantedPermissions.includes(permission));
+    const hasPermission = requiredPermissions.every((permission) =>
+      grantedPermissions.includes(permission)
+    );
 
     if (!hasPermission) {
-      return res.status(403).json({ message: "You do not have permission to perform this action." });
+      return res
+        .status(403)
+        .json({ message: "You do not have permission to perform this action." });
     }
 
     return next();

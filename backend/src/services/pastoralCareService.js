@@ -4,7 +4,11 @@ const CounselingSession = require("../models/CounselingSession");
 const VisitationRecord = require("../models/VisitationRecord");
 const { logAudit } = require("./auditService");
 const { createPendingAction } = require("./pendingActionService");
-const { canAccessCareNote, getHighestCareTier, logRestrictedCareView } = require("./careAccessService");
+const {
+  canAccessCareNote,
+  getHighestCareTier,
+  logRestrictedCareView,
+} = require("./careAccessService");
 
 async function listCareCases() {
   return CareCase.find()

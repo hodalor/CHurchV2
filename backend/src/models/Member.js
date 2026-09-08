@@ -272,5 +272,3 @@ memberSchema.index(
 );
 
 module.exports = createScopedModel("Member", memberSchema);
-
-

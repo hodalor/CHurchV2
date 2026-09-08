@@ -75,5 +75,3 @@ const duplicateCandidateSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("DuplicateCandidate", duplicateCandidateSchema);
-
-

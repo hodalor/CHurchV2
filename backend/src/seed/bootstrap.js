@@ -51,7 +51,13 @@ async function seedLookupData() {
       key: "visitor_status",
       label: "Visitor Status",
       module: "visitor",
-      values: ["First-Time", "Repeat/Staying", "Lapsed", "Converted-to-Prospect", "Converted-to-Member"],
+      values: [
+        "First-Time",
+        "Repeat/Staying",
+        "Lapsed",
+        "Converted-to-Prospect",
+        "Converted-to-Member",
+      ],
     },
     {
       key: "visitor_retention_window",
@@ -63,13 +69,29 @@ async function seedLookupData() {
       key: "evangelism_pipeline_stage",
       label: "Evangelism Pipeline Stage",
       module: "evangelism",
-      values: ["Contact", "Gospel Shared", "Bible Study", "Worship Attendance", "Baptism", "Discipleship", "Ministry Integration"],
+      values: [
+        "Contact",
+        "Gospel Shared",
+        "Bible Study",
+        "Worship Attendance",
+        "Baptism",
+        "Discipleship",
+        "Ministry Integration",
+      ],
     },
     {
       key: "evangelism_source",
       label: "Evangelism Source",
       module: "evangelism",
-      values: ["Visitor Conversion", "Outreach", "Friend Invite", "Crusade", "Community Visit", "Social Media", "Other"],
+      values: [
+        "Visitor Conversion",
+        "Outreach",
+        "Friend Invite",
+        "Crusade",
+        "Community Visit",
+        "Social Media",
+        "Other",
+      ],
     },
     {
       key: "bible_study_status",
@@ -129,13 +151,30 @@ async function seedLookupData() {
       key: "finance_expense_category",
       label: "Finance Expense Category",
       module: "finance",
-      values: ["Utilities", "Salaries", "Maintenance", "Ministry Expense", "Missions", "Administration", "Other"],
+      values: [
+        "Utilities",
+        "Salaries",
+        "Maintenance",
+        "Ministry Expense",
+        "Missions",
+        "Administration",
+        "Other",
+      ],
     },
     {
       key: "care_note_type",
       label: "Care Note Type",
       module: "care",
-      values: ["Visitation", "Hospital Visit", "Phone Call", "Counseling Session", "Crisis Intervention", "Prayer Follow-Up", "General Check-In", "Other"],
+      values: [
+        "Visitation",
+        "Hospital Visit",
+        "Phone Call",
+        "Counseling Session",
+        "Crisis Intervention",
+        "Prayer Follow-Up",
+        "General Check-In",
+        "Other",
+      ],
     },
     {
       key: "communication_channel",
@@ -216,7 +255,10 @@ async function seedLookupData() {
     const seededKeys = [];
 
     for (const [index, label] of seed.values.entries()) {
-      const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const key = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "");
       seededKeys.push(key);
       await LookupValue.findOneAndUpdate(
         { type: lookupType._id, key },
@@ -248,7 +290,9 @@ async function seedLookupData() {
 }
 
 async function seedDiscipleshipProgrammes() {
-  const existingProgramme = await DiscipleshipProgramme.findOne({ name: "New Converts Foundation" });
+  const existingProgramme = await DiscipleshipProgramme.findOne({
+    name: "New Converts Foundation",
+  });
   if (existingProgramme) {
     return;
   }
@@ -269,15 +313,35 @@ async function seedDiscipleshipProgrammes() {
 
 async function seedMinistries() {
   const ministrySeeds = [
-    { name: "Evangelism", description: "Outreach, follow-up, and prospect engagement.", color: "#4f46e5" },
+    {
+      name: "Evangelism",
+      description: "Outreach, follow-up, and prospect engagement.",
+      color: "#4f46e5",
+    },
     { name: "Men", description: "Men's fellowship and discipleship activities.", color: "#0ea5e9" },
     { name: "Women", description: "Women's fellowship and care activities.", color: "#ec4899" },
     { name: "Youth", description: "Youth services, mentoring, and events.", color: "#f59e0b" },
     { name: "Children", description: "Children's church and teaching support.", color: "#14b8a6" },
-    { name: "Marriage", description: "Marriage enrichment and household support.", color: "#8b5cf6" },
-    { name: "Empowerment", description: "Skills, support, and empowerment initiatives.", color: "#f97316" },
-    { name: "Finance", description: "Finance stewardship and reporting support.", color: "#22c55e" },
-    { name: "Administration", description: "Operations, records, and service coordination.", color: "#64748b" },
+    {
+      name: "Marriage",
+      description: "Marriage enrichment and household support.",
+      color: "#8b5cf6",
+    },
+    {
+      name: "Empowerment",
+      description: "Skills, support, and empowerment initiatives.",
+      color: "#f97316",
+    },
+    {
+      name: "Finance",
+      description: "Finance stewardship and reporting support.",
+      color: "#22c55e",
+    },
+    {
+      name: "Administration",
+      description: "Operations, records, and service coordination.",
+      color: "#64748b",
+    },
   ];
 
   await Promise.all(

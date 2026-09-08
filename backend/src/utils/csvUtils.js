@@ -11,9 +11,9 @@ function parseCsv(text = "") {
     const character = text[index];
     const nextCharacter = text[index + 1];
 
-    if (character === "\"") {
-      if (insideQuotes && nextCharacter === "\"") {
-        current += "\"";
+    if (character === '"') {
+      if (insideQuotes && nextCharacter === '"') {
+        current += '"';
         index += 1;
       } else {
         insideQuotes = !insideQuotes;
@@ -52,13 +52,7 @@ function parseCsv(text = "") {
 }
 
 function toCsv(rows = []) {
-  return rows
-    .map((row) =>
-      row
-        .map((value) => escapeCsvValue(value))
-        .join(",")
-    )
-    .join("\n");
+  return rows.map((row) => row.map((value) => escapeCsvValue(value)).join(",")).join("\n");
 }
 
 function escapeCsvValue(value) {
@@ -66,7 +60,7 @@ function escapeCsvValue(value) {
   if (!/[",\n\r]/.test(text)) {
     return text;
   }
-  return `"${text.replace(/"/g, "\"\"")}"`;
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 function normalizeCsvHeader(value = "") {
@@ -110,7 +104,9 @@ function rowsToRecords(rows = []) {
   const headers = rows[0].map((header) => normalizeCsvHeader(header));
   return rows
     .slice(1)
-    .filter((values) => Array.isArray(values) && values.some((value) => String(value || "").trim() !== ""))
+    .filter(
+      (values) => Array.isArray(values) && values.some((value) => String(value || "").trim() !== "")
+    )
     .map((values, rowIndex) => {
       const record = { __rowNumber: rowIndex + 2 };
       headers.forEach((header, columnIndex) => {
@@ -124,14 +120,27 @@ function rowsToRecords(rows = []) {
 }
 
 function parseImportFile(buffer, { originalName = "", mimeType = "" } = {}) {
-  const extension = String(path.extname(originalName || "")).trim().toLowerCase();
+  const extension = String(path.extname(originalName || ""))
+    .trim()
+    .toLowerCase();
   const normalizedMimeType = String(mimeType || "").toLowerCase();
 
-  if (extension === ".xlsx" || extension === ".xls" || normalizedMimeType.includes("spreadsheetml") || normalizedMimeType.includes("ms-excel")) {
+  if (
+    extension === ".xlsx" ||
+    extension === ".xls" ||
+    normalizedMimeType.includes("spreadsheetml") ||
+    normalizedMimeType.includes("ms-excel")
+  ) {
     return parseSpreadsheet(buffer);
   }
 
-  if (!extension || extension === ".csv" || extension === ".txt" || normalizedMimeType.includes("csv") || normalizedMimeType.startsWith("text/")) {
+  if (
+    !extension ||
+    extension === ".csv" ||
+    extension === ".txt" ||
+    normalizedMimeType.includes("csv") ||
+    normalizedMimeType.startsWith("text/")
+  ) {
     return parseCsv(buffer.toString("utf8"));
   }
 

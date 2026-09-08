@@ -7,13 +7,18 @@ function normalizeBiometricPayload(payload = {}) {
     throw new Error("Fingerprint template reference is required.");
   }
 
-  const qualityScore = payload.qualityScore === "" || payload.qualityScore === undefined || payload.qualityScore === null
-    ? null
-    : Number(payload.qualityScore);
+  const qualityScore =
+    payload.qualityScore === "" ||
+    payload.qualityScore === undefined ||
+    payload.qualityScore === null
+      ? null
+      : Number(payload.qualityScore);
 
   return {
     enabled: true,
-    provider: String(payload.provider || "zkteco").trim().toLowerCase(),
+    provider: String(payload.provider || "zkteco")
+      .trim()
+      .toLowerCase(),
     templateRef,
     deviceName: String(payload.deviceName || "").trim(),
     qualityScore: Number.isFinite(qualityScore) ? qualityScore : null,
@@ -27,11 +32,17 @@ async function assertTemplateRefAvailable(templateRef, exclude = {}) {
     Visitor.findOne({ "biometric.templateRef": templateRef }),
   ]);
 
-  if (member && !(exclude.subjectType === "member" && String(member._id) === String(exclude.subjectId))) {
+  if (
+    member &&
+    !(exclude.subjectType === "member" && String(member._id) === String(exclude.subjectId))
+  ) {
     throw new Error(`Fingerprint template is already linked to member ${member.memberId}.`);
   }
 
-  if (visitor && !(exclude.subjectType === "visitor" && String(visitor._id) === String(exclude.subjectId))) {
+  if (
+    visitor &&
+    !(exclude.subjectType === "visitor" && String(visitor._id) === String(exclude.subjectId))
+  ) {
     throw new Error(`Fingerprint template is already linked to visitor ${visitor.visitorId}.`);
   }
 }

@@ -38,5 +38,3 @@ const communicationGroupSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("CommunicationGroup", communicationGroupSchema);
-
-

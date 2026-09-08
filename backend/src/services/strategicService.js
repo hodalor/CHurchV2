@@ -3,7 +3,6 @@ const KPI = require("../models/KPI");
 const KPIActual = require("../models/KPIActual");
 const KPITarget = require("../models/KPITarget");
 const StrategicObjective = require("../models/StrategicObjective");
-const StrategicPillar = require("../models/StrategicPillar");
 const { getLookupValueByTypeAndKey } = require("./lookupService");
 const { computeVariance } = require("./varianceService");
 
@@ -19,7 +18,11 @@ async function computeKpiActualFields(kpiId, period, actualValue) {
 
   const targetValue = Number(target?.targetValue || 0);
   const { variance } = computeVariance(targetValue, Number(actualValue || 0));
-  const ragStatus = await resolveRagStatus(kpi.ragThresholds || {}, targetValue, Number(actualValue || 0));
+  const ragStatus = await resolveRagStatus(
+    kpi.ragThresholds || {},
+    targetValue,
+    Number(actualValue || 0)
+  );
 
   return {
     variance,
@@ -28,7 +31,9 @@ async function computeKpiActualFields(kpiId, period, actualValue) {
 }
 
 async function getStrategicScorecard({ ministryId = "" } = {}) {
-  const objectives = await StrategicObjective.find(ministryId ? { responsibleMinistryId: ministryId } : {})
+  const objectives = await StrategicObjective.find(
+    ministryId ? { responsibleMinistryId: ministryId } : {}
+  )
     .populate("pillarId", "name planId")
     .populate("responsibleMinistryId", "name")
     .lean();
@@ -42,16 +47,24 @@ async function getStrategicScorecard({ ministryId = "" } = {}) {
   const kpiIds = kpis.map((kpi) => kpi._id);
   const [targets, actuals, greenStatus, amberStatus, redStatus] = await Promise.all([
     KPITarget.find({ kpiId: { $in: kpiIds } }).lean(),
-    KPIActual.find({ kpiId: { $in: kpiIds } }).populate("ragStatus", "label key").lean(),
+    KPIActual.find({ kpiId: { $in: kpiIds } })
+      .populate("ragStatus", "label key")
+      .lean(),
     getLookupValueByTypeAndKey("rag_status", "green"),
     getLookupValueByTypeAndKey("rag_status", "amber"),
     getLookupValueByTypeAndKey("rag_status", "red"),
   ]);
 
   const ragCounts = {
-    Green: actuals.filter((item) => String(item.ragStatus?._id || item.ragStatus) === String(greenStatus?._id)).length,
-    Amber: actuals.filter((item) => String(item.ragStatus?._id || item.ragStatus) === String(amberStatus?._id)).length,
-    Red: actuals.filter((item) => String(item.ragStatus?._id || item.ragStatus) === String(redStatus?._id)).length,
+    Green: actuals.filter(
+      (item) => String(item.ragStatus?._id || item.ragStatus) === String(greenStatus?._id)
+    ).length,
+    Amber: actuals.filter(
+      (item) => String(item.ragStatus?._id || item.ragStatus) === String(amberStatus?._id)
+    ).length,
+    Red: actuals.filter(
+      (item) => String(item.ragStatus?._id || item.ragStatus) === String(redStatus?._id)
+    ).length,
   };
 
   return {

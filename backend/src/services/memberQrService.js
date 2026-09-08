@@ -124,9 +124,16 @@ async function regenerateMemberQr(member, user = null) {
 
 async function migrateMemberQRCodes({ limit = 0, user = null } = {}) {
   const query = {
-    $or: [{ qrToken: { $exists: false } }, { qrToken: "" }, { qrCodeImageUrl: { $exists: false } }, { qrCodeImageUrl: "" }],
+    $or: [
+      { qrToken: { $exists: false } },
+      { qrToken: "" },
+      { qrCodeImageUrl: { $exists: false } },
+      { qrCodeImageUrl: "" },
+    ],
   };
-  const members = await Member.find(query).sort({ createdAt: 1 }).limit(Number(limit) > 0 ? Number(limit) : 0);
+  const members = await Member.find(query)
+    .sort({ createdAt: 1 })
+    .limit(Number(limit) > 0 ? Number(limit) : 0);
   let updatedCount = 0;
 
   for (const member of members) {

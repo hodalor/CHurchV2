@@ -23,5 +23,3 @@ const strategicPillarSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("StrategicPillar", strategicPillarSchema);
-
-

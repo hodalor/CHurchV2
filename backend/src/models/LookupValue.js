@@ -40,5 +40,3 @@ const lookupValueSchema = new mongoose.Schema(
 lookupValueSchema.index({ type: 1, key: 1 }, { unique: true });
 
 module.exports = createScopedModel("LookupValue", lookupValueSchema);
-
-

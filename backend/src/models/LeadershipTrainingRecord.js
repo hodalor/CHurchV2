@@ -32,5 +32,3 @@ const leadershipTrainingRecordSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("LeadershipTrainingRecord", leadershipTrainingRecordSchema);
-
-

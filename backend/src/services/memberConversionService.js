@@ -28,7 +28,11 @@ async function createMemberFromProfile(profile, payload = {}) {
     address: payload.address || profile.address || "",
     membershipStatus: payload.membershipStatus || "Active",
     membershipDate: payload.membershipDate ? new Date(payload.membershipDate) : new Date(),
-    dateJoined: payload.dateJoined ? new Date(payload.dateJoined) : payload.membershipDate ? new Date(payload.membershipDate) : new Date(),
+    dateJoined: payload.dateJoined
+      ? new Date(payload.dateJoined)
+      : payload.membershipDate
+        ? new Date(payload.membershipDate)
+        : new Date(),
     baptismStatus: payload.baptismStatus || "Not Baptized",
     baptismDate: payload.baptismDate ? new Date(payload.baptismDate) : null,
     placeBaptized: payload.placeBaptized || "",
@@ -38,7 +42,12 @@ async function createMemberFromProfile(profile, payload = {}) {
     occupation: payload.occupation || "",
     employerOrBusiness: payload.employerOrBusiness || "",
     educationOrSkills: payload.educationOrSkills || "",
-    sourceRecordRef: payload.sourceRecordRef || profile.sourceRecordRef || profile.visitorId || profile.prospectId || "",
+    sourceRecordRef:
+      payload.sourceRecordRef ||
+      profile.sourceRecordRef ||
+      profile.visitorId ||
+      profile.prospectId ||
+      "",
     dataEntryClerk: payload.dataEntryClerk || "",
     dateCaptured: payload.dateCaptured ? new Date(payload.dateCaptured) : new Date(),
     notes: payload.notes || "",

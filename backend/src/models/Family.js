@@ -116,5 +116,3 @@ const familySchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("Family", familySchema);
-
-

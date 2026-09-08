@@ -39,62 +39,70 @@ router.post("/", authorizePermissions(PERMISSIONS.MANAGE_MINISTRIES), async (req
   }
 });
 
-router.put("/:ministryId", authorizePermissions(PERMISSIONS.MANAGE_MINISTRIES), async (req, res) => {
-  const ministry = await Ministry.findById(req.params.ministryId);
-  if (!ministry) {
-    return res.status(404).json({ message: "Ministry not found." });
+router.put(
+  "/:ministryId",
+  authorizePermissions(PERMISSIONS.MANAGE_MINISTRIES),
+  async (req, res) => {
+    const ministry = await Ministry.findById(req.params.ministryId);
+    if (!ministry) {
+      return res.status(404).json({ message: "Ministry not found." });
+    }
+
+    const previousValue = ministry.toObject();
+    const payload = normalizeMinistryPayload(req.body);
+
+    ministry.name = payload.name ?? ministry.name;
+    ministry.description = payload.description ?? ministry.description;
+    ministry.leader = payload.leader ?? ministry.leader;
+    ministry.leadership = payload.leadership ?? ministry.leadership;
+    ministry.members = payload.members ?? ministry.members;
+    ministry.color = payload.color ?? ministry.color;
+
+    try {
+      await ministry.save();
+      await syncMinistryMembers(ministry, payload);
+      await logAudit({
+        action: "update",
+        module: "Ministry",
+        recordType: "Ministry",
+        recordId: ministry._id.toString(),
+        previousValue,
+        newValue: ministry.toObject(),
+        user: req.user,
+        ipAddress: req.ip,
+      });
+      return res.json(ministry);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
   }
+);
 
-  const previousValue = ministry.toObject();
-  const payload = normalizeMinistryPayload(req.body);
+router.delete(
+  "/:ministryId",
+  authorizePermissions(PERMISSIONS.MANAGE_MINISTRIES),
+  async (req, res) => {
+    const ministry = await Ministry.findById(req.params.ministryId);
+    if (!ministry) {
+      return res.status(404).json({ message: "Ministry not found." });
+    }
 
-  ministry.name = payload.name ?? ministry.name;
-  ministry.description = payload.description ?? ministry.description;
-  ministry.leader = payload.leader ?? ministry.leader;
-  ministry.leadership = payload.leadership ?? ministry.leadership;
-  ministry.members = payload.members ?? ministry.members;
-  ministry.color = payload.color ?? ministry.color;
+    const previousValue = ministry.toObject();
 
-  try {
-    await ministry.save();
-    await syncMinistryMembers(ministry, payload);
+    await Member.updateMany({ ministry: ministry._id }, { $set: { ministry: null } });
+    await Ministry.deleteOne({ _id: ministry._id });
     await logAudit({
-      action: "update",
+      action: "delete",
       module: "Ministry",
       recordType: "Ministry",
       recordId: ministry._id.toString(),
       previousValue,
-      newValue: ministry.toObject(),
       user: req.user,
       ipAddress: req.ip,
     });
-    return res.json(ministry);
-  } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return res.json({ success: true });
   }
-});
-
-router.delete("/:ministryId", authorizePermissions(PERMISSIONS.MANAGE_MINISTRIES), async (req, res) => {
-  const ministry = await Ministry.findById(req.params.ministryId);
-  if (!ministry) {
-    return res.status(404).json({ message: "Ministry not found." });
-  }
-
-  const previousValue = ministry.toObject();
-
-  await Member.updateMany({ ministry: ministry._id }, { $set: { ministry: null } });
-  await Ministry.deleteOne({ _id: ministry._id });
-  await logAudit({
-    action: "delete",
-    module: "Ministry",
-    recordType: "Ministry",
-    recordId: ministry._id.toString(),
-    previousValue,
-    user: req.user,
-    ipAddress: req.ip,
-  });
-  return res.json({ success: true });
-});
+);
 
 function normalizeMinistryPayload(payload = {}) {
   const leadership = normalizeLeadership(payload.leadership || payload);

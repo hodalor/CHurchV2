@@ -49,7 +49,9 @@ async function saveDepositAccount({ accountId = "", payload = {}, user = null, i
     action: existing ? "update" : "create",
     module: "Church Setup",
     recordType: "DepositAccount",
-    recordId: String(existing?._id || profile.depositAccounts[profile.depositAccounts.length - 1]?._id || ""),
+    recordId: String(
+      existing?._id || profile.depositAccounts[profile.depositAccounts.length - 1]?._id || ""
+    ),
     previousValue,
     newValue: profile.toObject(),
     user,

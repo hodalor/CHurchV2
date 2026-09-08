@@ -39,5 +39,3 @@ const visitationRecordSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("VisitationRecord", visitationRecordSchema);
-
-

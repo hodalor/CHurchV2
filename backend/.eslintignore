@@ -1,0 +1,6 @@
+node_modules/
+coverage/
+vendor/
+.venv-biometric/
+src/biometric-bridge/__pycache__/
+*.json

@@ -44,5 +44,3 @@ const discipleshipProgrammeSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("DiscipleshipProgramme", discipleshipProgrammeSchema);
-
-

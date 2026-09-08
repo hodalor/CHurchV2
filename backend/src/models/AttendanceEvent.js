@@ -49,5 +49,3 @@ const attendanceEventSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("AttendanceEvent", attendanceEventSchema);
-
-

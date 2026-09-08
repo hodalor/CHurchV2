@@ -37,7 +37,8 @@ registerCrudRoutes({
   managePermission: PERMISSIONS.MANAGE_LEADERSHIP,
   moduleName: "Leadership",
   recordType: "SkillTalent",
-  populateQuery: (query) => query.populate("memberId", "memberId firstName lastName ministry").sort({ createdAt: -1 }),
+  populateQuery: (query) =>
+    query.populate("memberId", "memberId firstName lastName ministry").sort({ createdAt: -1 }),
 });
 
 registerCrudRoutes({
@@ -77,7 +78,10 @@ registerCrudRoutes({
   managePermission: PERMISSIONS.MANAGE_LEADERSHIP,
   moduleName: "Leadership",
   recordType: "LeadershipTrainingRecord",
-  populateQuery: (query) => query.populate("memberId", "memberId firstName lastName ministry").sort({ date: -1, createdAt: -1 }),
+  populateQuery: (query) =>
+    query
+      .populate("memberId", "memberId firstName lastName ministry")
+      .sort({ date: -1, createdAt: -1 }),
 });
 
 registerCrudRoutes({
@@ -106,55 +110,71 @@ registerCrudRoutes({
       .sort({ assessedDate: -1, createdAt: -1 }),
 });
 
-router.get("/reports/pipeline", authorizePermissions(PERMISSIONS.VIEW_LEADERSHIP), async (req, res) => {
-  const [roles, readiness, members] = await Promise.all([
-    LeadershipRole.find().populate("roleName", "label key").populate("memberId", "ministry"),
-    SuccessionReadiness.find()
-      .populate("readinessCategory", "label key")
-      .populate("memberId", "ministry"),
-    Member.find({}, { ministry: 1 }).lean(),
-  ]);
+router.get(
+  "/reports/pipeline",
+  authorizePermissions(PERMISSIONS.VIEW_LEADERSHIP),
+  async (req, res) => {
+    const [roles, readiness, members] = await Promise.all([
+      LeadershipRole.find().populate("roleName", "label key").populate("memberId", "ministry"),
+      SuccessionReadiness.find()
+        .populate("readinessCategory", "label key")
+        .populate("memberId", "ministry"),
+      Member.find({}, { ministry: 1 }).lean(),
+    ]);
 
-  const byRole = roles.reduce((acc, item) => {
-    const label = item.roleName?.label || "Unassigned";
-    acc[label] = (acc[label] || 0) + 1;
-    return acc;
-  }, {});
+    const byRole = roles.reduce((acc, item) => {
+      const label = item.roleName?.label || "Unassigned";
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {});
 
-  const byReadiness = readiness.reduce((acc, item) => {
-    const label = item.readinessCategory?.label || "Unassigned";
-    acc[label] = (acc[label] || 0) + 1;
-    return acc;
-  }, {});
+    const byReadiness = readiness.reduce((acc, item) => {
+      const label = item.readinessCategory?.label || "Unassigned";
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {});
 
-  const byMinistry = members.reduce((acc, item) => {
-    const label = item.ministry ? String(item.ministry) : "unassigned";
-    acc[label] = (acc[label] || 0) + 1;
-    return acc;
-  }, {});
+    const byMinistry = members.reduce((acc, item) => {
+      const label = item.ministry ? String(item.ministry) : "unassigned";
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {});
 
-  res.json({
-    totals: {
-      currentRoles: roles.length,
-      readinessRecords: readiness.length,
-    },
-    byRole: toSeries(byRole),
-    byReadiness: toSeries(byReadiness),
-    byMinistry: toSeries(byMinistry),
-  });
-});
+    res.json({
+      totals: {
+        currentRoles: roles.length,
+        readinessRecords: readiness.length,
+      },
+      byRole: toSeries(byRole),
+      byReadiness: toSeries(byReadiness),
+      byMinistry: toSeries(byMinistry),
+    });
+  }
+);
 
-function registerCrudRoutes({ path, Model, viewPermission, managePermission, moduleName, recordType, populateQuery }) {
+function registerCrudRoutes({
+  path,
+  Model,
+  viewPermission,
+  managePermission,
+  moduleName,
+  recordType,
+  populateQuery,
+}) {
   router.get(path, authorizePermissions(viewPermission), async (req, res) => {
     const query = Model.find();
-    const records = populateQuery ? await populateQuery(query) : await query.sort({ createdAt: -1 });
+    const records = populateQuery
+      ? await populateQuery(query)
+      : await query.sort({ createdAt: -1 });
     res.json(records);
   });
 
   router.post(path, authorizePermissions(managePermission), async (req, res) => {
     try {
       const record = await Model.create(req.body);
-      const hydratedRecord = populateQuery ? await populateQuery(Model.find({ _id: record._id })) : [record];
+      const hydratedRecord = populateQuery
+        ? await populateQuery(Model.find({ _id: record._id }))
+        : [record];
       await logAudit({
         action: "create",
         module: moduleName,
@@ -189,7 +209,9 @@ function registerCrudRoutes({ path, Model, viewPermission, managePermission, mod
       user: req.user,
       ipAddress: req.ip,
     });
-    const hydratedRecord = populateQuery ? await populateQuery(Model.find({ _id: record._id })) : [record];
+    const hydratedRecord = populateQuery
+      ? await populateQuery(Model.find({ _id: record._id }))
+      : [record];
     return res.json(Array.isArray(hydratedRecord) ? hydratedRecord[0] : hydratedRecord);
   });
 

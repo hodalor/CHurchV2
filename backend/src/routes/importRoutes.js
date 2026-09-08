@@ -5,7 +5,6 @@ const Family = require("../models/Family");
 const Ministry = require("../models/Ministry");
 const Group = require("../models/Group");
 const authenticate = require("../middleware/authenticate");
-const { authorizePermissions } = require("../middleware/authorize");
 const { generateDuplicateExplanation } = require("../services/aiService");
 const { logAudit } = require("../services/auditService");
 const {
@@ -32,7 +31,7 @@ router.get("/template/:entity", async (req, res) => {
     }
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename=\"${entity}-import-template.csv\"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${entity}-import-template.csv"`);
     return res.send(toCsv(template));
   } catch (error) {
     return res.status(error.status || 400).json({ message: error.message });
@@ -82,7 +81,8 @@ function authorizeEntityAccess(entity, req, mode) {
   const permissionByEntity = {
     members: mode === "manage" ? PERMISSIONS.MANAGE_MEMBERS : PERMISSIONS.VIEW_MEMBERS,
     households: mode === "manage" ? PERMISSIONS.MANAGE_HOUSEHOLDS : PERMISSIONS.VIEW_HOUSEHOLDS,
-    ministrymembers: mode === "manage" ? PERMISSIONS.MANAGE_MINISTRIES : PERMISSIONS.VIEW_MINISTRIES,
+    ministrymembers:
+      mode === "manage" ? PERMISSIONS.MANAGE_MINISTRIES : PERMISSIONS.VIEW_MINISTRIES,
   };
 
   const permission = permissionByEntity[entity];
@@ -207,16 +207,8 @@ function getTemplateRows(entity) {
 
   if (entity === "ministrymembers") {
     return [
-      [
-        "*ministryName",
-        "*memberId",
-        "assignmentType",
-      ],
-      [
-        "Choir",
-        "M000001",
-        "member",
-      ],
+      ["*ministryName", "*memberId", "assignmentType"],
+      ["Choir", "M000001", "member"],
     ];
   }
 
@@ -261,59 +253,67 @@ async function previewMembers(rows) {
   const ministryNames = new Set(ministries.map((item) => item.name.toLowerCase()));
   const groupNames = new Set(groups.map((item) => item.name.toLowerCase()));
 
-  const previewRows = await Promise.all(rows.map(async (row) => {
-    const errors = [];
-    const warnings = [];
-    requireFields(row, ["firstName", "lastName", "gender", "phone", "residentialArea", "membershipStatus"], errors);
-    validateIsoDateField(row, "dateOfBirth", errors);
-    validateIsoDateField(row, "membershipDate", errors);
-    validateIsoDateField(row, "dateJoined", errors);
-    validateIsoDateField(row, "baptismDate", errors);
+  const previewRows = await Promise.all(
+    rows.map(async (row) => {
+      const errors = [];
+      const warnings = [];
+      requireFields(
+        row,
+        ["firstName", "lastName", "gender", "phone", "residentialArea", "membershipStatus"],
+        errors
+      );
+      validateIsoDateField(row, "dateOfBirth", errors);
+      validateIsoDateField(row, "membershipDate", errors);
+      validateIsoDateField(row, "dateJoined", errors);
+      validateIsoDateField(row, "baptismDate", errors);
 
-    if (row.ministryName && !ministryNames.has(row.ministryName.toLowerCase())) {
-      errors.push(`Ministry \"${row.ministryName}\" was not found.`);
-    }
-
-    const requestedGroups = splitList(row.groupNames);
-    requestedGroups.forEach((name) => {
-      if (!groupNames.has(name.toLowerCase())) {
-        errors.push(`Group \"${name}\" was not found.`);
+      if (row.ministryName && !ministryNames.has(row.ministryName.toLowerCase())) {
+        errors.push(`Ministry "${row.ministryName}" was not found.`);
       }
-    });
 
-    const duplicates = await evaluateDuplicateCandidatesForRecord("member", row, {
-      minimumScore: 70,
-    });
-    const duplicatePreview = await Promise.all(
-      duplicates.slice(0, 3).map(async (candidate) => {
-        const explanation = await generateDuplicateExplanation({
-          recordType: "member",
-          incomingLabel: `${row.firstName || ""} ${row.lastName || ""}`.trim(),
-          candidateLabel: candidate.recordLabel,
-          reasons: candidate.matchReasons,
-        });
-        return {
-          ...candidate,
-          aiExplanation: explanation.text,
-        };
-      })
-    );
-    if (duplicatePreview.length) {
-      warnings.push(`Possible duplicate with ${duplicatePreview.map((item) => item.recordId).join(", ")}.`);
-    }
+      const requestedGroups = splitList(row.groupNames);
+      requestedGroups.forEach((name) => {
+        if (!groupNames.has(name.toLowerCase())) {
+          errors.push(`Group "${name}" was not found.`);
+        }
+      });
 
-    return {
-      rowNumber: row.__rowNumber,
-      valid: !errors.length,
-      errors,
-      warnings,
-      duplicates: duplicatePreview,
-      preview: buildImportPreview(row, {
-        groupNames: requestedGroups.join(", "),
-      }),
-      row,
-    };
-  }));
+      const duplicates = await evaluateDuplicateCandidatesForRecord("member", row, {
+        minimumScore: 70,
+      });
+      const duplicatePreview = await Promise.all(
+        duplicates.slice(0, 3).map(async (candidate) => {
+          const explanation = await generateDuplicateExplanation({
+            recordType: "member",
+            incomingLabel: `${row.firstName || ""} ${row.lastName || ""}`.trim(),
+            candidateLabel: candidate.recordLabel,
+            reasons: candidate.matchReasons,
+          });
+          return {
+            ...candidate,
+            aiExplanation: explanation.text,
+          };
+        })
+      );
+      if (duplicatePreview.length) {
+        warnings.push(
+          `Possible duplicate with ${duplicatePreview.map((item) => item.recordId).join(", ")}.`
+        );
+      }
+
+      return {
+        rowNumber: row.__rowNumber,
+        valid: !errors.length,
+        errors,
+        warnings,
+        duplicates: duplicatePreview,
+        preview: buildImportPreview(row, {
+          groupNames: requestedGroups.join(", "),
+        }),
+        row,
+      };
+    })
+  );
 
   return buildPreviewResponse(previewRows);
 }
@@ -337,7 +337,7 @@ async function previewHouseholds(rows) {
       .filter(Boolean)
       .forEach((memberId) => {
         if (!memberIds.has(memberId)) {
-          errors.push(`Member \"${memberId}\" was not found.`);
+          errors.push(`Member "${memberId}" was not found.`);
         }
       });
 
@@ -377,15 +377,15 @@ async function previewMinistryMembers(rows) {
     requireFields(row, ["ministryName", "memberId"], errors);
 
     if (row.ministryName && !ministryNames.has(row.ministryName.toLowerCase())) {
-      errors.push(`Ministry \"${row.ministryName}\" was not found.`);
+      errors.push(`Ministry "${row.ministryName}" was not found.`);
     }
 
     if (row.memberId && !memberIds.has(row.memberId)) {
-      errors.push(`Member \"${row.memberId}\" was not found.`);
+      errors.push(`Member "${row.memberId}" was not found.`);
     }
 
     if (row.assignmentType && !validAssignmentTypes.has(row.assignmentType)) {
-      errors.push(`Assignment type \"${row.assignmentType}\" is not supported.`);
+      errors.push(`Assignment type "${row.assignmentType}" is not supported.`);
     }
 
     return {
@@ -413,7 +413,9 @@ async function commitMembers(rows, user, ipAddress) {
 
   for (const entry of preview.rows) {
     const row = entry.row;
-    const ministry = ministries.find((item) => item.name.toLowerCase() === String(row.ministryName || "").toLowerCase());
+    const ministry = ministries.find(
+      (item) => item.name.toLowerCase() === String(row.ministryName || "").toLowerCase()
+    );
     const selectedGroups = splitList(row.groupNames)
       .map((name) => groups.find((item) => item.name.toLowerCase() === name.toLowerCase()))
       .filter(Boolean)
@@ -534,8 +536,12 @@ async function commitHouseholds(rows, user, ipAddress) {
       primaryContactNumber: row.primaryContactNumber || "",
       headOfHousehold: buildMemberLookup(row.headOfHouseholdMemberId, members),
       spouse: buildMemberLookup(row.spouseMemberId, members),
-      children: splitList(row.childrenMemberIds).map((memberId) => buildMemberLookup(memberId, members)).filter(Boolean),
-      dependants: splitList(row.dependantsMemberIds).map((memberId) => buildMemberLookup(memberId, members)).filter(Boolean),
+      children: splitList(row.childrenMemberIds)
+        .map((memberId) => buildMemberLookup(memberId, members))
+        .filter(Boolean),
+      dependants: splitList(row.dependantsMemberIds)
+        .map((memberId) => buildMemberLookup(memberId, members))
+        .filter(Boolean),
       visitationHistory: row.visitationHistory || "",
       dateLastVisited: parseIsoDateValue(row.dateLastVisited),
       sourceRecordRef: row.sourceRecordRef || "bulk-import",
@@ -578,7 +584,9 @@ async function commitMinistryMembers(rows, user, ipAddress) {
 
   for (const entry of preview.rows) {
     const row = entry.row;
-    const ministry = ministries.find((item) => item.name.toLowerCase() === row.ministryName.toLowerCase());
+    const ministry = ministries.find(
+      (item) => item.name.toLowerCase() === row.ministryName.toLowerCase()
+    );
     const member = members.find((item) => item.memberId === row.memberId);
     const selection = {
       memberId: member.memberId,
@@ -652,9 +660,7 @@ function requireFields(row, fieldNames, errors) {
 
 function buildImportPreview(row, overrides = {}) {
   return Object.entries({
-    ...Object.fromEntries(
-      Object.entries(row || {}).filter(([key]) => key !== "__rowNumber")
-    ),
+    ...Object.fromEntries(Object.entries(row || {}).filter(([key]) => key !== "__rowNumber")),
     ...overrides,
   }).reduce((accumulator, [key, value]) => {
     accumulator[key] = value ?? "";

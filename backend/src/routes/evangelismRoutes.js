@@ -384,27 +384,23 @@ router.get("/campaigns", authorizePermissions(PERMISSIONS.VIEW_EVANGELISM), asyn
   res.json(campaigns);
 });
 
-router.post(
-  "/campaigns",
-  authorizePermissions(PERMISSIONS.MANAGE_EVANGELISM),
-  async (req, res) => {
-    try {
-      const campaign = await createCampaign(req.body);
-      await logAudit({
-        action: "create",
-        module: "Evangelism",
-        recordType: "Campaign",
-        recordId: campaign._id.toString(),
-        newValue: campaign.toObject(),
-        user: req.user,
-        ipAddress: req.ip,
-      });
-      return res.status(201).json(campaign);
-    } catch (error) {
-      return res.status(400).json({ message: error.message });
-    }
+router.post("/campaigns", authorizePermissions(PERMISSIONS.MANAGE_EVANGELISM), async (req, res) => {
+  try {
+    const campaign = await createCampaign(req.body);
+    await logAudit({
+      action: "create",
+      module: "Evangelism",
+      recordType: "Campaign",
+      recordId: campaign._id.toString(),
+      newValue: campaign.toObject(),
+      user: req.user,
+      ipAddress: req.ip,
+    });
+    return res.status(201).json(campaign);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
   }
-);
+});
 
 router.put(
   "/campaigns/:campaignId",

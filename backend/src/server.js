@@ -98,7 +98,7 @@ app.use("/api/strategic", strategicRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/visitors", visitorRoutes);
 
-app.use((error, req, res, next) => {
+app.use((error, req, res, _next) => {
   console.error(error);
   res.status(error.status || 500).json({
     message: error.message || "Something went wrong.",

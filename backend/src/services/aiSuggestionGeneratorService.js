@@ -17,9 +17,11 @@ const SuccessionRequirement = require("../models/SuccessionRequirement");
 const Transaction = require("../models/Transaction");
 const User = require("../models/User");
 const Visitor = require("../models/Visitor");
-const { enforceCommunicationPreferences, resolveCommunicationAudience } = require("./communicationService");
+const {
+  enforceCommunicationPreferences,
+  resolveCommunicationAudience,
+} = require("./communicationService");
 const { generateClaudeText, hasClaudeConfig } = require("./claudeService");
-const { getLookupValueByTypeAndKey } = require("./lookupService");
 const { getStrategicScorecard } = require("./strategicService");
 const { upsertAiSuggestion } = require("./aiService");
 
@@ -34,7 +36,9 @@ function diffDays(fromDate, toDate = new Date()) {
 }
 
 function sanitizeText(value = "") {
-  return String(value || "").replace(/\s+/g, " ").trim();
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeKey(value = "") {
@@ -72,15 +76,31 @@ async function generateVisitorFollowUpSuggestions({
   ipAddress = "",
 } = {}) {
   const visitors = await Visitor.find({
-    $or: [{ convertedToProspectId: { $in: ["", null] } }, { convertedToProspectId: { $exists: false } }],
-    $or: [{ convertedToMemberId: { $in: ["", null] } }, { convertedToMemberId: { $exists: false } }],
+    $and: [
+      {
+        $or: [
+          { convertedToProspectId: { $in: ["", null] } },
+          { convertedToProspectId: { $exists: false } },
+        ],
+      },
+      {
+        $or: [
+          { convertedToMemberId: { $in: ["", null] } },
+          { convertedToMemberId: { $exists: false } },
+        ],
+      },
+    ],
   })
     .populate("howHeard", "label key")
     .populate("assignedFollowUpUserId", "displayName username")
     .sort({ firstVisitDate: 1 });
 
   const candidates = visitors
-    .filter((visitor) => Number(visitor.visitCount || 0) <= 1 && diffDays(visitor.firstVisitDate) >= Number(windowDays))
+    .filter(
+      (visitor) =>
+        Number(visitor.visitCount || 0) <= 1 &&
+        diffDays(visitor.firstVisitDate) >= Number(windowDays)
+    )
     .slice(0, Number(limit));
 
   const suggestions = [];
@@ -98,9 +118,10 @@ async function generateVisitorFollowUpSuggestions({
         `Recorded visit note: ${visitNote || "None"}`,
         "Write a short follow-up draft for a human reviewer to edit before sending.",
       ].join("\n"),
-      fallbackText: `Hello ${visitor.firstName || ""}, thank you again for visiting us. We are glad you came through ${hearingSource}. We wanted to check in, hear how you are doing, and let you know you are welcome back any time.`
-        .replace(/\s+/g, " ")
-        .trim(),
+      fallbackText:
+        `Hello ${visitor.firstName || ""}, thank you again for visiting us. We are glad you came through ${hearingSource}. We wanted to check in, hear how you are doing, and let you know you are welcome back any time.`
+          .replace(/\s+/g, " ")
+          .trim(),
     });
 
     const suggestion = await upsertAiSuggestion({
@@ -171,9 +192,12 @@ async function generateEvangelismSuggestions({
   const stalledSuggestions = [];
   for (const prospect of prospects) {
     const latestContact = latestContactByProspect.get(String(prospect._id));
-    const lastStageChange = [...(prospect.stageHistory || [])]
-      .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())[0];
-    const daysSinceContact = diffDays(latestContact?.date || prospect.dateFirstContact || prospect.createdAt);
+    const lastStageChange = [...(prospect.stageHistory || [])].sort(
+      (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()
+    )[0];
+    const daysSinceContact = diffDays(
+      latestContact?.date || prospect.dateFirstContact || prospect.createdAt
+    );
     const daysInStage = diffDays(lastStageChange?.date || prospect.createdAt);
     if (daysSinceContact < Number(contactWindowDays) && daysInStage < Number(stageWindowDays)) {
       continue;
@@ -184,7 +208,9 @@ async function generateEvangelismSuggestions({
       reasons.push(`no contact logged in ${daysSinceContact} days`);
     }
     if (daysInStage >= Number(stageWindowDays)) {
-      reasons.push(`in ${prospect.currentStage?.label || "the current stage"} for ${daysInStage} days`);
+      reasons.push(
+        `in ${prospect.currentStage?.label || "the current stage"} for ${daysInStage} days`
+      );
     }
 
     const draft = await draftNarrative({
@@ -248,13 +274,19 @@ async function generateEvangelismSuggestions({
   const campaigns = await Campaign.find().sort({ startDate: -1 }).limit(10).lean();
   const campaignSuggestions = [];
   for (const campaign of campaigns) {
-    const linkedProspects = prospects.filter((item) => String(item.campaignId?._id || item.campaignId) === String(campaign._id));
+    const linkedProspects = prospects.filter(
+      (item) => String(item.campaignId?._id || item.campaignId) === String(campaign._id)
+    );
     if (!linkedProspects.length) {
       continue;
     }
 
-    const bibleStudyCount = linkedProspects.filter((item) => item.currentStage?.key === "bible_study").length;
-    const baptizedCount = linkedProspects.filter((item) => item.baptismDate || item.convertedMemberId).length;
+    const bibleStudyCount = linkedProspects.filter(
+      (item) => item.currentStage?.key === "bible_study"
+    ).length;
+    const baptizedCount = linkedProspects.filter(
+      (item) => item.baptismDate || item.convertedMemberId
+    ).length;
     const fallbackText = `${campaign.name}: ${linkedProspects.length} linked prospects, ${bibleStudyCount} in Bible study, ${baptizedCount} baptized or converted so far.`;
     const draft = await draftNarrative({
       systemPrompt:
@@ -304,11 +336,7 @@ async function generateEvangelismSuggestions({
   return [...stalledSuggestions, ...campaignSuggestions];
 }
 
-async function generateMentorMatchSuggestions({
-  user,
-  limit = 15,
-  ipAddress = "",
-} = {}) {
+async function generateMentorMatchSuggestions({ user, limit = 15, ipAddress = "" } = {}) {
   const enrollments = await DiscipleshipEnrollment.find({
     mentorId: null,
   })
@@ -325,8 +353,12 @@ async function generateMentorMatchSuggestions({
   const [users, members, skillTalents, activeEnrollments] = await Promise.all([
     User.find({ status: { $ne: "Inactive" }, memberId: { $nin: ["", null] } }).lean(),
     Member.find({}).lean(),
-    SkillTalent.find({ memberId: { $in: memberIds } }).populate("memberId", "memberId").lean(),
-    DiscipleshipEnrollment.find({ mentorId: { $ne: null } }).populate("mentorId", "displayName username").lean(),
+    SkillTalent.find({ memberId: { $in: memberIds } })
+      .populate("memberId", "memberId")
+      .lean(),
+    DiscipleshipEnrollment.find({ mentorId: { $ne: null } })
+      .populate("mentorId", "displayName username")
+      .lean(),
   ]);
 
   const memberByMemberId = new Map(members.map((member) => [member.memberId, member]));
@@ -377,7 +409,10 @@ async function generateMentorMatchSuggestions({
           reasons.push("same ministry involvement");
         }
 
-        if (normalizeKey(item.member.residentialArea) && normalizeKey(item.member.residentialArea) === normalizeKey(enrollee.residentialArea)) {
+        if (
+          normalizeKey(item.member.residentialArea) &&
+          normalizeKey(item.member.residentialArea) === normalizeKey(enrollee.residentialArea)
+        ) {
           score += 10;
           reasons.push("same residential area");
         }
@@ -399,7 +434,11 @@ async function generateMentorMatchSuggestions({
 
         const currentLoad = mentorLoadMap.get(String(item.account._id)) || 0;
         score += Math.max(0, 20 - currentLoad * 5);
-        reasons.push(currentLoad ? `${currentLoad} current mentoring assignment(s)` : "no current mentoring load");
+        reasons.push(
+          currentLoad
+            ? `${currentLoad} current mentoring assignment(s)`
+            : "no current mentoring load"
+        );
 
         return {
           userId: item.account._id.toString(),
@@ -428,7 +467,10 @@ async function generateMentorMatchSuggestions({
         `Enrollment member: ${enrollee.firstName} ${enrollee.lastName}`.trim(),
         `Programme: ${enrollment.programmeId?.name || "Unassigned"}`,
         `Top mentor candidates: ${candidates
-          .map((candidate) => `${candidate.displayName} [score ${candidate.score}] because ${candidate.reasons.join(", ")}`)
+          .map(
+            (candidate) =>
+              `${candidate.displayName} [score ${candidate.score}] because ${candidate.reasons.join(", ")}`
+          )
           .join(" ; ")}`,
         "Write a short suggestion for a human reviewer.",
       ].join("\n"),
@@ -439,7 +481,8 @@ async function generateMentorMatchSuggestions({
       suggestionType: "mentor_match_suggestion",
       subjectType: "DiscipleshipEnrollment",
       subjectId: enrollment._id.toString(),
-      subjectLabel: `${enrollee.memberId || ""} - ${enrollee.firstName || ""} ${enrollee.lastName || ""}`.trim(),
+      subjectLabel:
+        `${enrollee.memberId || ""} - ${enrollee.firstName || ""} ${enrollee.lastName || ""}`.trim(),
       sourceModule: "Discipleship",
       generatedForUser: user?._id || null,
       title: `Mentor options for ${enrollee.firstName || enrollee.memberId}`,
@@ -451,7 +494,8 @@ async function generateMentorMatchSuggestions({
           label: enrollment.programmeId?.name || "Discipleship enrollment",
         },
       ],
-      promptContextSummary: "Mentor options ranked deterministically by ministry fit, skill overlap, and current mentor load.",
+      promptContextSummary:
+        "Mentor options ranked deterministically by ministry fit, skill overlap, and current mentor load.",
       metadata: {
         fingerprint: `mentor-match:${enrollment._id}`,
         candidates,
@@ -502,11 +546,14 @@ async function generateAttendanceAnomalySuggestions({
     return accumulator;
   }, new Map());
 
-  const members = await Member.find({ membershipStatus: { $nin: ["Inactive", "Passed On"] } }, {
-    memberId: 1,
-    firstName: 1,
-    lastName: 1,
-  }).lean();
+  const members = await Member.find(
+    { membershipStatus: { $nin: ["Inactive", "Passed On"] } },
+    {
+      memberId: 1,
+      firstName: 1,
+      lastName: 1,
+    }
+  ).lean();
 
   const suggestions = [];
   for (const member of members) {
@@ -561,8 +608,12 @@ async function generateAttendanceAnomalySuggestions({
     }
   }
 
-  const recentCutoff = new Date(Date.now() - Number(recentMinistryWindowDays) * 24 * 60 * 60 * 1000);
-  const previousCutoff = new Date(Date.now() - Number(recentMinistryWindowDays) * 2 * 24 * 60 * 60 * 1000);
+  const recentCutoff = new Date(
+    Date.now() - Number(recentMinistryWindowDays) * 24 * 60 * 60 * 1000
+  );
+  const previousCutoff = new Date(
+    Date.now() - Number(recentMinistryWindowDays) * 2 * 24 * 60 * 60 * 1000
+  );
   const ministryRecords = await AttendanceRecord.aggregate([
     {
       $lookup: {
@@ -592,7 +643,10 @@ async function generateAttendanceAnomalySuggestions({
           $sum: {
             $cond: [
               {
-                $and: [{ $lt: ["$event.date", recentCutoff] }, { $gte: ["$event.date", previousCutoff] }],
+                $and: [
+                  { $lt: ["$event.date", recentCutoff] },
+                  { $gte: ["$event.date", previousCutoff] },
+                ],
               },
               1,
               0,
@@ -603,7 +657,9 @@ async function generateAttendanceAnomalySuggestions({
     },
   ]);
 
-  const ministryMap = new Map((await Ministry.find().lean()).map((item) => [String(item._id), item]));
+  const ministryMap = new Map(
+    (await Ministry.find().lean()).map((item) => [String(item._id), item])
+  );
   for (const item of ministryRecords) {
     if (Number(item.previousCount || 0) < 5) {
       continue;
@@ -651,7 +707,8 @@ async function generateAttendanceAnomalySuggestions({
           label: ministry.name,
         },
       ],
-      promptContextSummary: "Recent ministry attendance is materially lower than the previous comparison window.",
+      promptContextSummary:
+        "Recent ministry attendance is materially lower than the previous comparison window.",
       metadata: {
         fingerprint: `attendance-ministry-drop:${ministry._id}:${recentMinistryWindowDays}`,
         recentCount: item.recentCount,
@@ -772,7 +829,10 @@ async function generateCommunicationDraftSuggestion({
   }
 
   const group = groupId ? await CommunicationGroup.findById(groupId) : null;
-  const audience = await resolveCommunicationAudience(filterCriteria || group?.filterCriteria || {}, group);
+  const audience = await resolveCommunicationAudience(
+    filterCriteria || group?.filterCriteria || {},
+    group
+  );
   const filteredAudience = channelId
     ? await enforceCommunicationPreferences(audience, channelId)
     : audience;
@@ -808,7 +868,8 @@ async function generateCommunicationDraftSuggestion({
           },
         ]
       : [],
-    promptContextSummary: "Drafted communication message based on a sender prompt and permission-filtered audience preview.",
+    promptContextSummary:
+      "Drafted communication message based on a sender prompt and permission-filtered audience preview.",
     metadata: {
       fingerprint: `communication-draft:${group?._id?.toString() || "ad_hoc"}:${normalizeKey(promptText)}`,
       promptText: sanitizeText(promptText),
@@ -824,11 +885,7 @@ async function generateCommunicationDraftSuggestion({
   });
 }
 
-async function generateCommunicationAudienceSuggestion({
-  user,
-  requestText,
-  ipAddress = "",
-} = {}) {
+async function generateCommunicationAudienceSuggestion({ user, requestText, ipAddress = "" } = {}) {
   if (!sanitizeText(requestText)) {
     throw new Error("A plain-language audience request is required.");
   }
@@ -836,7 +893,9 @@ async function generateCommunicationAudienceSuggestion({
   const ministries = await Ministry.find({}, { _id: 1, name: 1 }).lean();
   const requestKey = normalizeKey(requestText);
   const suggestedFilterCriteria = {};
-  const matchedMinistry = ministries.find((ministry) => requestKey.includes(normalizeKey(ministry.name)));
+  const matchedMinistry = ministries.find((ministry) =>
+    requestKey.includes(normalizeKey(ministry.name))
+  );
   if (matchedMinistry) {
     suggestedFilterCriteria.ministryId = String(matchedMinistry._id);
   }
@@ -881,7 +940,8 @@ async function generateCommunicationAudienceSuggestion({
           },
         ]
       : [],
-    promptContextSummary: "Plain-language audience request translated into proposed structured filter criteria.",
+    promptContextSummary:
+      "Plain-language audience request translated into proposed structured filter criteria.",
     metadata: {
       fingerprint: `communication-audience:${normalizeKey(requestText)}`,
       requestText: sanitizeText(requestText),
@@ -908,9 +968,11 @@ async function generateStrategicCommentarySuggestions({
     .limit(Number(limit));
 
   const targetMap = new Map(
-    (await KPITarget.find({
-      $or: actuals.map((item) => ({ kpiId: item.kpiId?._id || item.kpiId, period: item.period })),
-    }).lean()).map((item) => [`${item.kpiId}:${item.period}`, item])
+    (
+      await KPITarget.find({
+        $or: actuals.map((item) => ({ kpiId: item.kpiId?._id || item.kpiId, period: item.period })),
+      }).lean()
+    ).map((item) => [`${item.kpiId}:${item.period}`, item])
   );
 
   const kpiIds = actuals.map((item) => item.kpiId?._id || item.kpiId).filter(Boolean);
@@ -966,7 +1028,8 @@ async function generateStrategicCommentarySuggestions({
           label: actual.period,
         },
       ],
-      promptContextSummary: "First-pass KPI commentary grounded in captured actual, target, variance, and RAG.",
+      promptContextSummary:
+        "First-pass KPI commentary grounded in captured actual, target, variance, and RAG.",
       metadata: {
         fingerprint: `strategic-commentary:${actual._id}`,
         period: actual.period,
@@ -1024,10 +1087,7 @@ async function generateStrategicCommentarySuggestions({
   return suggestions;
 }
 
-async function generateLeadershipGapSuggestions({
-  user,
-  ipAddress = "",
-} = {}) {
+async function generateLeadershipGapSuggestions({ user, ipAddress = "" } = {}) {
   const [requirements, readiness] = await Promise.all([
     SuccessionRequirement.find({ keyRole: true }).populate("roleName", "label key").lean(),
     SuccessionReadiness.find()
@@ -1042,10 +1102,14 @@ async function generateLeadershipGapSuggestions({
 
   for (const requirement of requirements) {
     const matches = readiness.filter(
-      (item) => String(item.targetRoleName?._id || item.targetRoleName) === String(requirement.roleName?._id || requirement.roleName)
+      (item) =>
+        String(item.targetRoleName?._id || item.targetRoleName) ===
+        String(requirement.roleName?._id || requirement.roleName)
     );
     const viableMatches = matches.filter((item) =>
-      developmentKeys.has(normalizeKey(item.readinessCategory?.label || item.readinessCategory?.key || ""))
+      developmentKeys.has(
+        normalizeKey(item.readinessCategory?.label || item.readinessCategory?.key || "")
+      )
     );
 
     if (viableMatches.length) {
@@ -1082,7 +1146,8 @@ async function generateLeadershipGapSuggestions({
           label: requirement.roleName?.label || "Key role",
         },
       ],
-      promptContextSummary: "Key succession requirement has no ready or developing candidate recorded.",
+      promptContextSummary:
+        "Key succession requirement has no ready or developing candidate recorded.",
       metadata: {
         fingerprint: `leadership-gap:${requirement._id}`,
         readinessCount: matches.length,
@@ -1106,7 +1171,14 @@ async function generateImportFieldMappingSuggestion({
   ipAddress = "",
 } = {}) {
   const fieldCatalog = {
-    member: ["firstName", "lastName", "gender", "primaryMobile", "residentialArea", "membershipStatus"],
+    member: [
+      "firstName",
+      "lastName",
+      "gender",
+      "primaryMobile",
+      "residentialArea",
+      "membershipStatus",
+    ],
     household: ["familyName", "physicalAddress", "residentialArea", "primaryContactNumber"],
     ministrymembers: ["memberId", "ministryName", "role", "joinedDate"],
   };
@@ -1132,7 +1204,9 @@ async function generateImportFieldMappingSuggestion({
   const unmatchedHeaders = [];
   headers.forEach((header) => {
     const normalized = normalizeKey(header).replace(/[^a-z0-9]/g, "");
-    const directField = targetFields.find((field) => normalizeKey(field).replace(/[^a-z0-9]/g, "") === normalized);
+    const directField = targetFields.find(
+      (field) => normalizeKey(field).replace(/[^a-z0-9]/g, "") === normalized
+    );
     const synonymField = synonyms[normalized];
     if (directField) {
       mapping[header] = directField;
@@ -1153,9 +1227,11 @@ async function generateImportFieldMappingSuggestion({
     userPrompt: [
       `Entity: ${entity}`,
       `Headers: ${headers.join(", ")}`,
-      `Deterministic matches: ${Object.entries(mapping)
-        .map(([header, field]) => `${header} -> ${field}`)
-        .join("; ") || "None"}`,
+      `Deterministic matches: ${
+        Object.entries(mapping)
+          .map(([header, field]) => `${header} -> ${field}`)
+          .join("; ") || "None"
+      }`,
       `Unmatched headers: ${unmatchedHeaders.join(", ") || "None"}`,
       "Write a short mapping note for a human reviewer.",
     ].join("\n"),
@@ -1173,7 +1249,8 @@ async function generateImportFieldMappingSuggestion({
     title: `Import mapping for ${entity}`,
     generatedText: draft.text,
     basedOnRefs: [],
-    promptContextSummary: "Deterministic header mapping completed before any optional AI explanation or reviewer confirmation.",
+    promptContextSummary:
+      "Deterministic header mapping completed before any optional AI explanation or reviewer confirmation.",
     metadata: {
       fingerprint: `import-mapping:${String(entity || "").toLowerCase()}:${headers.length}:${Object.keys(mapping).length}`,
       entity: String(entity || "").toLowerCase(),
@@ -1186,8 +1263,18 @@ async function generateImportFieldMappingSuggestion({
   });
 }
 
-async function generateGivingFollowUpSuggestions({ user, ipAddress = "", limit = 20, recentWindowDays = 60, lapsedWindowDays = 90 } = {}) {
-  const transactions = await Transaction.find({ status: "posted", isReversal: false, amount: { $gt: 0 } })
+async function generateGivingFollowUpSuggestions({
+  user,
+  ipAddress = "",
+  limit = 20,
+  recentWindowDays = 60,
+  lapsedWindowDays = 90,
+} = {}) {
+  const transactions = await Transaction.find({
+    status: "posted",
+    isReversal: false,
+    amount: { $gt: 0 },
+  })
     .populate("memberId", "memberId firstName lastName")
     .populate("householdId", "familyId familyName")
     .sort({ date: -1, createdAt: -1 });
@@ -1200,7 +1287,11 @@ async function generateGivingFollowUpSuggestions({ user, ipAddress = "", limit =
   const now = new Date();
   const groupedTransactions = new Map();
   transactions.forEach((transaction) => {
-    const subjectKey = transaction.memberId ? `member:${transaction.memberId._id}` : transaction.householdId ? `household:${transaction.householdId._id}` : "";
+    const subjectKey = transaction.memberId
+      ? `member:${transaction.memberId._id}`
+      : transaction.householdId
+        ? `household:${transaction.householdId._id}`
+        : "";
     if (!subjectKey) {
       return;
     }
@@ -1212,7 +1303,9 @@ async function generateGivingFollowUpSuggestions({ user, ipAddress = "", limit =
 
   const draftsToPersist = [];
   groupedTransactions.forEach((items, subjectKey) => {
-    const sortedItems = [...items].sort((left, right) => new Date(right.date) - new Date(left.date));
+    const sortedItems = [...items].sort(
+      (left, right) => new Date(right.date) - new Date(left.date)
+    );
     const primary = sortedItems[0];
     const subjectType = primary.memberId ? "Member" : "Household";
     const subjectId = String(primary.memberId?._id || primary.householdId?._id || subjectKey);
@@ -1268,16 +1361,20 @@ async function generateGivingFollowUpSuggestions({ user, ipAddress = "", limit =
         facts: {
           recentTotal,
           previousTotal,
-          changePercent: previousTotal === 0 ? 0 : ((recentTotal - previousTotal) / previousTotal) * 100,
+          changePercent:
+            previousTotal === 0 ? 0 : ((recentTotal - previousTotal) / previousTotal) * 100,
         },
       });
     }
   });
 
   pledges.forEach((pledge) => {
-    const linkedPayments = transactions.filter((item) => String(item.linkedPledgeId || "") === String(pledge._id));
+    const linkedPayments = transactions.filter(
+      (item) => String(item.linkedPledgeId || "") === String(pledge._id)
+    );
     const fulfilledAmount = linkedPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const expectedAmount = Number(pledge.pledgedAmount || 0) * computePledgeElapsedRatio(pledge, now);
+    const expectedAmount =
+      Number(pledge.pledgedAmount || 0) * computePledgeElapsedRatio(pledge, now);
     if (fulfilledAmount + 0.01 >= expectedAmount) {
       return;
     }
@@ -1335,7 +1432,8 @@ async function generateGivingFollowUpSuggestions({ user, ipAddress = "", limit =
       title: draftSeed.title,
       generatedText: draft.text,
       basedOnRefs: draftSeed.basedOnRefs,
-      promptContextSummary: "Deterministic giving signals are computed first; any AI phrasing stays advisory-only and pastoral in tone.",
+      promptContextSummary:
+        "Deterministic giving signals are computed first; any AI phrasing stays advisory-only and pastoral in tone.",
       metadata: {
         fingerprint: `finance-giving:${draftSeed.subjectType}:${draftSeed.subjectId}:${draftSeed.insightKind}`,
         insightKind: draftSeed.insightKind,

@@ -29,5 +29,3 @@ const groupSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("Group", groupSchema);
-
-

@@ -23,5 +23,3 @@ const initiativeSchema = new mongoose.Schema(
 );
 
 module.exports = createScopedModel("Initiative", initiativeSchema);
-
-

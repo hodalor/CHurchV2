@@ -10,14 +10,17 @@ class OperatorConsoleProvider {
     return {
       provider: "operator_console",
       ready: Boolean(process.stdin.isTTY && process.stdout.isTTY),
-      message: process.stdin.isTTY && process.stdout.isTTY
-        ? "Operator console bridge is ready."
-        : "Operator console bridge needs an interactive terminal.",
+      message:
+        process.stdin.isTTY && process.stdout.isTTY
+          ? "Operator console bridge is ready."
+          : "Operator console bridge needs an interactive terminal.",
     };
   }
 
   async enroll(payload = {}) {
-    const subjectLabel = String(payload.label || `${payload.subjectType || "person"} ${payload.subjectId || ""}`).trim();
+    const subjectLabel = String(
+      payload.label || `${payload.subjectType || "person"} ${payload.subjectId || ""}`
+    ).trim();
     const templateRef = await this.prompt(
       [
         "",
@@ -81,7 +84,10 @@ class OperatorConsoleProvider {
       });
 
     const nextPrompt = this.promptQueue.then(runPrompt, runPrompt);
-    this.promptQueue = nextPrompt.then(() => undefined, () => undefined);
+    this.promptQueue = nextPrompt.then(
+      () => undefined,
+      () => undefined
+    );
     return nextPrompt;
   }
 
