@@ -3,10 +3,12 @@ import { FaCheck, FaMinus, FaSearch } from "react-icons/fa";
 import BulkImportModal from "../components/common/BulkImportModal";
 import ExportOptionsModal from "../components/common/ExportOptionsModal";
 import { useAppContext } from "../context/AppContext";
+import { exportMembershipApplicationPdf } from "../utils/membershipApplicationPdf";
 
 export default function MembersPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [downloadingForm, setDownloadingForm] = useState(false);
   const [memberGenderFilter, setMemberGenderFilter] = useState("all");
   const [memberHouseholdFilter, setMemberHouseholdFilter] = useState("all");
   const [memberStatusFilter, setMemberStatusFilter] = useState("all");
@@ -19,6 +21,7 @@ export default function MembersPage() {
     families,
     groups,
     ministries,
+    branding,
     memberSearch,
     setMemberSearch,
     memberMinistryFilter,
@@ -26,7 +29,25 @@ export default function MembersPage() {
     openRecordModal,
     regenerateMemberQr,
     mediaUploadState,
+    notifyError,
+    notifySuccess,
   } = useAppContext();
+
+  const handleDownloadMembershipForm = async () => {
+    if (downloadingForm) {
+      return;
+    }
+
+    setDownloadingForm(true);
+    try {
+      await exportMembershipApplicationPdf({ branding });
+      notifySuccess("Membership application form downloaded.");
+    } catch (error) {
+      notifyError(error.message || "Unable to download membership form.");
+    } finally {
+      setDownloadingForm(false);
+    }
+  };
 
   const householdOptions = useMemo(
     () =>
@@ -293,6 +314,14 @@ export default function MembersPage() {
             <option value="name_desc">Sort: Name Z-A</option>
           </select>
           <div className="toolbar-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={handleDownloadMembershipForm}
+              disabled={downloadingForm}
+            >
+              {downloadingForm ? "Preparing form..." : "Download Form"}
+            </button>
             <button type="button" className="ghost-button" onClick={() => setShowExportModal(true)}>
               Export
             </button>
